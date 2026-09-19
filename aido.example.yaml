@@ -1,0 +1,118 @@
+# AIDO Code — governed configuration for AI Dev Orchestrator (schema v1).
+# See ai-dev-orchestrator/docs/PROJECT_CONFIG.md for the full schema
+# reference, and this project's own CONTRIBUTING.md for how to use this
+# file locally.
+#
+# This is the tracked, portable template. Copy it to `aido.yaml` (already
+# in .gitignore) before running `aido validate`/`aido run` against it;
+# never commit a real aido.yaml, since state_dir/workspace paths are
+# machine-specific.
+#
+# Prepared by P13 (ai-dev-orchestrator, "découplage moteur / externalisation
+# AIDO Code") as this project's initial governed configuration. No `aido
+# run` has been executed against this file by that preparation; see
+# ROADMAP.md, "Status".
+
+schema_version: 1
+
+project:
+  id: aido-code
+  name: AIDO Code
+  workspace: .
+  # state_dir omitted on purpose: defaults deterministically to
+  # ~/.local/state/ai-dev-orchestrator/projects/aido-code/
+
+workers:
+  # Reference (never a copy) to the sibling ai-dev-orchestrator checkout's
+  # own real worker pool. Edit this path if your checkout layout differs.
+  registry: ../ai-dev-orchestrator/config/workers.yaml
+
+execution:
+  # unrestricted: consistent with the maintainer's current environment for
+  # this project (see the P13 decoupling task's own instruction). Prints a
+  # visible warning on every `aido run`; see ai-dev-orchestrator's
+  # docs/PROJECT_CONFIG.md security warning before ever changing this for
+  # a shared/untrusted environment.
+  permission_mode: unrestricted
+
+git:
+  base_branch: main
+
+mvp:
+  id: mvp-0.1
+  objective: "Ship the first usable AIDO Code frontend (M1); see MVP_SPEC.yaml for the full acceptance contract."
+  acceptance_criteria:
+    - "See MVP_SPEC.yaml for the complete, authoritative list. This field intentionally stays short; the governed WorkItems below carry the real per-WorkItem criteria."
+
+work_items:
+  - id: WI-01
+    title: "Bootstrap package and test harness"
+    required_capabilities: [development]
+    dependencies: []
+    acceptance_criteria:
+      - "A Python package (e.g. src/aido_code/) exists with pyproject.toml, installable via `pip install -e .`."
+      - "pytest is configured and runnable (`pytest -q`) against an initial, minimal placeholder test. This is the QA command every later WorkItem is also validated against."
+      - "No functional REPL/CLI/engine-client code is written in this WorkItem; bootstrap only."
+
+  - id: WI-02
+    title: "Engine client wrapper"
+    required_capabilities: [development]
+    dependencies: [WI-01]
+    acceptance_criteria:
+      - "A thin internal module wraps orchestrator.engine.OrchestratorEngine.open(...) and surfaces .validate()/.status()/.workers()/.run() to the rest of this package."
+      - "This module never constructs MVPManager/WorkerSelector/QuotaManager/a ProviderAdapter and never reads a Store/SQLite file directly; see docs/ENGINE_CONTRACT.md."
+      - "Offline tests use OrchestratorEngine.open(...)'s own provider_adapters/subprocess_runner injection seams, never a real provider/Ralph call."
+
+  - id: WI-03
+    title: "REPL minimal + /help, /exit"
+    required_capabilities: [development]
+    dependencies: [WI-02]
+    acceptance_criteria:
+      - "A REPL loop starts via `python -m aido_code` (and/or an aido-code console script) and accepts commands."
+      - "/help lists available commands."
+      - "/exit cleanly exits the REPL."
+      - "An unrecognized command prints a clear message, never a traceback."
+
+  - id: WI-04
+    title: "/status, /config, /validate"
+    required_capabilities: [development]
+    dependencies: [WI-03]
+    acceptance_criteria:
+      - "/status renders the real ProjectStatusSnapshot from the engine client (WI-02), including the NOT_INITIALIZED case."
+      - "/config renders the real ProjectSnapshot from .validate(), never a raw file dump of aido.yaml."
+      - "/validate reports success/failure from a real .validate() call, with no side effect."
+      - "Offline tests cover both an uninitialized and an initialized project."
+
+  - id: WI-05
+    title: "/workers"
+    required_capabilities: [development]
+    dependencies: [WI-04]
+    acceptance_criteria:
+      - "/workers renders the real WorkerSnapshot tuple from .workers(); enabled and disabled workers both shown."
+      - "No provider probe happens as part of /workers (probe_workers() is out of scope for M1's command set; see docs/CLI_SPEC.md)."
+      - "Offline test proves no provider adapter is ever instantiated by this command."
+
+  - id: WI-06
+    title: "/run (also project resume)"
+    required_capabilities: [development]
+    dependencies: [WI-05]
+    acceptance_criteria:
+      - "/run calls the real .run() and renders the resulting RunResult (cycles_run, work_items, events)."
+      - "Re-running /run against an already-completed project reports nothing eligible/due, without re-executing anything; proven by an offline test with a fake subprocess runner scripted to raise if called."
+      - "No separate resume command exists in this MVP; /run is documented as also being the resume path (docs/CLI_SPEC.md)."
+
+  - id: WI-07
+    title: "Frontend/engine acceptance (offline, end to end)"
+    required_capabilities: [development]
+    dependencies: [WI-06]
+    acceptance_criteria:
+      - "One offline, end-to-end test drives a fake project through /status (NOT_INITIALIZED) -> /validate -> /run (drives a fake WorkItem to completed via a scripted fake Ralph subprocess) -> /status (reflects completion) -> /exit."
+      - "The full MVP_SPEC.yaml acceptance_criteria list is satisfied; this WorkItem's own QA is the final gate for MVP 0.1."
+      - "pytest -q passes for the whole package, offline, with zero real provider/Ralph calls anywhere in the suite."
+
+qa:
+  - id: qa-tests
+    kind: unit_test
+    argv: ["pytest", "-q"]
+    timeout_seconds: 300
+    required: true

@@ -1,0 +1,46 @@
+# MVP 0.1 acceptance contract: AIDO Code, milestone M1 (minimal
+# interactive shell). See ROADMAP.md for the full milestone list and
+# docs/ENGINE_CONTRACT.md for the exact engine API this MVP consumes.
+#
+# This file states what "done" means for MVP 0.1. It does not itself
+# execute anything; the governed WorkItems that implement it live in
+# aido.example.yaml's work_items section, driven by AI Dev Orchestrator
+# (see CONTRIBUTING.md), never by a human/assistant writing code directly
+# into this repository.
+
+schema_version: 1
+
+mvp:
+  id: mvp-0.1
+  name: Minimal interactive shell
+  objective: >
+    Ship the first usable AIDO Code frontend: a package installable and
+    runnable as `python -m aido_code` (or an `aido-code` console script),
+    presenting a REPL with /help, /status, /workers, /config, /validate,
+    /run, /exit, each backed by a real orchestrator.engine.
+    OrchestratorEngine call, never a second, duplicated orchestration
+    implementation.
+
+acceptance_criteria:
+  - "A package exists (installable via pip, e.g. `pip install -e .`) exposing an entry point runnable as `python -m aido_code` and/or an `aido-code` console script."
+  - "Running it in a directory containing a valid aido.yaml connects to that project via orchestrator.engine.OrchestratorEngine.open(...), never a hand-rolled reimplementation of ProjectConfig loading."
+  - "Running it in a directory with no aido.yaml, or an invalid one, prints a clear error (via EngineConfigError) and exits cleanly, never a raw traceback."
+  - "/help lists the available commands."
+  - "/status renders OrchestratorEngine.status()'s real ProjectStatusSnapshot, including the NOT_INITIALIZED case."
+  - "/workers renders OrchestratorEngine.workers()'s real WorkerSnapshot tuple; enabled and disabled workers both shown, never just the enabled ones silently."
+  - "/config renders OrchestratorEngine.validate()'s real ProjectSnapshot, never a raw dump of the aido.yaml file contents."
+  - "/validate calls OrchestratorEngine.validate() and reports success/failure without side effects."
+  - "/run calls OrchestratorEngine.run() and renders the real RunResult (cycles_run, work_items, events); this is also how a project resumes, and no separate resume command exists in M1."
+  - "/exit cleanly exits the REPL."
+  - "No command in this MVP ever constructs MVPManager, WorkerSelector, QuotaManager, a ProviderAdapter, or reads a Store/SQLite file directly; verified by a structural test analogous to ai-dev-orchestrator's own test_cli.py::TestStatus::test_status_never_instantiates_any_provider_adapter."
+  - "All tests are offline: fake provider adapters and a fake/scripted Ralph subprocess runner passed through OrchestratorEngine.open()'s own provider_adapters/subprocess_runner seams, never a real Claude/Codex/Vibe/DeepSeek/Kimi/Ralph invocation."
+  - "No aido run (the orchestrator's own existing CLI) and no OrchestratorEngine.run() call against a real provider happens as part of building or testing this MVP; only as part of this project's own later, real governed development, executed by AI Dev Orchestrator itself."
+
+out_of_scope_for_this_mvp:
+  - "Sessions, /resume, /new, --resume, -r, --continue, -c (M2)."
+  - "Natural-language piloting (M3)."
+  - "Non-interactive mode, -p (M4)."
+  - "json/stream-json structured output (M5)."
+  - "aido doctor (M6)."
+  - "Real-time timeline rendering of engine events (M7)."
+  - "Claiming the `aido` command name (M8)."
