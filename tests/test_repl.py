@@ -87,6 +87,18 @@ class TestEntryPoints:
         assert "Unknown command: '/bogus'" in result.stdout
         assert "Traceback" not in result.stderr
 
+    def test_python_dash_m_aido_code_reports_missing_config_cleanly(self, tmp_path: Path) -> None:
+        result = subprocess.run(
+            [sys.executable, "-m", "aido_code"],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert result.returncode == 1
+        assert "Error:" in result.stderr
+        assert "Traceback" not in result.stderr
+
 
 class TestStatus:
     def test_uninitialized_project_reports_not_initialized(self, tmp_path: Path) -> None:
