@@ -14,15 +14,15 @@ listed here. This roadmap starts at M1.
 
 ## Status
 
-`PREPARED`: roadmap, architecture, acceptance spec, and governed
-configuration exist; no functional code has been written yet. See
-`MVP_SPEC.yaml` for MVP 0.1's exact acceptance contract (M1) and
-`aido.example.yaml`'s `work_items` for the governed WorkItems that will
-implement it.
+`M1 DONE`: WI-01 through WI-07 (`aido.example.yaml`'s governed
+WorkItems) were completed by AI Dev Orchestrator's real WorkItem Flow —
+see `MVP_SPEC.yaml` for the acceptance contract they satisfy and
+`docs/M1_REFERENCE_RUN.md` for the full factual record of that run
+(including a real engine defect it found and its subsequent fix).
 
 | Milestone | Status |
 |---|---|
-| M1 — Minimal interactive shell | `PLANNED` (MVP 0.1's scope) |
+| M1 — Minimal interactive shell | `DONE` (see `docs/M1_REFERENCE_RUN.md`) |
 | M2 — Sessions and resume | `PLANNED` (WorkItems drafted, not scheduled) |
 | M3 — Natural-language piloting | `À VOTER` |
 | M4 — Non-interactive mode | `À VOTER` |

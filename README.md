@@ -2,10 +2,15 @@
 
 The interactive terminal frontend for [AI Dev Orchestrator](https://github.com/yannickameur/ai-dev-orchestrator).
 
-**Status: `PREPARED`, development not started.** This repository currently
-contains the project's roadmap, architecture, acceptance spec, and
-governed configuration only. No functional CLI code exists yet; see
-"How this project gets built" below.
+**Status: M1 `DONE`.** WI-01 through WI-07 were completed by AI Dev
+Orchestrator's real, governed WorkItem Flow (never by a human/assistant
+writing code directly here; see "How this project gets built" below): a
+minimal interactive shell exists, installable and runnable, with 32
+offline tests passing. See [`docs/M1_REFERENCE_RUN.md`](docs/M1_REFERENCE_RUN.md)
+for the full factual record of that run, including a real engine defect
+it found and that was fixed before this project was promoted to a
+second real reference project. M2 (sessions/resume) and later are
+`PLANNED`, not started.
 
 ## What AIDO Code is
 
@@ -46,6 +51,10 @@ P13, for the full decoupling rationale.
   surface, milestone by milestone.
 - [`MVP_SPEC.yaml`](MVP_SPEC.yaml): the acceptance contract for MVP 0.1
   (M1, a minimal interactive shell).
+- [`docs/M1_REFERENCE_RUN.md`](docs/M1_REFERENCE_RUN.md): the factual
+  record of M1's real, governed build — including a real engine defect
+  it found and its fix.
+- [`CONTRIBUTORS.md`](CONTRIBUTORS.md): who/what actually produced M1.
 
 ## How this project gets built
 
@@ -54,6 +63,12 @@ repository. AI Dev Orchestrator governs its own development the same way
 it governed Morpion Web 3D: DEV A implements, DEV B reviews and
 corrects, deterministic QA decides PASS/FAIL, a governed merge lands the
 result. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+## Contributors
+
+See [`CONTRIBUTORS.md`](CONTRIBUTORS.md): who/what actually produced
+M1's real, governed commits (workers `Alice`/`Victor`, never a
+provider/vendor name), and the project's own maintainer.
 
 ## Relationship to `ai-dev-orchestrator`
 
