@@ -174,6 +174,7 @@ class TestRun:
         assert "cycles_run: 1" in transcript
         assert "all_terminal: True" in transcript
         assert "wi-1: completed" in transcript
+        assert "work_item.completed: work_item=wi-1" in transcript
         assert len(runner.calls) == 2
 
     def test_rerunning_an_already_completed_project_does_nothing_and_never_re_executes(
@@ -194,7 +195,9 @@ class TestRun:
         first_result = client.run()
         assert first_result.all_terminal is True
 
-        never_called_runner = ScriptedRalphRunner([])
+        async def never_called_runner(*args: object, **kwargs: object) -> tuple[int, bytes, bytes]:
+            raise AssertionError("completed projects must not invoke the subprocess runner")
+
         transcript = _run(
             "/run\n/exit\n",
             config_path=str(config_path),
@@ -204,7 +207,6 @@ class TestRun:
         assert "Traceback" not in transcript
         assert "all_terminal: True" in transcript
         assert "wi-1: completed" in transcript
-        assert never_called_runner.calls == []
 
     def test_missing_aido_yaml_prints_clear_error_not_a_traceback(self, tmp_path: Path) -> None:
         transcript = _run("/run\n/exit\n", config_path=str(tmp_path / "does-not-exist.yaml"))
