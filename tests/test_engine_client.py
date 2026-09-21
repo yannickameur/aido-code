@@ -158,10 +158,16 @@ def _write_config(tmp_path: Path, *, registry: str = REGISTRY_TWO_WORKERS) -> Pa
     return config_path
 
 
+def _open_offline(config_path: Path) -> EngineClient:
+    return EngineClient.open(
+        str(config_path), provider_adapters={"anthropic": _NeverCalledAdapter()},
+    )
+
+
 class TestOpen:
     def test_open_returns_engine_client(self, tmp_path: Path) -> None:
         config_path = _write_config(tmp_path)
-        client = EngineClient.open(str(config_path))
+        client = _open_offline(config_path)
         assert isinstance(client, EngineClient)
 
     def test_open_raises_engine_config_error_for_missing_file(self, tmp_path: Path) -> None:
@@ -171,7 +177,7 @@ class TestOpen:
     def test_open_raises_engine_config_error_for_bad_worker_registry(self, tmp_path: Path) -> None:
         config_path = _write_config(tmp_path, registry="workers:\n  - worker_id: alice\n")
         with pytest.raises(EngineConfigError):
-            EngineClient.open(str(config_path))
+            _open_offline(config_path)
 
 
 class TestValidate:
