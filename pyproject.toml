@@ -9,6 +9,9 @@ description = "AIDO Code: the interactive terminal frontend for AI Dev Orchestra
 readme = "README.md"
 requires-python = ">=3.10"
 
+[project.scripts]
+aido-code = "aido_code.__main__:main"
+
 [project.optional-dependencies]
 test = ["pytest>=7"]
 
