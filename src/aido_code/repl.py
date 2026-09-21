@@ -1,9 +1,9 @@
 """Minimal REPL loop for AIDO Code.
 
-WI-04 scope: `/help`, `/exit`, `/status`, `/config`, `/validate`, and a
-clear message (never a traceback) for anything unrecognized or for any
-engine/config error. `/workers` and `/run` are later WorkItems; see
-docs/CLI_SPEC.md and aido.yaml's work_items.
+WI-05 scope: `/help`, `/exit`, `/status`, `/config`, `/validate`,
+`/workers`, and a clear message (never a traceback) for anything
+unrecognized or for any engine/config error. `/run` is a later
+WorkItem; see docs/CLI_SPEC.md and aido.yaml's work_items.
 """
 
 from __future__ import annotations
@@ -15,11 +15,13 @@ from aido_code.engine_client import (
     EngineError,
     ProjectSnapshot,
     ProjectStatusSnapshot,
+    WorkerSnapshot,
 )
 
 COMMANDS: dict[str, str] = {
     "/help": "List available commands.",
     "/status": "Show the project's real, persisted status.",
+    "/workers": "List configured workers (enabled and disabled), no provider probe.",
     "/config": "Show the loaded aido.yaml's validated configuration.",
     "/validate": "Validate aido.yaml and its worker registry.",
     "/exit": "Exit the REPL.",
@@ -87,6 +89,24 @@ def format_status(snapshot: ProjectStatusSnapshot) -> str:
     return "\n".join(lines)
 
 
+def format_workers(snapshots: tuple[WorkerSnapshot, ...]) -> str:
+    if not snapshots:
+        return "(no workers configured)"
+
+    lines = []
+    for worker in snapshots:
+        state = "enabled" if worker.enabled else "disabled"
+        line = (
+            f"  {worker.worker_id} ({worker.display_name}): {state} "
+            f"provider={worker.provider} backend={worker.backend} priority={worker.priority}"
+        )
+        if worker.model:
+            line += f" model={worker.model}"
+        lines.append(line)
+        lines.append(f"      capabilities: {', '.join(worker.capabilities) or '(none)'}")
+    return "\n".join(lines)
+
+
 def _run_status(config_path: str) -> str:
     try:
         with EngineClient.open(config_path) as client:
@@ -114,6 +134,15 @@ def _run_validate(config_path: str) -> str:
     return "Configuration is valid."
 
 
+def _run_workers(config_path: str) -> str:
+    try:
+        with EngineClient.open(config_path) as client:
+            snapshots = client.workers()
+    except EngineError as exc:
+        return f"Error: {exc}"
+    return format_workers(snapshots)
+
+
 def run(
     input_stream: TextIO,
     output_stream: TextIO,
@@ -139,6 +168,9 @@ def run(
             continue
         if command == "/status":
             output_stream.write(_run_status(config_path) + "\n")
+            continue
+        if command == "/workers":
+            output_stream.write(_run_workers(config_path) + "\n")
             continue
         if command == "/config":
             output_stream.write(_run_config(config_path) + "\n")

@@ -40,6 +40,28 @@ REGISTRY_TWO_WORKERS = dedent(
 )
 
 
+REGISTRY_ENABLED_AND_DISABLED = dedent(
+    """
+    workers:
+      - worker_id: alice
+        display_name: Alice
+        provider: anthropic
+        backend: claude_code
+        capabilities: [development]
+        profiles:
+          standard: {quality_tier: STANDARD, model: sonnet}
+      - worker_id: bob
+        display_name: Bob
+        provider: anthropic
+        backend: claude_code
+        capabilities: [development]
+        enabled: false
+        profiles:
+          standard: {quality_tier: STANDARD, model: sonnet}
+    """
+)
+
+
 class NeverCalledAdapter(ProviderAdapter):
     async def probe(self) -> ProviderState:
         raise AssertionError("provider probe must never be called by this wrapper call")

@@ -1,6 +1,7 @@
 """Tests for aido_code.repl: the minimal REPL loop, `/help`/`/exit` (WI-03)
-plus the engine-backed `/status`, `/config`, `/validate` commands (WI-04).
-Offline only; see tests/conftest.py and CONTRIBUTING.md.
+plus the engine-backed `/status`, `/config`, `/validate`, `/workers`
+commands (WI-04, WI-05). Offline only; see tests/conftest.py and
+CONTRIBUTING.md.
 """
 
 from __future__ import annotations
@@ -10,9 +11,17 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from aido_code.engine_client import EngineClient
 from aido_code.repl import DEFAULT_CONFIG_PATH, format_help, run
-from tests.conftest import FakeAdapter, ScriptedRalphRunner, commit_action, write_config
+from tests.conftest import (
+    REGISTRY_ENABLED_AND_DISABLED,
+    FakeAdapter,
+    ScriptedRalphRunner,
+    commit_action,
+    write_config,
+)
 
 
 def _run(commands: str, *, config_path: str = DEFAULT_CONFIG_PATH) -> str:
@@ -131,4 +140,35 @@ class TestValidate:
     def test_missing_aido_yaml_reports_failure_not_a_traceback(self, tmp_path: Path) -> None:
         transcript = _run("/validate\n/exit\n", config_path=str(tmp_path / "does-not-exist.yaml"))
         assert "Validation failed" in transcript
+
+
+class TestWorkers:
+    def test_lists_enabled_and_disabled_workers(self, tmp_path: Path) -> None:
+        config_path = write_config(tmp_path, registry=REGISTRY_ENABLED_AND_DISABLED)
+        transcript = _run("/workers\n/exit\n", config_path=str(config_path))
+        assert "alice" in transcript
+        assert "enabled" in transcript
+        assert "bob" in transcript
+        assert "disabled" in transcript
+        assert "Traceback" not in transcript
+
+    def test_missing_aido_yaml_prints_clear_error_not_a_traceback(self, tmp_path: Path) -> None:
+        transcript = _run("/workers\n/exit\n", config_path=str(tmp_path / "does-not-exist.yaml"))
+        assert "Error:" in transcript
+        assert "Traceback" not in transcript
+
+    def test_no_provider_adapter_is_ever_instantiated(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import orchestrator.engine as engine_module
+
+        def _fail_resolve(providers: object) -> None:
+            raise AssertionError("provider adapters must never be resolved by /workers")
+
+        monkeypatch.setattr(engine_module, "resolve_provider_adapters", _fail_resolve)
+
+        config_path = write_config(tmp_path, registry=REGISTRY_ENABLED_AND_DISABLED)
+        transcript = _run("/workers\n/exit\n", config_path=str(config_path))
+        assert "alice" in transcript
+        assert "Traceback" not in transcript
         assert "Traceback" not in transcript
