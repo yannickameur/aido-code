@@ -171,4 +171,3 @@ class TestWorkers:
         transcript = _run("/workers\n/exit\n", config_path=str(config_path))
         assert "alice" in transcript
         assert "Traceback" not in transcript
-        assert "Traceback" not in transcript
