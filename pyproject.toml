@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "AIDO Code: the interactive terminal frontend for AI Dev Orchestrator"
 readme = "README.md"
 requires-python = ">=3.10"
+dependencies = ["orchestrator>=0.1.1"]
 
 [project.scripts]
 aido-code = "aido_code.__main__:main"
