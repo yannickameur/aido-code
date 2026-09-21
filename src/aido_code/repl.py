@@ -1,9 +1,10 @@
 """Minimal REPL loop for AIDO Code.
 
-WI-05 scope: `/help`, `/exit`, `/status`, `/config`, `/validate`,
-`/workers`, and a clear message (never a traceback) for anything
-unrecognized or for any engine/config error. `/run` is a later
-WorkItem; see docs/CLI_SPEC.md and aido.yaml's work_items.
+WI-06 scope: `/help`, `/exit`, `/status`, `/config`, `/validate`,
+`/workers`, `/run`, and a clear message (never a traceback) for anything
+unrecognized or for any engine/config error. `/run` is also how a
+project resumes: there is no separate resume command in this MVP; see
+docs/CLI_SPEC.md and docs/ENGINE_CONTRACT.md ("`.run()` is also resume").
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from aido_code.engine_client import (
     EngineError,
     ProjectSnapshot,
     ProjectStatusSnapshot,
+    RunResult,
     WorkerSnapshot,
 )
 
@@ -24,6 +26,7 @@ COMMANDS: dict[str, str] = {
     "/workers": "List configured workers (enabled and disabled), no provider probe.",
     "/config": "Show the loaded aido.yaml's validated configuration.",
     "/validate": "Validate aido.yaml and its worker registry.",
+    "/run": "Start or resume the project (drives the engine to completion or WAITING).",
     "/exit": "Exit the REPL.",
 }
 
@@ -89,6 +92,31 @@ def format_status(snapshot: ProjectStatusSnapshot) -> str:
     return "\n".join(lines)
 
 
+def format_run(result: RunResult) -> str:
+    lines = [
+        f"cycles_run: {result.cycles_run}",
+        f"all_terminal: {result.all_terminal}",
+        f"reached_max_cycles: {result.reached_max_cycles}",
+    ]
+
+    if result.work_items:
+        lines.append("")
+        lines.append("work items:")
+        for work_item in result.work_items:
+            line = f"  {work_item.work_item_id}: {work_item.status}"
+            if work_item.blocked_reason:
+                line += f" (blocked_reason={work_item.blocked_reason})"
+            lines.append(line)
+
+    if result.events:
+        lines.append("")
+        lines.append("events:")
+        for event in result.events:
+            lines.append(f"  {event.kind}: work_item={event.work_item_id}")
+
+    return "\n".join(lines)
+
+
 def format_workers(snapshots: tuple[WorkerSnapshot, ...]) -> str:
     if not snapshots:
         return "(no workers configured)"
@@ -134,6 +162,22 @@ def _run_validate(config_path: str) -> str:
     return "Configuration is valid."
 
 
+def _run_run(
+    config_path: str,
+    *,
+    provider_adapters: dict[str, object] | None = None,
+    subprocess_runner: object | None = None,
+) -> str:
+    try:
+        with EngineClient.open(
+            config_path, provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
+        ) as client:
+            result = client.run()
+    except EngineError as exc:
+        return f"Error: {exc}"
+    return format_run(result)
+
+
 def _run_workers(config_path: str) -> str:
     try:
         with EngineClient.open(config_path) as client:
@@ -149,8 +193,16 @@ def run(
     *,
     prompt: str = "aido> ",
     config_path: str = DEFAULT_CONFIG_PATH,
+    provider_adapters: dict[str, object] | None = None,
+    subprocess_runner: object | None = None,
 ) -> None:
-    """Read commands from ``input_stream`` until ``/exit`` or EOF."""
+    """Read commands from ``input_stream`` until ``/exit`` or EOF.
+
+    ``provider_adapters``/``subprocess_runner`` are forwarded to
+    ``/run``'s ``EngineClient.open()`` call; same test-only seams as
+    ``EngineClient.open()`` itself (see ``engine_client.py``), production
+    callers (``__main__.py``) never set them.
+    """
     while True:
         output_stream.write(prompt)
         output_stream.flush()
@@ -177,6 +229,16 @@ def run(
             continue
         if command == "/validate":
             output_stream.write(_run_validate(config_path) + "\n")
+            continue
+        if command == "/run":
+            output_stream.write(
+                _run_run(
+                    config_path,
+                    provider_adapters=provider_adapters,
+                    subprocess_runner=subprocess_runner,
+                )
+                + "\n"
+            )
             continue
 
         output_stream.write(f"Unknown command: {command!r}. Type /help for a list of commands.\n")

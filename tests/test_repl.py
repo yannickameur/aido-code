@@ -1,7 +1,7 @@
 """Tests for aido_code.repl: the minimal REPL loop, `/help`/`/exit` (WI-03)
-plus the engine-backed `/status`, `/config`, `/validate`, `/workers`
-commands (WI-04, WI-05). Offline only; see tests/conftest.py and
-CONTRIBUTING.md.
+plus the engine-backed `/status`, `/config`, `/validate`, `/workers`,
+`/run` commands (WI-04, WI-05, WI-06). Offline only; see tests/conftest.py
+and CONTRIBUTING.md.
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ import io
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -24,9 +25,21 @@ from tests.conftest import (
 )
 
 
-def _run(commands: str, *, config_path: str = DEFAULT_CONFIG_PATH) -> str:
+def _run(
+    commands: str,
+    *,
+    config_path: str = DEFAULT_CONFIG_PATH,
+    provider_adapters: dict[str, Any] | None = None,
+    subprocess_runner: object | None = None,
+) -> str:
     output = io.StringIO()
-    run(io.StringIO(commands), output, config_path=config_path)
+    run(
+        io.StringIO(commands),
+        output,
+        config_path=config_path,
+        provider_adapters=provider_adapters,
+        subprocess_runner=subprocess_runner,
+    )
     return output.getvalue()
 
 
@@ -140,6 +153,63 @@ class TestValidate:
     def test_missing_aido_yaml_reports_failure_not_a_traceback(self, tmp_path: Path) -> None:
         transcript = _run("/validate\n/exit\n", config_path=str(tmp_path / "does-not-exist.yaml"))
         assert "Validation failed" in transcript
+
+
+class TestRun:
+    def test_run_calls_the_real_engine_and_renders_the_run_result(self, tmp_path: Path) -> None:
+        config_path = write_config(tmp_path)
+        runner = ScriptedRalphRunner(
+            [
+                {"topic": "work.completed", "mutate": commit_action("feature.py", "x = 1\n", "DEV A")},
+                {"topic": "work.completed"},
+            ]
+        )
+        transcript = _run(
+            "/run\n/exit\n",
+            config_path=str(config_path),
+            provider_adapters={"anthropic": FakeAdapter(available=True)},
+            subprocess_runner=runner,
+        )
+        assert "Traceback" not in transcript
+        assert "cycles_run: 1" in transcript
+        assert "all_terminal: True" in transcript
+        assert "wi-1: completed" in transcript
+        assert len(runner.calls) == 2
+
+    def test_rerunning_an_already_completed_project_does_nothing_and_never_re_executes(
+        self, tmp_path: Path
+    ) -> None:
+        config_path = write_config(tmp_path)
+        first_runner = ScriptedRalphRunner(
+            [
+                {"topic": "work.completed", "mutate": commit_action("feature.py", "x = 1\n", "DEV A")},
+                {"topic": "work.completed"},
+            ]
+        )
+        client = EngineClient.open(
+            str(config_path),
+            provider_adapters={"anthropic": FakeAdapter(available=True)},
+            subprocess_runner=first_runner,
+        )
+        first_result = client.run()
+        assert first_result.all_terminal is True
+
+        never_called_runner = ScriptedRalphRunner([])
+        transcript = _run(
+            "/run\n/exit\n",
+            config_path=str(config_path),
+            provider_adapters={"anthropic": FakeAdapter(available=True)},
+            subprocess_runner=never_called_runner,
+        )
+        assert "Traceback" not in transcript
+        assert "all_terminal: True" in transcript
+        assert "wi-1: completed" in transcript
+        assert never_called_runner.calls == []
+
+    def test_missing_aido_yaml_prints_clear_error_not_a_traceback(self, tmp_path: Path) -> None:
+        transcript = _run("/run\n/exit\n", config_path=str(tmp_path / "does-not-exist.yaml"))
+        assert "Error:" in transcript
+        assert "Traceback" not in transcript
 
 
 class TestWorkers:
