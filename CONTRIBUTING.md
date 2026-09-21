@@ -47,8 +47,41 @@ that one path.
   Authentication stays entirely with the provider CLI/environment,
   exactly like `ai-dev-orchestrator` itself.
 - No `aido run` against this repository as part of documentation/spec
-  work (like the one that produced this file); only as part of this
-  project's own real, later governed development.
+  work (like the one that produced this file). This does not restrict
+  real governed development itself: once WorkItems are actually
+  scheduled, AI Dev Orchestrator's own `aido run` driving DEV A, DEV B,
+  QA, and governed merge is expected and required to use real
+  workers/providers. What must always stay offline is this project's own
+  pytest suite: it must never call a real Claude/Codex/Vibe/DeepSeek/
+  Kimi/Ralph provider, and no real provider consumption may ever come
+  from this project's own QA (`pytest -q`) either; see `MVP_SPEC.yaml`.
+
+## Local development bootstrap (engine dependency)
+
+This repository is a separate project from `ai-dev-orchestrator` but
+depends directly on `orchestrator.engine.OrchestratorEngine` at runtime
+(see `docs/ENGINE_CONTRACT.md`). For the current development phase, the
+engine is a sibling Git checkout, not yet a published package:
+
+1. Create/use a Python environment suited to this work (e.g. a venv).
+2. Install the engine from the sibling checkout in editable mode:
+   ```bash
+   python -m pip install -e ../ai-dev-orchestrator
+   ```
+   (adjust the path if your checkout layout differs; this installs the
+   `orchestrator` distribution and makes `orchestrator.engine` importable).
+3. Once WI-01 creates this project's own package, install it too:
+   ```bash
+   python -m pip install -e .
+   ```
+
+**Never add a machine-specific path dependency to a tracked
+`pyproject.toml`** — no `file:///home/...`, no `../ai-dev-orchestrator`,
+no local path of any kind committed as a dependency. The sibling checkout
+above is only today's development convention, not something the shipped
+product may depend on. See `ROADMAP.md`, "M8", for the packaging/
+distribution contract this must resolve into before this project claims
+the `aido` command name.
 
 ## Questions about the engine itself
 

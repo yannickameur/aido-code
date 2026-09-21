@@ -130,6 +130,20 @@ claims the `aido` binary name (`python -m aido_code`/`aido-code` instead).
 The orchestrator retiring or renaming its own console script is a
 separate decision made in that project, not here.
 
+**Packaging requirement, gating this milestone**: today's development
+convention of two sibling Git checkouts with `pip install -e
+../ai-dev-orchestrator` (see `CONTRIBUTING.md`) is a development-only
+convenience, never something the shipped product may require. Before
+this project claims the `aido` command, there must be a stable
+distribution/versioning contract between `aido-code` and
+`ai-dev-orchestrator` that lets the final product be installed without
+manually managing two sibling Git checkouts. The exact mechanism is not
+designed yet (candidates to evaluate at cutover time include: a
+publishable engine package, a versioned dependency, a common
+distribution, or another standard Python packaging mechanism); per
+KISS/YAGNI, this is documented now as a requirement, not built now, since
+M1 does not need it.
+
 ## M9+
 
 Background jobs, attach, logs, stop, respawn, MCP, hooks, plugins, a

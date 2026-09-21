@@ -34,7 +34,7 @@ acceptance_criteria:
   - "/exit cleanly exits the REPL."
   - "No command in this MVP ever constructs MVPManager, WorkerSelector, QuotaManager, a ProviderAdapter, or reads a Store/SQLite file directly; verified by a structural test analogous to ai-dev-orchestrator's own test_cli.py::TestStatus::test_status_never_instantiates_any_provider_adapter."
   - "All tests are offline: fake provider adapters and a fake/scripted Ralph subprocess runner passed through OrchestratorEngine.open()'s own provider_adapters/subprocess_runner seams, never a real Claude/Codex/Vibe/DeepSeek/Kimi/Ralph invocation."
-  - "No aido run (the orchestrator's own existing CLI) and no OrchestratorEngine.run() call against a real provider happens as part of building or testing this MVP; only as part of this project's own later, real governed development, executed by AI Dev Orchestrator itself."
+  - "AI Dev Orchestrator's own governed process that builds this MVP (DEV A, DEV B, deterministic QA, governed merge) is expected and required to use its real `aido run` / `OrchestratorEngine.run()` against real workers/providers; that external build process is not restricted by this criterion. What this criterion restricts is this MVP's own pytest suite: no test in it ever performs a real Claude/Codex/Vibe/DeepSeek/Kimi/Ralph provider call, and no real provider consumption ever originates from this MVP's own QA (`qa-tests`/`pytest -q`) either; tests of `/run` inject fake provider adapters and a fake/scripted Ralph subprocess runner through OrchestratorEngine.open()'s own provider_adapters/subprocess_runner seams instead."
 
 out_of_scope_for_this_mvp:
   - "Sessions, /resume, /new, --resume, -r, --continue, -c (M2)."
