@@ -18,7 +18,8 @@ records — nothing here is inferred or aspirational.
 - AI Dev Orchestrator worker (`anthropic`/`claude_code`).
 - DEV A for every WorkItem in M1 (WI-01 through WI-07): first
   implementation of each WorkItem's acceptance criteria.
-- Also produced the DEV FIX commit for WI-02's one rework cycle (see
+- Also performed the DEV FIX execution for WI-02, which changed the
+  execution environment without producing a Git commit (see
   `docs/M1_REFERENCE_RUN.md`).
 
 ## Victor

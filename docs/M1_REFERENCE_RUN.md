@@ -1,12 +1,13 @@
 # M1 reference run
 
-A factual record of the real, governed build of MVP 0.1 (M1) — the first
-real development this project has ever had, and the first real,
-end-to-end proof that AI Dev Orchestrator's own governed WorkItem Flow
-can build a genuinely separate, external product. This document does not
-hide anything found during that run, including a real engine defect —
-that defect, and its fix, are themselves part of the value this run
-produced.
+A factual record of the real, governed build of MVP 0.1 (M1) — this
+project's first real development. AIDO Code is the second real reference
+project built by AI Dev Orchestrator, after Morpion Web 3D, and its first
+substantial self-dogfooding case: the orchestrator built its own
+independent terminal frontend through the governed WorkItem Flow. This
+document does not hide anything found during that run, including a real
+engine defect — that defect, and its fix, are themselves part of the
+value this run produced.
 
 ## What ran
 
