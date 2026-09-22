@@ -217,19 +217,30 @@ claims the `aido` binary name (`python -m aido_code`/`aido-code` instead).
 The orchestrator retiring or renaming its own console script is a
 separate decision made in that project, not here.
 
-**Packaging requirement, gating this milestone**: today's development
-convention of two sibling Git checkouts with `pip install -e
-../ai-dev-orchestrator` (see `CONTRIBUTING.md`) is a development-only
-convenience, never something the shipped product may require. Before
-this project claims the `aido` command, there must be a stable
-distribution/versioning contract between `aido-code` and
-`ai-dev-orchestrator` that lets the final product be installed without
-manually managing two sibling Git checkouts. The exact mechanism is not
-designed yet (candidates to evaluate at cutover time include: a
-publishable engine package, a versioned dependency, a common
-distribution, or another standard Python packaging mechanism); per
-KISS/YAGNI, this is documented now as a requirement, not built now, since
-M1 does not need it.
+**Packaging requirement, gating this milestone** — status as of M1.1:
+
+- `RESOLVED`: the engine has a unique, unambiguous PyPI distribution
+  name (`ai-dev-orchestrator`, never the third-party-owned
+  `orchestrator`); this project declares it as a real dependency
+  (`ai-dev-orchestrator>=0.1.2`); and automatic installation from local
+  wheels was proven end to end — `pip install --no-index --find-links
+  <wheelhouse> aido-code` in a fully clean venv (no sibling checkout, no
+  prior editable install of either package) installed
+  `ai-dev-orchestrator` automatically as a transitive dependency, and
+  `aido-code`'s own commands (including `/status --probe`) worked
+  correctly against it, all with zero `orchestrator` (third-party)
+  distribution ever present. See `docs/M1_1_REFERENCE_RUN.md`.
+- `NOT YET RESOLVED`: no public distribution/versioning channel exists
+  (no PyPI publish, no Trusted Publishing, no tag/release for either
+  package — a deliberate scope boundary of M1.1, a separate human
+  decision); the `aido` binary name cutover itself has not happened;
+  and the still-open `.init()` gate in `docs/ENGINE_CONTRACT.md`
+  ("What this contract does not give AIDO Code (yet)") is unaffected by
+  this work.
+- Today's development convention of two sibling Git checkouts with
+  `pip install -e ../ai-dev-orchestrator` (see `CONTRIBUTING.md`)
+  remains the local dev-loop convenience for now; a real, publishable
+  install path is proven above but not yet the default onboarding path.
 
 ## M9+
 
