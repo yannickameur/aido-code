@@ -5,6 +5,13 @@ WI-06 scope: `/help`, `/exit`, `/status`, `/config`, `/validate`,
 unrecognized or for any engine/config error. `/run` is also how a
 project resumes: there is no separate resume command in this MVP; see
 docs/CLI_SPEC.md and docs/ENGINE_CONTRACT.md ("`.run()` is also resume").
+
+WI-M1.1-03 extends `/status`/`/workers` with an explicit `--probe`
+opt-in (see docs/CLI_SPEC.md, "M1.1"): `/status` (no flags) now also
+renders the full worker list, still with zero provider probes; `--probe`
+on either command is the only thing that ever calls
+`EngineClient.probe_workers()`, and both share the exact same
+`format_workers()` rendering path (see `_format_workers_section()`).
 """
 
 from __future__ import annotations
@@ -16,14 +23,17 @@ from aido_code.engine_client import (
     EngineError,
     ProjectSnapshot,
     ProjectStatusSnapshot,
+    ProviderSnapshot,
     RunResult,
     WorkerSnapshot,
 )
 
 COMMANDS: dict[str, str] = {
     "/help": "List available commands.",
-    "/status": "Show the project's real, persisted status.",
+    "/status": "Show the project's real, persisted status, plus the full worker list.",
+    "/status --probe": "Same as /status, plus one real provider probe of each worker's state.",
     "/workers": "List configured workers (enabled and disabled), no provider probe.",
+    "/workers --probe": "Same as /workers, plus one real provider probe of each worker's state.",
     "/config": "Show the loaded aido.yaml's validated configuration.",
     "/validate": "Validate aido.yaml and its worker registry.",
     "/run": "Start or resume the project (drives the engine to completion or WAITING).",
@@ -117,7 +127,35 @@ def format_run(result: RunResult) -> str:
     return "\n".join(lines)
 
 
-def format_workers(snapshots: tuple[WorkerSnapshot, ...]) -> str:
+def _worker_probe_state(worker: WorkerSnapshot, provider_states: dict[str, ProviderSnapshot]) -> str:
+    """Never fabricates a per-worker state: disabled workers are never
+    probed (``probe_workers()`` only probes enabled workers' providers),
+    and workers sharing one provider honestly share that provider's own
+    observed state."""
+    if not worker.enabled:
+        return "disabled"
+    state = provider_states.get(worker.provider)
+    if state is None:
+        return "unknown"
+    if state.available:
+        return "available"
+    if state.reason.startswith("probe_error"):
+        return state.reason
+    if state.reason == "quota_exhausted":
+        return "quota"
+    if state.reason in ("auth_error", "provider_error"):
+        return f"unavailable ({state.reason})"
+    return "unknown"
+
+
+def format_workers(
+    snapshots: tuple[WorkerSnapshot, ...],
+    provider_states: dict[str, ProviderSnapshot] | None = None,
+) -> str:
+    """Renders the static worker list; with ``provider_states`` (from
+    ``probe_workers()``, keyed by provider) also renders each worker's
+    real observable state. The single rendering path shared by
+    `/status --probe` and `/workers --probe` (see `_format_workers_section()`)."""
     if not snapshots:
         return "(no workers configured)"
 
@@ -130,18 +168,45 @@ def format_workers(snapshots: tuple[WorkerSnapshot, ...]) -> str:
         )
         if worker.model:
             line += f" model={worker.model}"
+        if provider_states is not None:
+            line += f" probe={_worker_probe_state(worker, provider_states)}"
         lines.append(line)
         lines.append(f"      capabilities: {', '.join(worker.capabilities) or '(none)'}")
     return "\n".join(lines)
 
 
-def _run_status(config_path: str) -> str:
+def _format_workers_section(
+    workers: tuple[WorkerSnapshot, ...], providers: tuple[ProviderSnapshot, ...] | None
+) -> str:
+    """The one probe/rendering code path `/status --probe` and
+    `/workers --probe` both call: `providers=None` renders the static
+    view, otherwise it maps `probe_workers()`'s own ``ProviderSnapshot``
+    tuple onto the workers that use each provider."""
+    if providers is None:
+        return format_workers(workers)
+    provider_states = {snapshot.provider: snapshot for snapshot in providers}
+    return format_workers(workers, provider_states)
+
+
+def _run_status(
+    config_path: str,
+    *,
+    probe: bool = False,
+    provider_adapters: dict[str, object] | None = None,
+    subprocess_runner: object | None = None,
+) -> str:
     try:
-        with EngineClient.open(config_path) as client:
+        with EngineClient.open(
+            config_path, provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
+        ) as client:
             snapshot = client.status()
+            workers = client.workers()
+            providers = client.probe_workers() if probe else None
     except EngineError as exc:
         return f"Error: {exc}"
-    return format_status(snapshot)
+    return "\n\n".join(
+        [format_status(snapshot), "workers:", _format_workers_section(workers, providers)]
+    )
 
 
 def _run_config(config_path: str) -> str:
@@ -178,13 +243,22 @@ def _run_run(
     return format_run(result)
 
 
-def _run_workers(config_path: str) -> str:
+def _run_workers(
+    config_path: str,
+    *,
+    probe: bool = False,
+    provider_adapters: dict[str, object] | None = None,
+    subprocess_runner: object | None = None,
+) -> str:
     try:
-        with EngineClient.open(config_path) as client:
+        with EngineClient.open(
+            config_path, provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
+        ) as client:
             snapshots = client.workers()
+            providers = client.probe_workers() if probe else None
     except EngineError as exc:
         return f"Error: {exc}"
-    return format_workers(snapshots)
+    return _format_workers_section(snapshots, providers)
 
 
 def run(
@@ -198,10 +272,12 @@ def run(
 ) -> None:
     """Read commands from ``input_stream`` until ``/exit`` or EOF.
 
-    ``provider_adapters``/``subprocess_runner`` are forwarded to
-    ``/run``'s ``EngineClient.open()`` call; same test-only seams as
-    ``EngineClient.open()`` itself (see ``engine_client.py``), production
-    callers (``__main__.py``) never set them.
+    ``provider_adapters``/``subprocess_runner`` are forwarded to every
+    ``EngineClient.open()`` call this loop makes (``/run``, and
+    ``/status``/``/workers`` when ``--probe`` triggers a real
+    ``probe_workers()``); same test-only seams as ``EngineClient.open()``
+    itself (see ``engine_client.py``), production callers (``__main__.py``)
+    never set them.
     """
     while True:
         output_stream.write(prompt)
@@ -213,16 +289,34 @@ def run(
         command = line.strip()
         if not command:
             continue
-        if command == "/exit":
+        tokens = command.split()
+        name, flags = tokens[0], tokens[1:]
+        if name == "/exit" and not flags:
             return
-        if command == "/help":
+        if name == "/help" and not flags:
             output_stream.write(format_help() + "\n")
             continue
-        if command == "/status":
-            output_stream.write(_run_status(config_path) + "\n")
+        if name == "/status" and flags in ([], ["--probe"]):
+            output_stream.write(
+                _run_status(
+                    config_path,
+                    probe=flags == ["--probe"],
+                    provider_adapters=provider_adapters,
+                    subprocess_runner=subprocess_runner,
+                )
+                + "\n"
+            )
             continue
-        if command == "/workers":
-            output_stream.write(_run_workers(config_path) + "\n")
+        if name == "/workers" and flags in ([], ["--probe"]):
+            output_stream.write(
+                _run_workers(
+                    config_path,
+                    probe=flags == ["--probe"],
+                    provider_adapters=provider_adapters,
+                    subprocess_runner=subprocess_runner,
+                )
+                + "\n"
+            )
             continue
         if command == "/config":
             output_stream.write(_run_config(config_path) + "\n")

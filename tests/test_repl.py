@@ -14,12 +14,15 @@ from typing import Any
 
 import pytest
 
+from orchestrator.providers.contracts import UnavailabilityReason
+
 from aido_code.engine_client import EngineClient
 from aido_code.repl import DEFAULT_CONFIG_PATH, format_help, run
 from tests.conftest import (
     REGISTRY_ENABLED_AND_DISABLED,
     FakeAdapter,
     ScriptedRalphRunner,
+    UnavailableAdapter,
     commit_action,
     write_config,
 )
@@ -129,6 +132,65 @@ class TestStatus:
 
     def test_missing_aido_yaml_prints_clear_error_not_a_traceback(self, tmp_path: Path) -> None:
         transcript = _run("/status\n/exit\n", config_path=str(tmp_path / "does-not-exist.yaml"))
+        assert "Error:" in transcript
+        assert "Traceback" not in transcript
+
+    def test_renders_full_worker_list_with_zero_provider_probes(self, tmp_path: Path) -> None:
+        config_path = write_config(tmp_path, registry=REGISTRY_ENABLED_AND_DISABLED)
+        transcript = _run("/status\n/exit\n", config_path=str(config_path))
+        assert "workers:" in transcript
+        assert "alice" in transcript
+        assert "enabled" in transcript
+        assert "bob" in transcript
+        assert "disabled" in transcript
+        assert "probe=" not in transcript
+        assert "Traceback" not in transcript
+
+    def test_no_provider_adapter_is_ever_instantiated(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import orchestrator.engine as engine_module
+
+        def _fail_resolve(providers: object) -> None:
+            raise AssertionError("provider adapters must never be resolved by plain /status")
+
+        monkeypatch.setattr(engine_module, "resolve_provider_adapters", _fail_resolve)
+
+        config_path = write_config(tmp_path, registry=REGISTRY_ENABLED_AND_DISABLED)
+        transcript = _run("/status\n/exit\n", config_path=str(config_path))
+        assert "alice" in transcript
+        assert "Traceback" not in transcript
+
+    def test_probe_renders_same_status_plus_real_worker_states(self, tmp_path: Path) -> None:
+        config_path = write_config(tmp_path, registry=REGISTRY_ENABLED_AND_DISABLED)
+        adapter = FakeAdapter(available=True)
+        transcript = _run(
+            "/status --probe\n/exit\n",
+            config_path=str(config_path),
+            provider_adapters={"anthropic": adapter},
+        )
+        assert "NOT_INITIALIZED" in transcript
+        assert "alice" in transcript
+        assert "probe=available" in transcript
+        assert "bob" in transcript
+        assert "probe=disabled" in transcript
+        assert adapter.calls == 1
+        assert "Traceback" not in transcript
+
+    def test_probe_reports_quota_exhaustion_honestly(self, tmp_path: Path) -> None:
+        config_path = write_config(tmp_path)
+        adapter = UnavailableAdapter(UnavailabilityReason.QUOTA_EXHAUSTED)
+        transcript = _run(
+            "/status --probe\n/exit\n",
+            config_path=str(config_path),
+            provider_adapters={"anthropic": adapter},
+        )
+        assert "alice" in transcript
+        assert "bob" in transcript
+        assert transcript.count("probe=quota") == 2
+
+    def test_probe_missing_aido_yaml_prints_clear_error_not_a_traceback(self, tmp_path: Path) -> None:
+        transcript = _run("/status --probe\n/exit\n", config_path=str(tmp_path / "does-not-exist.yaml"))
         assert "Error:" in transcript
         assert "Traceback" not in transcript
 
@@ -254,4 +316,25 @@ class TestWorkers:
         config_path = write_config(tmp_path, registry=REGISTRY_ENABLED_AND_DISABLED)
         transcript = _run("/workers\n/exit\n", config_path=str(config_path))
         assert "alice" in transcript
+        assert "Traceback" not in transcript
+
+    def test_probe_renders_the_same_worker_states_as_status_probe(self, tmp_path: Path) -> None:
+        config_path = write_config(tmp_path, registry=REGISTRY_ENABLED_AND_DISABLED)
+        adapter = FakeAdapter(available=True)
+        transcript = _run(
+            "/workers --probe\n/exit\n",
+            config_path=str(config_path),
+            provider_adapters={"anthropic": adapter},
+        )
+        assert "alice" in transcript
+        assert "probe=available" in transcript
+        assert "bob" in transcript
+        assert "probe=disabled" in transcript
+        assert adapter.calls == 1
+        assert "project:" not in transcript
+        assert "Traceback" not in transcript
+
+    def test_probe_missing_aido_yaml_prints_clear_error_not_a_traceback(self, tmp_path: Path) -> None:
+        transcript = _run("/workers --probe\n/exit\n", config_path=str(tmp_path / "does-not-exist.yaml"))
+        assert "Error:" in transcript
         assert "Traceback" not in transcript

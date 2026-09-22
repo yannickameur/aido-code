@@ -13,7 +13,7 @@ from pathlib import Path
 from textwrap import dedent
 
 from orchestrator.providers.adapter import ProviderAdapter
-from orchestrator.providers.contracts import ProviderAvailability, ProviderState
+from orchestrator.providers.contracts import ProviderAvailability, ProviderState, UnavailabilityReason
 
 from aido_code.engine_client import EngineClient
 
@@ -70,11 +70,30 @@ class NeverCalledAdapter(ProviderAdapter):
 class FakeAdapter(ProviderAdapter):
     def __init__(self, *, available: bool = True) -> None:
         self._available = available
+        self.calls = 0
 
     async def probe(self) -> ProviderState:
+        self.calls += 1
         return ProviderState(
             provider="anthropic",
             availability=ProviderAvailability(available=self._available, observed_at=UTC_T0, reason=None),
+            observed_at=UTC_T0,
+        )
+
+
+class UnavailableAdapter(ProviderAdapter):
+    """Reports a specific, real ``UnavailabilityReason`` (e.g. quota
+    exhaustion), never a fabricated state."""
+
+    def __init__(self, reason: UnavailabilityReason) -> None:
+        self._reason = reason
+        self.calls = 0
+
+    async def probe(self) -> ProviderState:
+        self.calls += 1
+        return ProviderState(
+            provider="anthropic",
+            availability=ProviderAvailability(available=False, observed_at=UTC_T0, reason=self._reason),
             observed_at=UTC_T0,
         )
 
