@@ -41,6 +41,6 @@ out_of_scope_for_this_mvp:
   - "Natural-language piloting (M3)."
   - "Non-interactive mode, -p (M4)."
   - "json/stream-json structured output (M5)."
-  - "aido doctor (M6)."
+  - "Doctor/diagnostics (M6)."
   - "Real-time timeline rendering of engine events (M7)."
   - "Claiming the `aido` command name (M8)."

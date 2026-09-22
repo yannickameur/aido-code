@@ -19,7 +19,15 @@ developer's own claim that "it works."
    corrective review, then deterministic QA, then a governed merge/tag,
    exactly as documented in `ai-dev-orchestrator`'s own `ROADMAP.md`,
    section "WorkItem Flow".
-4. Nothing lands on `main` here except through that governed flow.
+4. **No functional AIDO Code code** lands on `main` except through that
+   governed flow — that rule is absolute. It does not extend to
+   documentation: this project's own history already shows the
+   maintainer committing documentation, governance, roadmap, acceptance
+   specs, and WorkItem preparation directly (e.g. this repository's own
+   initial commit, and every M1/M2 preparation commit since). Those
+   changes are legitimate as long as they never implement functionality
+   indirectly — describing, specifying, or preparing WorkItems for the
+   governed flow to build is not the same as building it.
 
 ## Local configuration
 

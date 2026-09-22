@@ -31,8 +31,10 @@ records — nothing here is inferred or aspirational.
 
 ## Not M1 contributors
 
-`milo`/`juno` (mistral/vibe) and `dana`/`kai` (deepseek/kimi, disabled)
-are configured, available workers (see `aido.example.yaml`) but did not
-participate in this M1 run — WorkerSelector never selected them for
-WI-01 through WI-07. They are not listed as contributors above; a future
-run may credit them here if they actually produce a commit.
+`milo`/`juno` (mistral/vibe, enabled) and `dana`/`kai` (deepseek/kimi,
+configured but **disabled** — no API key, no real execution evidence yet;
+see `ai-dev-orchestrator`'s `config/workers.yaml`) are configured workers
+(see `aido.example.yaml`) but did not participate in this M1 run —
+WorkerSelector never selected them for WI-01 through WI-07. They are not
+listed as contributors above; a future run may credit them here if they
+actually produce a commit.

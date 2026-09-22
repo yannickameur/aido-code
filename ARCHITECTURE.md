@@ -69,21 +69,35 @@ Two entirely different concepts share the word "resume" in this
 ecosystem, on purpose (matching Claude Code/Codex CLI conventions the
 user already knows). They are never the same operation.
 
-- **Session resume** (`aido resume`, `aido resume <id>`, `--resume`/`-r`,
-  `--continue`/`-c`, `/resume`, `/new`; see `docs/CLI_SPEC.md`, M2) is
-  about *this project's own UX state*: which conversation, which
-  directory, which history. It is AIDO Code's own concern and touches
-  nothing in the orchestrator's persisted state.
+- **Session resume** (`aido-code resume`, `aido-code resume <id>`,
+  `--resume`/`-r`, `--continue`/`-c`, `/resume`, `/new`; see
+  `docs/CLI_SPEC.md`, M2, and `docs/SESSION_CONTRACT.md` for the full
+  contract) is about *this project's own UX state*: which conversation,
+  which directory, which history. It is AIDO Code's own concern and
+  touches nothing in the orchestrator's persisted state.
 - **Project run/resume** is `OrchestratorEngine.run()` alone. The engine
   decides, from its own real persisted state (`READY`/`WAITING`/
   `RECOVERY_REQUIRED`/...), what "continuing the project" actually means.
   AIDO Code never re-implements that decision, and a session resume never
   substitutes for calling `.run()`.
 
-Selecting or resuming a session may, as a UX convenience, immediately
-also call `.run()` against the project that session is attached to, but
-these remain two separate steps, never merged into one undifferentiated
-"resume".
+**Hard invariant (M2): session resume never automatically triggers the
+engine.** Selecting, resuming, or creating a session (`resume`,
+`--resume`/`-r`, `--continue`/`-c`, `/resume`, `/new`) only ever
+restores/creates AIDO Code's own UX state — it loads the session,
+restores its interaction history and its project/config binding, and
+restores display context. It **never**, by itself:
+
+- calls `OrchestratorEngine.run()`;
+- starts or resumes a WorkItem;
+- selects a worker;
+- causes a provider call (including `.probe_workers()`);
+- mutates any engine state.
+
+Advancing the project always requires a separate, explicit user action —
+`/run` today, or a future M3 request explicitly interpreted as a run
+intent. Resume and run are never the same step, and resume never
+implicitly chains into one.
 
 ## Events / timeline
 

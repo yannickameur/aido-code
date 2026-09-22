@@ -23,7 +23,7 @@ see `MVP_SPEC.yaml` for the acceptance contract they satisfy and
 | Milestone | Status |
 |---|---|
 | M1 — Minimal interactive shell | `DONE` (see `docs/M1_REFERENCE_RUN.md`) |
-| M2 — Sessions and resume | `PLANNED` (WorkItems drafted, not scheduled) |
+| M2 — Sessions and resume | `READY FOR GOVERNED DEVELOPMENT`, not started (see `M2_SPEC.yaml`, `docs/SESSION_CONTRACT.md`) |
 | M3 — Natural-language piloting | `À VOTER` |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
@@ -57,41 +57,74 @@ Commands: `/help`, `/status`, `/workers`, `/config`, `/validate`,
 
 ## M2 — Sessions and resume
 
-**Not scheduled for MVP 0.1.** WorkItems are drafted (see "M2 WorkItems"
-below) but not created as real, executable orchestrator WorkItems yet:
-per explicit instruction, this roadmap prepares them without launching
-any of them.
+**Status: `READY FOR GOVERNED DEVELOPMENT`, not started.** Fully
+specified — acceptance contract in `M2_SPEC.yaml`, the session data
+model/persistence/concurrency contract in `docs/SESSION_CONTRACT.md`,
+and 10 governed WorkItems drafted below (portable template:
+`aido.m2.example.yaml`, see "Runtime transition" below) — but not yet
+created in any orchestrator runtime state, and no code has been written.
+A human GO is required before launching this milestone's governed
+WorkItem Flow, exactly like M1's.
+
+Current, pre-M8 binary name throughout (see `docs/CLI_SPEC.md`): every
+command below is `aido-code ...`/`python -m aido_code ...`, never
+`aido ...` (that syntax is post-M8 future syntax only).
 
 Must cover:
 
-- session storage;
-- a session index;
-- `aido resume`;
-- a session picker;
-- `aido resume <session-id>`;
-- `--resume`/`-r`;
-- `--continue`/`-c`;
+- a versioned, persistent session model (`docs/SESSION_CONTRACT.md`);
+- a session index with a deterministic most-recent rule;
+- `aido-code resume`: interactive picker;
+- `aido-code resume <session-id>`: direct resume;
+- `--resume`/`-r`, `--continue`/`-c` CLI aliases;
 - `/resume`/`/new` in the REPL;
-- a session's link to its project (directory/`aido.yaml`);
-- strict separation between session/frontend state and engine state (see
-  "Session resume vs. project run/resume", `ARCHITECTURE.md`);
+- a session's link to its project (directory/`aido.yaml`), without
+  duplicating `ProjectConfig` or engine state in the SessionStore;
+- strict separation between session/frontend state and engine state:
+  session resume **never** automatically calls `OrchestratorEngine.run()`,
+  probes/selects a worker, or mutates engine state (see the "Hard
+  invariant (M2)" in `ARCHITECTURE.md`, "Session resume vs. project
+  run/resume");
 - resume after this process restarts;
-- offline tests.
+- concurrency/corruption/error handling, fail-closed;
+- tests entirely offline (`M2_SPEC.yaml`, criterion 17).
 
-### M2 WorkItems (drafted, not created in any orchestrator state)
+### Runtime transition (mvp-0.1 -> mvp-0.2)
 
-1. Session storage format and store.
-2. Session index (list/most-recent).
-3. `aido resume`: interactive picker.
-4. `aido resume <session-id>`: direct resume.
-5. `--resume`/`-r` flag aliases.
-6. `--continue`/`-c` flag aliases.
-7. `/resume`/`/new` REPL commands.
-8. Session-to-project linking.
-9. Session/engine state separation: acceptance test proving a session
-   resume never bypasses or duplicates `OrchestratorEngine.run()`'s own
-   WAITING/RECOVERY_REQUIRED handling.
-10. Resume-after-restart acceptance test.
+Verified by direct code inspection of `ProjectRuntime.bootstrap()` and
+`OrchestratorEngine._drive()` (`ai-dev-orchestrator`, `src/orchestrator/
+project_runtime.py`/`engine.py`), plus an isolated, temporary, fully
+offline reproduction (fake provider adapter, temporary git workspace and
+`state_dir`, never the real `aido-code` project state): the engine
+supports adding a new `mvp.id` (e.g. `mvp-0.2`) to the **same**
+`project.id`/`state_dir` as an already-completed MVP (`mvp-0.1`), without
+conflict, data loss, or mutation of the prior MVP's historical WorkItem
+records. `bootstrap()` scopes WorkItem lookups by `mvp_id`, and
+`OrchestratorEngine.run()`/`.status()` operate on whatever `mvp.id` the
+currently-loaded `aido.yaml` names — never on a separately-tracked
+"current MVP" pointer. This is what makes `aido.m2.example.yaml` (below)
+safe to prepare against this same project.
+
+### M2 WorkItems (drafted, portable template only — see `aido.m2.example.yaml`; not created in any orchestrator runtime state)
+
+1. **WI-M2-01** — Session model + versioned persistence.
+2. **WI-M2-02** — Session index + deterministic most-recent selection.
+3. **WI-M2-03** — Session-to-project/config binding.
+4. **WI-M2-04** — Direct resume by session id.
+5. **WI-M2-05** — Interactive resume picker.
+6. **WI-M2-06** — `--resume`/`-r` and `--continue`/`-c` CLI aliases.
+7. **WI-M2-07** — REPL `/resume` and `/new`.
+8. **WI-M2-08** — Session/engine isolation (proves resume never calls
+   `.run()`/`.probe_workers()`/selects a worker, and never duplicates
+   engine state as a source of truth).
+9. **WI-M2-09** — Concurrency/corruption/error handling.
+10. **WI-M2-10** — Resume-after-process-restart acceptance.
+
+Full acceptance criteria per WorkItem: `aido.m2.example.yaml`. Full
+functional contract these WorkItems build toward: `M2_SPEC.yaml` and
+`docs/SESSION_CONTRACT.md`. Real test scenarios to run after this
+milestone is actually built (not run in this preparation task):
+`docs/M2_REAL_TEST_PLAN.md`.
 
 ## M3 — Natural-language piloting
 
@@ -100,7 +133,8 @@ Free-form status/steering questions answered from real engine facts; see
 
 ## M4 — Non-interactive mode
 
-`aido -p "<request>"`, stdin piping. See `docs/CLI_SPEC.md`.
+`aido-code -p "<request>"` (current, pre-M8 binary name), stdin piping.
+See `docs/CLI_SPEC.md`.
 
 ## M5 — Structured output
 
@@ -110,9 +144,10 @@ terminal-output parser. See `docs/CLI_SPEC.md`.
 
 ## M6 — Doctor/diagnostics
 
-`aido doctor`: engine, config, project, Git, Ralph, providers, workers,
-observable quota, QA, permissions; read-only wherever the underlying
-fact genuinely is. See `docs/CLI_SPEC.md`.
+`aido-code doctor` (current, pre-M8 binary name): engine, config,
+project, Git, Ralph, providers, workers, observable quota, QA,
+permissions; read-only wherever the underlying fact genuinely is. See
+`docs/CLI_SPEC.md`.
 
 ## M7 — Real-time timeline
 

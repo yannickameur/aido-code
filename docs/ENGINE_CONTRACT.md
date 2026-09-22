@@ -105,6 +105,13 @@ SQLite connection, or any dataclass from `orchestrator.project_state`/
   again, or drives its own loop around repeated `.status()` calls for a
   read-only view while a separate `.run()` is in flight elsewhere.
 - Cancellation of an in-flight `.run()`.
+- A public `.init()` method. This contract's methods today are exactly
+  `.validate()`/`.status()`/`.workers()`/`.probe_workers()`/`.run()`/
+  `.close()` — there is no engine-level equivalent of the orchestrator's
+  own `aido init`. This is the specific gate `ROADMAP.md`'s M8 (`aido`
+  command cutover) cannot pass until resolved; see that section for the
+  options under consideration. AIDO Code must never import
+  `orchestrator.cli`'s private helpers to work around this gap.
 
 None of these are invented here. They are real, future orchestrator-side
 work, tracked as `À VOTER`/future increments in `ai-dev-orchestrator`'s

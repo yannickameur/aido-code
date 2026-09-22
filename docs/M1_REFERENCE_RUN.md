@@ -84,8 +84,10 @@ engine's own QA determinism guarantee.
 
 ## The engine fix
 
-`ai-dev-orchestrator` was fixed (PR merging `fix/qa-environment-determinism`,
-after this run) to close this gap: every validation command now records
+`ai-dev-orchestrator` was fixed (branch `fix/qa-environment-determinism`,
+[PR #9](https://github.com/yannickameur/ai-dev-orchestrator/pull/9),
+merged as `e3bd2e48bdf08512aedc65e5ca19e70e41e62272`, after this run) to
+close this gap: every validation command now records
 its actual resolved executable, the underlying Python interpreter
 (generic — never a `pytest`-specific rule), its version, and an installed-
 package fingerprint. Two QA attempts at the same head SHA whose recorded
