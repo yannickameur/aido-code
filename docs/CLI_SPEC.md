@@ -6,9 +6,10 @@ what each milestone actually delivers and its acceptance criteria).
 - **M1: `IMPLEMENTED`/`DONE`** — the commands below under "M1" are real,
   tested, and shipped (see `README.md`, "Status", and
   `docs/M1_REFERENCE_RUN.md`).
-- **M1.1: `READY FOR GOVERNED DEVELOPMENT`, not started** — specified
-  (`M1_1_SPEC.yaml`, `aido.m1_1.example.yaml`) but not yet built; a
-  small increment between M1 and M2, not part of M2.
+- **M1.1: `IMPLEMENTED`/`DONE`** — specified (`M1_1_SPEC.yaml`,
+  `aido.m1_1.example.yaml`) and built: `--probe` on `/status`/`/workers`
+  is real, tested, and shipped; a small increment between M1 and M2, not
+  part of M2.
 - **M2: `READY FOR GOVERNED DEVELOPMENT`, not started** — specified
   (`M2_SPEC.yaml`, `docs/SESSION_CONTRACT.md`) but not yet built.
 - **M3-M8: `PLANNED`/`À VOTER`** — not specified in detail yet, nothing
@@ -43,7 +44,7 @@ shows the loaded `aido.yaml` facts (via `.validate()`'s
 `ProjectSnapshot`), not a raw file dump. `/run` is also how a project
 resumes; see "Session resume vs. project run" in `ARCHITECTURE.md`.
 
-## M1.1 — `--probe` on `/status`/`/workers` (`READY FOR GOVERNED DEVELOPMENT`, not implemented)
+## M1.1 — `--probe` on `/status`/`/workers` (`IMPLEMENTED`/`DONE`)
 
 Full functional contract: `M1_1_SPEC.yaml` and `aido.m1_1.example.yaml`.
 
@@ -58,10 +59,12 @@ Full functional contract: `M1_1_SPEC.yaml` and `aido.m1_1.example.yaml`.
 project/MVP/work-item view and adds the same worker list `/workers`
 already renders, still with zero provider probes. `--probe` on either
 command is the only thing in M1.1 that ever calls
-`OrchestratorEngine.probe_workers()`; both flags share one
-probe/rendering code path (no duplicated logic). `/run` is unaffected
-and stays project start/resume — M1.1 adds no project-level `/resume`
-command.
+`EngineClient.probe_workers()` (a thin, direct delegation to
+`OrchestratorEngine.probe_workers()` — see `docs/ENGINE_CONTRACT.md`);
+both flags share one probe/rendering code path (no duplicated logic).
+`/run` is unaffected and stays project start/resume — M1.1 adds no
+project-level `/resume` command; session-level resume (M2) remains
+entirely unimplemented and unaffected by M1.1.
 
 ## M2 — Session commands and flags (`READY FOR GOVERNED DEVELOPMENT`, not implemented)
 

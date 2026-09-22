@@ -39,6 +39,18 @@ orchestrator-internal types AIDO Code must never import).
 `OrchestratorEngine` also supports `with OrchestratorEngine.open(...) as
 engine:` for symmetry, even though `.close()` does nothing today.
 
+### AIDO Code's own `EngineClient` wrapper
+
+`aido_code.engine_client.EngineClient` (see that module) is the only
+place the rest of this package is allowed to import `orchestrator.engine`
+from. It is a thin, 1:1 wrapper: `.validate()`/`.status()`/`.workers()`/
+`.probe_workers()`/`.run()`/`.close()` on `EngineClient` each delegate
+directly to the identically-named method above, with no local
+provider/quota/network logic, extra caching, or fabricated data of its
+own. `EngineClient.probe_workers()` in particular is the only thing
+`/status --probe` and `/workers --probe` (see `docs/CLI_SPEC.md`, "M1.1")
+ever call to reach `OrchestratorEngine.probe_workers()`.
+
 ### `.run()` is also resume
 
 There is no separate "resume" call at the engine level. Calling `.run()`

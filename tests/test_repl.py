@@ -76,6 +76,28 @@ class TestUnrecognizedCommand:
         assert "Unknown command" not in transcript
 
 
+class TestNoProjectLevelResumeCommand:
+    """M1.1 adds no project-level `/resume` command, and M2's own
+    session-level `/resume`/`/new` remain entirely unimplemented and
+    unaffected by this milestone: `/run` alone is still how a project
+    starts/resumes (see M1_1_SPEC.yaml)."""
+
+    def test_slash_resume_is_not_a_recognized_command(self) -> None:
+        transcript = _run("/resume\n/exit\n")
+        assert "Unknown command: '/resume'" in transcript
+        assert "Traceback" not in transcript
+
+    def test_slash_new_is_not_a_recognized_command(self) -> None:
+        transcript = _run("/new\n/exit\n")
+        assert "Unknown command: '/new'" in transcript
+        assert "Traceback" not in transcript
+
+    def test_help_never_advertises_resume_or_new(self) -> None:
+        transcript = _run("/help\n/exit\n")
+        assert "/resume" not in transcript
+        assert "/new" not in transcript
+
+
 class TestEntryPoints:
     def test_python_dash_m_aido_code_starts_repl_and_accepts_commands(self) -> None:
         result = subprocess.run(
