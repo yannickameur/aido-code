@@ -1,0 +1,108 @@
+# AIDO Code — governed configuration for AI Dev Orchestrator (schema v1),
+# M1.1 ("CLI conventions and standalone install"). See
+# ai-dev-orchestrator/docs/PROJECT_CONFIG.md for the full schema
+# reference, and this project's own CONTRIBUTING.md for how to use this
+# file locally.
+#
+# This is the tracked, portable M1.1 template — analogous to
+# aido.example.yaml (M1) and aido.m2.example.yaml (M2), never a
+# replacement for either. Copy it to `aido.yaml` (already in
+# .gitignore) before running `aido validate`/`aido run` against it;
+# never commit a real aido.yaml, since state_dir/workspace paths are
+# machine-specific.
+#
+# Runtime transition note (same reasoning already verified for M2 — see
+# ROADMAP.md, M2, "Runtime transition"): this file targets the SAME
+# project.id (aido-code) as aido.example.yaml (M1) and aido.m2.example.
+# yaml (M2), with its own mvp.id (mvp-0.1.1), inserted between mvp-0.1
+# (DONE) and mvp-0.2 (not started). AI Dev Orchestrator's ProjectRuntime.
+# bootstrap() creates this new MVP under the same persisted project/
+# state_dir without disturbing mvp-0.1's already-completed WorkItems
+# (WI-01..WI-07) or mvp-0.2's own future WorkItems.
+#
+# No `aido run` has been executed against this file by the task that
+# prepared it; see ROADMAP.md, "Status" / M1.1.
+
+schema_version: 1
+
+project:
+  id: aido-code
+  name: AIDO Code
+  workspace: .
+  # state_dir omitted on purpose: defaults deterministically to
+  # ~/.local/state/ai-dev-orchestrator/projects/aido-code/ — the SAME
+  # state_dir mvp-0.1/mvp-0.2 already use, by design (see the transition
+  # note above); their own persisted WorkItems are untouched by this.
+
+workers:
+  # Reference (never a copy) to the sibling ai-dev-orchestrator checkout's
+  # own real worker pool — identical to aido.example.yaml (M1).
+  registry: ../ai-dev-orchestrator/config/workers.yaml
+
+execution:
+  # unrestricted: consistent with the maintainer's current environment for
+  # this project (see aido.example.yaml). Prints a visible warning on
+  # every `aido run`; see ai-dev-orchestrator's docs/PROJECT_CONFIG.md
+  # security warning before ever changing this for a shared/untrusted
+  # environment.
+  permission_mode: unrestricted
+
+git:
+  base_branch: main
+
+mvp:
+  id: mvp-0.1.1
+  objective: "Correct the engine dependency to ai-dev-orchestrator>=0.1.2, add probe_workers() to the engine client, and make /status show all configured workers with an explicit --probe opt-in; see M1_1_SPEC.yaml for the full acceptance contract."
+  acceptance_criteria:
+    - "See M1_1_SPEC.yaml for the complete, authoritative list. This field intentionally stays short; the governed WorkItems below carry the real per-WorkItem criteria."
+
+work_items:
+  - id: WI-M1.1-01
+    title: "Correct AIDO Code engine dependency metadata"
+    required_capabilities: [development]
+    dependencies: []
+    acceptance_criteria:
+      - "pyproject.toml's dependencies list ai-dev-orchestrator>=0.1.2, never orchestrator>=... or any other reference to the third-party orchestrator package."
+      - "Existing imports (from orchestrator.engine import OrchestratorEngine, and the rest of docs/ENGINE_CONTRACT.md's surface) keep working unchanged after this change."
+      - "The full offline pytest suite (pytest -q) still passes, with zero real provider/network calls."
+
+  - id: WI-M1.1-02
+    title: "Extend EngineClient with probe_workers()"
+    required_capabilities: [development]
+    dependencies: [WI-M1.1-01]
+    acceptance_criteria:
+      - "EngineClient gains a probe_workers() method that delegates directly to OrchestratorEngine.probe_workers(), with no local provider/quota/network logic added to this project."
+      - "No provider adapter, QuotaManager, WorkerSelector, or MVPManager is ever imported by aido_code; the engine remains the sole authority."
+      - "Offline tests exercise probe_workers() via OrchestratorEngine.open()'s own provider_adapters injection seam; pytest -q never performs a real provider probe."
+
+  - id: WI-M1.1-03
+    title: "Improve /status and /workers UX"
+    required_capabilities: [development]
+    dependencies: [WI-M1.1-02]
+    acceptance_criteria:
+      - "/status (no flags) renders both the project/MVP/work-item status (M1's existing behavior, unregressed) and the full worker list (all configured workers, enabled and disabled, with provider/backend/model/capabilities), with zero provider probes."
+      - "/status --probe renders the same information as plain /status, plus one real probe_workers() call, showing each worker's observable state (available/quota/unavailable/probe_error/disabled/unknown) honestly, including workers that honestly share one provider's state."
+      - "/workers (no flags) is unchanged from M1: static WorkerRegistry view, never a probe."
+      - "/workers --probe reuses the exact same probe_workers() call and the exact same provider->worker rendering/association logic as /status --probe; no duplicated probe-rendering code path between the two commands."
+      - "EngineError from any of these commands renders as a clean message, never a raw traceback, consistent with M1's existing error handling."
+
+  - id: WI-M1.1-04
+    title: "Regression and acceptance tests, plus docs"
+    required_capabilities: [development]
+    dependencies: [WI-M1.1-03]
+    acceptance_criteria:
+      - "/run remains project start/resume exactly as M1 specified; no new project-level /resume command exists after this milestone."
+      - "Session-level resume (M2) remains entirely unimplemented and unaffected by this milestone."
+      - "/status with no flags never triggers a provider call, proven by an offline structural test analogous to ai-dev-orchestrator's own test_cli.py::TestStatus provider-adapter-instantiation test."
+      - "/status --probe and /workers --probe are proven, offline, to call probe_workers() exactly once each and to render its real ProviderSnapshot tuple, never a fabricated one."
+      - "All of M1's existing commands and acceptance criteria (MVP_SPEC.yaml) remain passing, unregressed."
+      - "pyproject.toml/packaging metadata match M1_1_SPEC.yaml's acceptance criteria (WI-M1.1-01), re-verified as part of this WorkItem's own QA."
+      - "docs/CLI_SPEC.md and docs/ENGINE_CONTRACT.md are updated to document /status --probe, /workers --probe, and probe_workers() on EngineClient, consistent with the rest of this milestone's behavior."
+      - "pytest -q passes for the whole package, offline, with zero real provider/Ralph calls anywhere in the suite; this WorkItem's own QA is the final gate for MVP 0.1.1."
+
+qa:
+  - id: qa-tests
+    kind: unit_test
+    argv: ["pytest", "-q"]
+    timeout_seconds: 300
+    required: true

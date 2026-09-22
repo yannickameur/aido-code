@@ -20,9 +20,17 @@ see `MVP_SPEC.yaml` for the acceptance contract they satisfy and
 `docs/M1_REFERENCE_RUN.md` for the full factual record of that run
 (including a real engine defect it found and its subsequent fix).
 
+`M1.1 READY FOR GOVERNED DEVELOPMENT`, not started: a small technical
+increment between M1 and M2 — correcting the engine dependency to the
+renamed `ai-dev-orchestrator` distribution, adding `probe_workers()` to
+the engine client, and improving `/status`/`/workers` (see
+`M1_1_SPEC.yaml`, `aido.m1_1.example.yaml`). It is not part of M2 and
+does not start M2.
+
 | Milestone | Status |
 |---|---|
 | M1 — Minimal interactive shell | `DONE` (see `docs/M1_REFERENCE_RUN.md`) |
+| M1.1 — CLI conventions and standalone install | `READY FOR GOVERNED DEVELOPMENT`, not started (see `M1_1_SPEC.yaml`) |
 | M2 — Sessions and resume | `READY FOR GOVERNED DEVELOPMENT`, not started (see `M2_SPEC.yaml`, `docs/SESSION_CONTRACT.md`) |
 | M3 — Natural-language piloting | `À VOTER` |
 | M4 — Non-interactive mode | `À VOTER` |
@@ -54,6 +62,49 @@ Commands: `/help`, `/status`, `/workers`, `/config`, `/validate`,
   decisions) is ever duplicated in this project;
 - tests are offline (fake provider adapters, fake Ralph subprocess;
   same conventions as `ai-dev-orchestrator`'s own test suite).
+
+## M1.1 — CLI conventions and standalone install
+
+**Status: `READY FOR GOVERNED DEVELOPMENT`, not started.** Fully
+specified — acceptance contract in `M1_1_SPEC.yaml`, 4 governed
+WorkItems drafted below (portable template: `aido.m1_1.example.yaml`,
+targeting the same `project.id`/`state_dir` as M1/M2, its own
+`mvp.id: mvp-0.1.1`) — but not yet created in any orchestrator runtime
+state, and no code has been written. A human GO is required before
+launching this milestone's governed WorkItem Flow, exactly like M1's. A
+small technical increment between M1 (`DONE`) and M2 (not started); it
+is not part of M2 and does not start M2.
+
+Must cover:
+
+- `ai-dev-orchestrator` engine's own PyPI distribution rename (from the
+  third-party-owned `orchestrator` name) reflected in this project's
+  `pyproject.toml` dependency (`ai-dev-orchestrator>=0.1.2`), with the
+  existing `from orchestrator.engine import ...` import path unchanged;
+- `EngineClient.probe_workers()`, delegating directly to
+  `OrchestratorEngine.probe_workers()`;
+- `/status` (no flags) showing the full worker list alongside the
+  existing project/MVP/work-item view, with zero provider probes;
+- `/status --probe`: the same view plus one real `probe_workers()`
+  call, rendering each worker's observable provider state honestly
+  (including workers that honestly share one provider's state);
+- `/workers` staying static (no probe) and gaining `/workers --probe`,
+  sharing the exact same probe/rendering path as `/status --probe` —
+  no duplicated logic (KISS);
+- `/run` staying project start/resume, unchanged; no new project-level
+  `/resume` command (session-level resume is M2's own, separate scope);
+- regression proof that M1's existing commands/criteria
+  (`MVP_SPEC.yaml`) are not broken.
+
+### M1.1 WorkItems (drafted, portable template only — see `aido.m1_1.example.yaml`; not created in any orchestrator runtime state)
+
+1. **WI-M1.1-01** — Correct AIDO Code engine dependency metadata.
+2. **WI-M1.1-02** — Extend `EngineClient` with `probe_workers()`.
+3. **WI-M1.1-03** — Improve `/status` and `/workers` UX.
+4. **WI-M1.1-04** — Regression/acceptance tests, plus docs.
+
+Full acceptance criteria per WorkItem: `aido.m1_1.example.yaml`. Full
+functional contract these WorkItems build toward: `M1_1_SPEC.yaml`.
 
 ## M2 — Sessions and resume
 

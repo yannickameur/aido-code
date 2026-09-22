@@ -77,7 +77,10 @@ engine is a sibling Git checkout, not yet a published package:
    python -m pip install -e ../ai-dev-orchestrator
    ```
    (adjust the path if your checkout layout differs; this installs the
-   `orchestrator` distribution and makes `orchestrator.engine` importable).
+   `ai-dev-orchestrator` distribution and makes `orchestrator.engine`
+   importable — the distribution name and the importable package name
+   are different on purpose, see `ai-dev-orchestrator`'s own
+   `pyproject.toml`).
 3. Once WI-01 creates this project's own package, install it too:
    ```bash
    python -m pip install -e .

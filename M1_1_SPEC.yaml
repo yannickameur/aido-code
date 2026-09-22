@@ -1,0 +1,49 @@
+# M1.1 acceptance contract: AIDO Code, milestone M1.1 (CLI conventions +
+# standalone install). See ROADMAP.md for the full milestone list and
+# docs/ENGINE_CONTRACT.md/docs/CLI_SPEC.md for the exact engine API and
+# command surface this milestone builds on.
+#
+# M1.1 is a small technical increment between M1 (DONE) and M2 (READY
+# FOR GOVERNED DEVELOPMENT, not started) — it is not part of M2 and does
+# not start M2. This file states what "done" means for M1.1. It does not
+# itself execute anything; the governed WorkItems that implement it live
+# in aido.m1_1.example.yaml's work_items section, driven by AI Dev
+# Orchestrator (see CONTRIBUTING.md), never by a human/assistant writing
+# code directly into this repository.
+
+schema_version: 1
+
+mvp:
+  id: mvp-0.1.1
+  name: CLI conventions and standalone install
+  objective: >
+    Correct this project's engine dependency to the renamed
+    ai-dev-orchestrator distribution (>=0.1.2), extend the engine client
+    with probe_workers(), and make /status show the full project +
+    worker picture (with an explicit --probe opt-in for a real provider
+    probe), on top of the real OrchestratorEngine facade M1 already
+    established — never a second, duplicated orchestration
+    implementation, and never an implicit provider/network call.
+
+acceptance_criteria:
+  - "pyproject.toml declares ai-dev-orchestrator>=0.1.2 as the engine dependency; no dependency on the third-party PyPI package named orchestrator remains anywhere in this repository."
+  - "The existing import `from orchestrator.engine import OrchestratorEngine` (and the rest of docs/ENGINE_CONTRACT.md's surface) keeps working unchanged — the distribution rename is transparent to this project's own code."
+  - "EngineClient gains a probe_workers() method that delegates directly to OrchestratorEngine.probe_workers(), with no local provider/quota/network logic of its own."
+  - "/status (no flags) renders the real ProjectStatusSnapshot (project, MVP, work items — M1's existing behavior, unregressed) AND the real WorkerSnapshot tuple (all configured workers, enabled and disabled, with provider/backend/model/capabilities), with zero provider probes and zero network calls."
+  - "/status --probe renders the same information as plain /status, plus one real call to probe_workers(), showing each worker's observable provider state (available/quota/unavailable/probe_error/disabled/unknown) honestly — workers sharing one provider show that shared state honestly, never a fabricated per-worker state the engine never reported."
+  - "/workers (no flags) is unchanged from M1: static WorkerRegistry view, never a probe."
+  - "/workers --probe uses the exact same probe_workers() call and the exact same provider->worker rendering/association logic as /status --probe — no duplicated probe-rendering implementation between the two commands."
+  - "/run remains project start/resume, exactly as M1 specified; no new project-level /resume command is added in this milestone (session-level resume is M2's own, separate concern, out of scope here)."
+  - "No command in this milestone ever constructs MVPManager, WorkerSelector, QuotaManager, a ProviderAdapter, or reads a Store/SQLite file directly, and only /status --probe and /workers --probe ever call probe_workers(); verified by structural offline tests analogous to M1's own."
+  - "All tests are offline: fake provider adapters and a fake/scripted Ralph subprocess runner passed through OrchestratorEngine.open()'s own provider_adapters/subprocess_runner seams (including for probe_workers()), never a real Claude/Codex/Vibe/DeepSeek/Kimi/Ralph invocation; pytest -q never performs a real provider call."
+  - "M1's existing acceptance criteria (MVP_SPEC.yaml) are not regressed: /help, /status, /workers, /config, /validate, /run, /exit all still behave exactly as M1 specified for every case M1 already covered."
+
+out_of_scope_for_this_mvp:
+  - "Sessions, /resume, /new, --resume, -r, --continue, -c (M2) — unaffected and unstarted by this milestone."
+  - "Natural-language piloting (M3)."
+  - "Non-interactive mode, -p (M4)."
+  - "json/stream-json structured output (M5)."
+  - "Doctor/diagnostics (M6)."
+  - "Real-time timeline rendering of engine events (M7)."
+  - "Claiming the `aido` command name (M8) — every command in this file's own acceptance criteria uses aido-code/python -m aido_code, never aido."
+  - "Publishing either package to PyPI, or any tag/release — this milestone only proves the dependency/import/install chain works from local wheels."
