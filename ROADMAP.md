@@ -20,17 +20,20 @@ see `MVP_SPEC.yaml` for the acceptance contract they satisfy and
 `docs/M1_REFERENCE_RUN.md` for the full factual record of that run
 (including a real engine defect it found and its subsequent fix).
 
-`M1.1 READY FOR GOVERNED DEVELOPMENT`, not started: a small technical
-increment between M1 and M2 — correcting the engine dependency to the
-renamed `ai-dev-orchestrator` distribution, adding `probe_workers()` to
-the engine client, and improving `/status`/`/workers` (see
-`M1_1_SPEC.yaml`, `aido.m1_1.example.yaml`). It is not part of M2 and
-does not start M2.
+`M1.1 DONE`: WI-M1.1-01 through WI-M1.1-04 (`aido.m1_1.example.yaml`'s
+governed WorkItems) were completed by AI Dev Orchestrator's real
+WorkItem Flow — a small technical increment between M1 and M2,
+correcting the engine dependency to the renamed `ai-dev-orchestrator`
+distribution, adding `probe_workers()` to the engine client, and
+extending `/status`/`/workers` with `--probe`; see `M1_1_SPEC.yaml` for
+the acceptance contract and `docs/M1_1_REFERENCE_RUN.md` for the full
+factual record (including a real Git-commit-identity engine defect it
+found). It is not part of M2 and did not start M2.
 
 | Milestone | Status |
 |---|---|
 | M1 — Minimal interactive shell | `DONE` (see `docs/M1_REFERENCE_RUN.md`) |
-| M1.1 — CLI conventions and standalone install | `READY FOR GOVERNED DEVELOPMENT`, not started (see `M1_1_SPEC.yaml`) |
+| M1.1 — CLI conventions and standalone install | `DONE` (see `docs/M1_1_REFERENCE_RUN.md`) |
 | M2 — Sessions and resume | `READY FOR GOVERNED DEVELOPMENT`, not started (see `M2_SPEC.yaml`, `docs/SESSION_CONTRACT.md`) |
 | M3 — Natural-language piloting | `À VOTER` |
 | M4 — Non-interactive mode | `À VOTER` |
@@ -65,15 +68,13 @@ Commands: `/help`, `/status`, `/workers`, `/config`, `/validate`,
 
 ## M1.1 — CLI conventions and standalone install
 
-**Status: `READY FOR GOVERNED DEVELOPMENT`, not started.** Fully
-specified — acceptance contract in `M1_1_SPEC.yaml`, 4 governed
-WorkItems drafted below (portable template: `aido.m1_1.example.yaml`,
-targeting the same `project.id`/`state_dir` as M1/M2, its own
-`mvp.id: mvp-0.1.1`) — but not yet created in any orchestrator runtime
-state, and no code has been written. A human GO is required before
-launching this milestone's governed WorkItem Flow, exactly like M1's. A
-small technical increment between M1 (`DONE`) and M2 (not started); it
-is not part of M2 and does not start M2.
+**Status: `DONE`.** WI-M1.1-01 through WI-M1.1-04 (portable template:
+`aido.m1_1.example.yaml`, same `project.id`/`state_dir` as M1/M2, its
+own `mvp.id: mvp-0.1.1`) were completed by AI Dev Orchestrator's real,
+governed WorkItem Flow — see `M1_1_SPEC.yaml` for the acceptance
+contract they satisfy and `docs/M1_1_REFERENCE_RUN.md` for the full
+factual record. A small technical increment between M1 (`DONE`) and M2
+(not started); it is not part of M2 and did not start M2.
 
 Must cover:
 

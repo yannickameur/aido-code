@@ -10,9 +10,14 @@ offline tests passing. See [`docs/M1_REFERENCE_RUN.md`](docs/M1_REFERENCE_RUN.md
 for the full factual record of that run, including a real engine defect
 it found and that was fixed before this project was promoted to a
 second real reference project. **M1.1 (CLI conventions and standalone
-install) is `READY FOR GOVERNED DEVELOPMENT`, not started** — see
-[`M1_1_SPEC.yaml`](M1_1_SPEC.yaml). M2 (sessions/resume) and later are
-`PLANNED`/`READY FOR GOVERNED DEVELOPMENT`, not started.
+install) is `DONE`.** WI-M1.1-01 through WI-M1.1-04 were completed by
+AI Dev Orchestrator's real, governed WorkItem Flow: the engine
+dependency now points at the renamed `ai-dev-orchestrator` package,
+`/status`/`/workers` gained a shared `--probe` opt-in, 47 offline tests
+pass. See [`docs/M1_1_REFERENCE_RUN.md`](docs/M1_1_REFERENCE_RUN.md)
+for the full factual record, including a real Git-commit-identity
+engine defect it found. M2 (sessions/resume) and later are `PLANNED`,
+not started.
 
 ## What AIDO Code is
 
@@ -55,6 +60,9 @@ P13, for the full decoupling rationale.
   (M1, a minimal interactive shell).
 - [`M1_1_SPEC.yaml`](M1_1_SPEC.yaml): the acceptance contract for MVP
   0.1.1 (M1.1, CLI conventions and standalone install).
+- [`docs/M1_1_REFERENCE_RUN.md`](docs/M1_1_REFERENCE_RUN.md): the
+  factual record of M1.1's real, governed build — including a real
+  Git-commit-identity engine defect it found.
 - [`docs/M1_REFERENCE_RUN.md`](docs/M1_REFERENCE_RUN.md): the factual
   record of M1's real, governed build — including a real engine defect
   it found and its fix.
