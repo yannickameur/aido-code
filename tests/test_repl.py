@@ -360,3 +360,37 @@ class TestWorkers:
         transcript = _run("/workers --probe\n/exit\n", config_path=str(tmp_path / "does-not-exist.yaml"))
         assert "Error:" in transcript
         assert "Traceback" not in transcript
+
+
+@pytest.mark.parametrize(
+    ("command", "expects_status"),
+    [("/status --probe", True), ("/workers --probe", False)],
+)
+def test_each_probe_command_calls_engine_probe_workers_exactly_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, command: str, expects_status: bool
+) -> None:
+    """Keep the M1.1 opt-in boundary structural: these commands must use
+    the engine's real snapshot tuple exactly once, rather than merely making
+    an equivalent-looking provider call or fabricating displayed states."""
+    config_path = write_config(tmp_path, registry=REGISTRY_ENABLED_AND_DISABLED)
+    adapter = FakeAdapter(available=True)
+    original_probe_workers = EngineClient.probe_workers
+    calls = 0
+
+    def count_and_delegate(client: EngineClient):
+        nonlocal calls
+        calls += 1
+        return original_probe_workers(client)
+
+    monkeypatch.setattr(EngineClient, "probe_workers", count_and_delegate)
+    transcript = _run(
+        f"{command}\n/exit\n",
+        config_path=str(config_path),
+        provider_adapters={"anthropic": adapter},
+    )
+
+    assert calls == 1
+    assert adapter.calls == 1
+    assert "probe=available" in transcript
+    assert "probe=disabled" in transcript
+    assert ("NOT_INITIALIZED" in transcript) is expects_status
