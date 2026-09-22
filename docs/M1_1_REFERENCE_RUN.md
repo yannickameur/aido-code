@@ -76,6 +76,25 @@ real, historical execution evidence, and left for a future
 (`docs/M1_REFERENCE_RUN.md`) was found, documented, and fixed afterward
 in a separate PR.
 
+**The engine fix**: `ai-dev-orchestrator` was fixed (branch
+`fix/worker-commit-identity`,
+[PR #11](https://github.com/yannickameur/ai-dev-orchestrator/pull/11),
+merged as `bd5fa858af8bf0e265ea31b5b2b04aceabaaf62a`, after this run) to
+close this gap — see that project's `ROADMAP.md`, "P13.2", for the full
+account. In summary: a second, independent defense
+(`scoped_worker_git_identity`) now sets the governed workspace's own
+LOCAL `git config` (`--local`, never `--global`/`--system`) to the
+worker's identity for the duration of a real execution, so a nested
+`git commit` lands on the worker's identity even without inheriting any
+environment variable — exactly the failure mode this run exposed. A
+deterministic, fail-closed post-execution audit
+(`WorkerCommitIdentityMismatchError`) now also verifies every commit an
+execution introduces before its result can ever reach QA/merge. This
+project's own real WI-M1.1-01 through WI-M1.1-04 commits, made before
+that fix — including `0e9eb96` — are unchanged and were not
+re-validated retroactively; they remain exactly what they were: real,
+governed, historical execution evidence.
+
 ## Honest status
 
 M1.1 is functionally `DONE`: WI-M1.1-01 through WI-M1.1-04 all
