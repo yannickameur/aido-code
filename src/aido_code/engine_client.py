@@ -19,6 +19,7 @@ from orchestrator.engine import (
     OrchestratorEngine,
     ProjectSnapshot,
     ProjectStatusSnapshot,
+    ProviderSnapshot,
     RunResult,
     WorkerSnapshot,
 )
@@ -29,6 +30,7 @@ __all__ = [
     "EngineError",
     "ProjectSnapshot",
     "ProjectStatusSnapshot",
+    "ProviderSnapshot",
     "RunResult",
     "WorkerSnapshot",
 ]
@@ -37,7 +39,7 @@ __all__ = [
 class EngineClient:
     """Wraps one ``OrchestratorEngine`` for the rest of this package,
     surfacing exactly its ``.validate()``/``.status()``/``.workers()``/
-    ``.run()`` calls. Construct via ``.open()``."""
+    ``.probe_workers()``/``.run()`` calls. Construct via ``.open()``."""
 
     def __init__(self, engine: OrchestratorEngine) -> None:
         self._engine = engine
@@ -68,6 +70,9 @@ class EngineClient:
 
     def workers(self) -> tuple[WorkerSnapshot, ...]:
         return self._engine.workers()
+
+    def probe_workers(self) -> tuple[ProviderSnapshot, ...]:
+        return self._engine.probe_workers()
 
     def run(self, *, max_cycles: int = DEFAULT_MAX_CYCLES) -> RunResult:
         return self._engine.run(max_cycles=max_cycles)

@@ -19,6 +19,7 @@ from aido_code.engine_client import (
     EngineConfigError,
     ProjectSnapshot,
     ProjectStatusSnapshot,
+    ProviderSnapshot,
 )
 from tests.conftest import (
     FakeAdapter as _FakeAdapter,
@@ -65,6 +66,17 @@ class TestWorkers:
         workers = client.workers()
         assert {w.worker_id for w in workers} == {"alice", "bob"}
         assert workers[0].provider == "anthropic"
+
+
+class TestProbeWorkers:
+    def test_probe_workers_returns_provider_snapshots_via_injected_adapter(self, tmp_path: Path) -> None:
+        config_path = _write_config(tmp_path)
+        client = EngineClient.open(str(config_path), provider_adapters={"anthropic": _FakeAdapter(available=True)})
+        snapshots = client.probe_workers()
+        assert len(snapshots) == 1
+        assert isinstance(snapshots[0], ProviderSnapshot)
+        assert snapshots[0].provider == "anthropic"
+        assert snapshots[0].available is True
 
 
 class TestStatus:
