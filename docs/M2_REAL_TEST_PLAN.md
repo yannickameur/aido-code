@@ -9,13 +9,34 @@ the additional real, human-driven smoke pass to run once that QA is
 green — mirroring how M1's own real smoke test was run after its
 WorkItems completed (`docs/M1_REFERENCE_RUN.md`).
 
-**Provider consumption note**: every scenario below is read-only/session-
-level and consumes no real provider — except **TEST 12**, which
-explicitly exercises `/run` and therefore *can* drive a real DEV A/DEV
-B/QA/merge cycle against real providers if a WorkItem is actually
-eligible at that point. That is flagged inline; every other test is
-provider-free by construction (this is exactly what WI-M2-08 exists to
-prove automatically, offline, before this plan is ever run for real).
+Every scenario is read-only/session-level and consumes no real
+provider, except **TEST 12**, which explicitly exercises `/run` and
+can drive a real DEV A/DEV B/QA/merge cycle if a WorkItem is eligible
+at that point (this is exactly what WI-M2-08 exists to prove
+automatically, offline, before this plan is ever run for real).
+
+## Scenarios
+
+| # | Scenario | Provider call expected |
+|---|---|---|
+| 1 | Create a new session | No |
+| 2 | Exit and resume by session id | No |
+| 3 | Resume with `-r` | No |
+| 4 | Resume the most recent session with `-c` | No |
+| 5 | Use the `resume` picker | No |
+| 6 | Create `/new` from the REPL | No |
+| 7 | Use `/resume` from another session | No |
+| 8 | Resume never launches a WorkItem | No |
+| 9 | Resume never triggers a provider call | No |
+| 10 | Engine project in `WAITING`: resume does not disturb it | No |
+| 11 | Engine project in `RECOVERY_REQUIRED`: resume does not consume/resolve it | No |
+| 12 | Only then, `/run`: the engine actually resumes | **Possible** |
+| 13 | Session bound to a moved/deleted `aido.yaml` | No |
+| 14 | Unknown session | No |
+| 15 | Corrupted session | No |
+| 16 | Two processes, same session | No |
+| 17 | Simulated restart | No |
+| 18 | M1 regression | Depends only on explicit `/run` |
 
 ## TEST 1 — Create a new session
 
@@ -57,16 +78,16 @@ session's own file on disk untouched.
 ## TEST 7 — Use `/resume` from another session
 
 From inside a running session (not the target), run `/resume` and pick
-a different existing session. Expect: the REPL switches context to that
-session's own state; the originating session's file is untouched.
+a different existing session. Expect: the REPL switches context to
+that session's own state; the originating session's file is untouched.
 
 ## TEST 8 — Resume never launches a WorkItem
 
 Resume a session bound to a project with at least one `READY`/
 `NEEDS_REWORK` WorkItem. Expect: no WorkItem starts, no execution
 record is created, engine state (verified via `aido-code`'s own
-`/status`, or the engine's own `aido status`) is unchanged by the resume
-itself.
+`/status`, or the engine's own `aido status`) is unchanged by the
+resume itself.
 
 ## TEST 9 — Resume never triggers a provider call
 
@@ -91,40 +112,41 @@ resolve it, exactly as the engine itself decides.
 ## TEST 12 — Only then, `/run`: the engine actually resumes
 
 **May consume a real provider.** From a resumed session (TEST 10/11's
-project), explicitly run `/run`. Expect: the engine drives its own real
-state machine (`WAITING`/`RECOVERY_REQUIRED`/`READY` handling) exactly
-as `OrchestratorEngine.run()` defines — this is the first and only point
-in this plan where an engine action, and therefore a real provider call,
-is expected to happen. Confirm this only happens after an explicit
-`/run`, never automatically as part of resume.
+project), explicitly run `/run`. Expect: the engine drives its own
+real state machine (`WAITING`/`RECOVERY_REQUIRED`/`READY` handling)
+exactly as `OrchestratorEngine.run()` defines — this is the first and
+only point in this plan where an engine action, and therefore a real
+provider call, is expected to happen. Confirm this only happens after
+an explicit `/run`, never automatically as part of resume.
 
 ## TEST 13 — Session bound to a moved/deleted `aido.yaml`
 
-Resume a session whose bound project directory or `aido.yaml` no longer
-exists at its recorded path. Expect: a clean, explicit failure naming
-the missing path (per `docs/SESSION_CONTRACT.md`'s documented choice) —
-never a silent recreation of the project, never a raw traceback.
+Resume a session whose bound project directory or `aido.yaml` no
+longer exists at its recorded path. Expect: a clean, explicit failure
+naming the missing path (per `docs/SESSION_CONTRACT.md`'s documented
+choice) — never a silent recreation of the project, never a raw
+traceback.
 
 ## TEST 14 — Unknown session
 
-`aido-code resume <a session id that does not exist>`. Expect: a clean,
-explicit "unknown session" error — never a silently created empty
-session standing in for it.
+`aido-code resume <a session id that does not exist>`. Expect: a
+clean, explicit "unknown session" error — never a silently created
+empty session standing in for it.
 
 ## TEST 15 — Corrupted session
 
-Hand-corrupt a session file on disk (e.g. truncate it / break its JSON)
-and attempt to resume it. Expect: a clean, explicit error naming the
-session id and the problem — never a silent drop, never a silent
+Hand-corrupt a session file on disk (e.g. truncate it / break its
+JSON) and attempt to resume it. Expect: a clean, explicit error naming
+the session id and the problem — never a silent drop, never a silent
 "repair," never a raw traceback.
 
 ## TEST 16 — Two processes, same session
 
 Start two AIDO Code processes and have both attempt to open the exact
 same session concurrently. Expect: the documented fail-closed behavior
-(`docs/SESSION_CONTRACT.md`'s concurrency contract) — one succeeds, the
-other gets an explicit "already in use" error, never silent corruption
-of the session file, never a torn/inconsistent write.
+(`docs/SESSION_CONTRACT.md`'s concurrency contract) — one succeeds,
+the other gets an explicit "already in use" error, never silent
+corruption of the session file, never a torn/inconsistent write.
 
 ## TEST 17 — Simulated restart
 
@@ -137,7 +159,7 @@ silently and incorrectly "fine" with lost/garbled data.
 ## TEST 18 — M1 regression
 
 With and without an active session, exercise every M1 command:
-`/status`, `/workers`, `/config`, `/validate`, `/run`, `/help`, `/exit`.
-Expect: identical, correct behavior to `MVP_SPEC.yaml`'s own acceptance
-criteria — M2 introduces sessions without changing any M1 command's own
-contract.
+`/status`, `/workers`, `/config`, `/validate`, `/run`, `/help`,
+`/exit`. Expect: identical, correct behavior to `MVP_SPEC.yaml`'s own
+acceptance criteria — M2 introduces sessions without changing any M1
+command's own contract.

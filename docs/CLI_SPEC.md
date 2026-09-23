@@ -1,56 +1,49 @@
 # CLI spec
 
-The command/flag surface, milestone by milestone (see `ROADMAP.md` for
-what each milestone actually delivers and its acceptance criteria).
-
-- **M1: `IMPLEMENTED`/`DONE`** — the commands below under "M1" are real,
-  tested, and shipped (see `README.md`, "Status", and
-  `docs/M1_REFERENCE_RUN.md`).
-- **M1.1: `IMPLEMENTED`/`DONE`** — specified (`M1_1_SPEC.yaml`,
-  `aido.m1_1.example.yaml`) and built: `--probe` on `/status`/`/workers`
-  is real, tested, and shipped; a small increment between M1 and M2, not
-  part of M2.
-- **M1.2: `IMPLEMENTED`/`DONE`** — specified (`M1_2_SPEC.yaml`,
-  `aido.m1_2.example.yaml`) and built: `--probe` on `/status`/`/workers`
-  now also renders real per-provider quota windows and reset credits; a
-  small increment after M1.1, not part of M2.
-- **M2: `READY FOR GOVERNED DEVELOPMENT`, not started** — specified
-  (`M2_SPEC.yaml`, `docs/SESSION_CONTRACT.md`) but not yet built.
-- **M3-M8: `PLANNED`/`À VOTER`** — not specified in detail yet, nothing
-  below for these milestones is implemented.
+The command/flag surface, milestone by milestone. See `ROADMAP.md` for
+what each milestone delivers and its acceptance criteria.
 
 ## Binary name
 
-**Current (M1 through M7, until M8's cutover gate is met — see "M8"
-below): `aido-code ...` or `python -m aido_code ...`.** The name `aido`
-belongs to the orchestrator's own existing CLI until M8; every command
-in this document below M8 uses `aido-code`/`python -m aido_code`, never
-`aido`. A separate, clearly-labeled "M8: future syntax" section further
-down documents the post-cutover `aido ...` syntax — the two are never
-mixed in the same example.
+**Current (M1 through M7, until M8's cutover gate is met): `aido-code
+...` or `python -m aido_code ...`.** The name `aido` belongs to the
+orchestrator's own existing CLI until M8. A separate, clearly-labeled
+"M8: future syntax" section below documents the post-cutover `aido ...`
+syntax — the two are never mixed in the same example.
 
-## M1 — REPL commands
+## Command reference
 
-```
-/help
-/status
-/workers
-/config
-/validate
-/run
-/exit
-```
+| Command | Status | Purpose | Provider call |
+|---|---|---|---|
+| `/help` | `IMPLEMENTED` | List available commands | No |
+| `/status` | `IMPLEMENTED` | Project + MVP + work items + all configured workers | No |
+| `/status --probe` | `IMPLEMENTED` | Same, plus one real `probe_workers()` call | Yes |
+| `/workers` | `IMPLEMENTED` | Configured workers (static view) | No |
+| `/workers --probe` | `IMPLEMENTED` | Workers, plus live provider/quota state | Yes |
+| `/config` | `IMPLEMENTED` | Loaded `aido.yaml` facts | No |
+| `/validate` | `IMPLEMENTED` | Config validation | No |
+| `/run` | `IMPLEMENTED` | Start or resume project execution | Potentially |
+| `/exit` | `IMPLEMENTED` | Exit the REPL | No |
+| `resume`, `--resume`/`-r` | `M2` | Resume a frontend session by id | No |
+| `--continue`/`-c` | `M2` | Resume the most recent session | No |
+| `/resume` | `M2` | Resume picker, from inside the REPL | No |
+| `/new` | `M2` | New frontend session | No |
+| Free-form natural language | `M3` | Status/steering questions | Depends |
+| `-p "<request>"` | `M4` | Non-interactive mode | Depends |
+| `--output json`/`stream-json` | `M5` | Structured output | No |
+| `doctor` | `M6` | Read-only diagnostics | No |
+| Timeline | `M7` | Real-time event feed | No |
 
-Each maps directly to one `OrchestratorEngine` call (see
+Each M1 command maps directly to one `OrchestratorEngine` call (see
 `docs/ENGINE_CONTRACT.md`): `/status` → `.status()`, `/workers` →
 `.workers()`, `/validate` → `.validate()`, `/run` → `.run()`. `/config`
 shows the loaded `aido.yaml` facts (via `.validate()`'s
-`ProjectSnapshot`), not a raw file dump. `/run` is also how a project
+`ProjectSnapshot`), never a raw file dump. `/run` is also how a project
 resumes; see "Session resume vs. project run" in `ARCHITECTURE.md`.
 
-## M1.1 — `--probe` on `/status`/`/workers` (`IMPLEMENTED`/`DONE`)
+## M1.1 — `--probe` on `/status`/`/workers`
 
-Full functional contract: `M1_1_SPEC.yaml` and `aido.m1_1.example.yaml`.
+Full contract: `M1_1_SPEC.yaml` and `aido.m1_1.example.yaml`.
 
 ```
 /status           # project + MVP + work items + all configured workers, zero provider calls
@@ -59,45 +52,36 @@ Full functional contract: `M1_1_SPEC.yaml` and `aido.m1_1.example.yaml`.
 /workers --probe  # same probe_workers() call and rendering as /status --probe
 ```
 
-`/status` (no flags) is extended, not replaced: it keeps M1's
-project/MVP/work-item view and adds the same worker list `/workers`
-already renders, still with zero provider probes. `--probe` on either
-command is the only thing in M1.1 that ever calls
+`/status` (no flags) extends M1's view with the same worker list
+`/workers` renders, still with zero provider probes. `--probe` on
+either command is the only thing here that calls
 `EngineClient.probe_workers()` (a thin, direct delegation to
-`OrchestratorEngine.probe_workers()` — see `docs/ENGINE_CONTRACT.md`);
-both flags share one probe/rendering code path (no duplicated logic).
-`/run` is unaffected and stays project start/resume — M1.1 adds no
-project-level `/resume` command; session-level resume (M2) remains
-entirely unimplemented and unaffected by M1.1.
+`OrchestratorEngine.probe_workers()`); both flags share one
+probe/rendering code path. `/run` is unaffected.
 
-## M1.2 — Rich provider quota status on `--probe` (`IMPLEMENTED`/`DONE`)
+## M1.2 — Rich provider quota status on `--probe`
 
-Full functional contract: `M1_2_SPEC.yaml` and `aido.m1_2.example.yaml`.
+Full contract: `M1_2_SPEC.yaml` and `aido.m1_2.example.yaml`.
 
 `/status --probe` and `/workers --probe` keep M1.1's per-worker
-`probe=...` state and, through that same shared rendering path (see
+`probe=...` state and, through the same shared rendering path (see
 `_format_workers_section()`/`format_provider_quotas()` in `repl.py`),
-now also render a `provider quotas:` section: for each provider actually
-probed (once per provider, never once per worker — two workers sharing
-one provider render one quota block), every observed quota window's
-`window_type`, `utilization` (as a percentage), `remaining` (as a
-percentage), and `reset_at`, plus any reset credits observed (`title`,
-`status`, `available` count). A quota window or reset-credit field the
-engine reports as `None`/unknown is rendered as the literal text
-`unknown`, never coerced to a fabricated `0%`/`100%`/count. A provider
-with no quota windows at all renders `quota: unknown` under its heading
-instead of an empty list.
+now also render a `provider quotas:` section: for each provider
+actually probed (once per provider, never once per worker), every
+observed quota window's `window_type`, `utilization` (%), `remaining`
+(%), and `reset_at`, plus any reset credits observed (`title`,
+`status`, `available` count). An unknown field renders as the literal
+text `unknown`, never a fabricated `0%`/`100%`/count. A provider with
+no quota windows renders `quota: unknown` instead of an empty list.
 
-`/status` and `/workers` (no flags) are entirely unaffected by M1.2:
-still zero provider calls, still exactly M1.1's rendering. `/run` stays
-project start/resume, unchanged; M1.2 adds no new command.
+`/status` and `/workers` (no flags) are entirely unaffected; `/run`
+stays project start/resume, unchanged.
 
-## M2 — Session commands and flags (`READY FOR GOVERNED DEVELOPMENT`, not implemented)
+## M2 — Session commands and flags
 
-Full functional contract: `M2_SPEC.yaml` and `docs/SESSION_CONTRACT.md`.
-Conventions deliberately close to Codex CLI/Claude Code, so an existing
-user of either is not lost — using the current, pre-M8 binary name (see
-"Binary name" above):
+Full contract: `M2_SPEC.yaml` and `docs/SESSION_CONTRACT.md`.
+Conventions deliberately close to Codex CLI/Claude Code — using the
+current, pre-M8 binary name:
 
 ```
 aido-code resume                # interactive session picker
@@ -109,8 +93,8 @@ aido-code --continue            # continue the most recent session
 aido-code -c                    # short alias
 ```
 
-Equivalently: `python -m aido_code resume`, `python -m aido_code --resume
-<session-id>`, etc.
+Equivalently: `python -m aido_code resume`, `python -m aido_code
+--resume <session-id>`, etc.
 
 In the REPL:
 
@@ -119,15 +103,14 @@ In the REPL:
 /new
 ```
 
-All of the above are session-level (AIDO Code's own conversation/UX
-state) and **never** automatically call `OrchestratorEngine.run()`,
-probe/select a worker, or otherwise touch engine state — see
-`docs/SESSION_CONTRACT.md` and "Session resume vs. project run/resume"
-in `ARCHITECTURE.md` for the exact invariant. Resuming a session only
-restores AIDO Code's own UX state; advancing the project always requires
-a separate, explicit `/run`.
+All of the above are session-level and **never** automatically call
+`OrchestratorEngine.run()`, probe/select a worker, or otherwise touch
+engine state — see `docs/SESSION_CONTRACT.md` and "Session resume vs.
+project run/resume" in `ARCHITECTURE.md`. Resuming a session only
+restores AIDO Code's own UX state; advancing the project always
+requires a separate, explicit `/run`.
 
-## M3 — Natural-language piloting (`PLANNED`, not specified in detail)
+## M3 — Natural-language piloting
 
 Free-form questions/requests handled in the REPL, e.g.:
 
@@ -140,12 +123,10 @@ qu'est-ce qui bloque la QA ?
 ```
 
 Every fact used to answer comes from an `OrchestratorEngine` snapshot.
-A conversational layer may explain/summarize; it never becomes a second
-authority on project state.
+A conversational layer may explain/summarize; it never becomes a
+second authority on project state.
 
-## M4 — Non-interactive mode (`PLANNED`, not specified in detail)
-
-Using the current, pre-M8 binary name (see "Binary name" above):
+## M4 — Non-interactive mode
 
 ```
 aido-code -p "status"
@@ -153,7 +134,7 @@ aido-code -p "continue le projet"
 echo "status" | aido-code -p
 ```
 
-## M5 — Structured output (`PLANNED`, not specified in detail)
+## M5 — Structured output
 
 ```
 --output text          # default, human-readable
@@ -166,43 +147,37 @@ dataclasses, serialized directly (see `docs/ENGINE_CONTRACT.md`): a
 stable API contract a script can depend on, never a parse of the
 human-readable terminal rendering.
 
-## M6 — `aido-code doctor` (`PLANNED`, not specified in detail)
+## M6 — `aido-code doctor`
 
 Read-only diagnostics, covering (as far as each can honestly be
 determined without side effects): engine version, config, project
 state, Git, Ralph, providers, workers, observable quota, QA, permission
-mode. Current, pre-M8 binary name: `aido-code doctor` /
-`python -m aido_code doctor`.
+mode.
 
-## M7 — Timeline (`PLANNED`, not specified in detail)
+## M7 — Timeline
 
-Renders `RunResult.events`/future engine event stream: DEV A, DEV B, QA,
-Git, WAITING, BLOCKED, COMPLETED. Granularity is bounded by what the
-engine actually emits; see "Events" in `ARCHITECTURE.md`.
+Renders `RunResult.events`/a future engine event stream: DEV A, DEV B,
+QA, Git, WAITING, BLOCKED, COMPLETED. Granularity is bounded by what
+the engine actually emits; see "Events" in `ARCHITECTURE.md`.
 
-## M8 — `aido` command cutover (`À VOTER`, gated on functional parity)
+## M8 — `aido` command cutover
 
-Only after functional parity with the orchestrator's own existing `aido`
-CLI (`init`/`validate`/`run`/`status`) is demonstrated. Before that
-point, this project never claims the `aido` command name; it runs as
-`python -m aido_code`/`aido-code`. The orchestrator's own console script
-is retired or renamed in a separate, later decision; this project does
-not do that unilaterally.
+Gated on functional parity with the orchestrator's own existing `aido`
+CLI (`init`/`validate`/`run`/`status`). Before that point, this project
+never claims the `aido` command name; it runs as `python -m
+aido_code`/`aido-code`. The orchestrator's own console script is
+retired or renamed in a separate, later decision.
 
 **Known gate, not yet resolved**: the orchestrator's public
 `orchestrator.engine.OrchestratorEngine` façade currently exposes
 `.validate()`/`.status()`/`.workers()`/`.probe_workers()`/`.run()`/
-`.close()` — **no public `.init()` method** — while parity requires
-matching all four of `init`/`validate`/`run`/`status`. This project must
-never import private helpers from `orchestrator.cli` to work around this
-gap. See `ROADMAP.md`, "M8", for the options to evaluate (a future public
-engine primitive, a frontend-only solution using a stable contract, or
-another clean mechanism) — not decided here, and not something M2
-depends on or blocks on.
+`.close()` — no public `.init()` method — while parity requires
+matching all four of `init`/`validate`/`run`/`status`. This project
+must never import private helpers from `orchestrator.cli` to work
+around this gap. See `ROADMAP.md`, "M8", for the options to evaluate —
+not decided here, and not something M2 depends on or blocks on.
 
-### M8: future syntax (post-cutover only, never mixed with the current syntax above)
-
-Only after the M8 gate above is met:
+### M8 future syntax (post-cutover only, never mixed with the current syntax above)
 
 ```
 aido resume
@@ -217,6 +192,6 @@ aido doctor
 
 ## M9+
 
-Only as real needs are established: background jobs, attach, logs, stop,
-respawn, MCP, hooks, plugins, a TUI. None of these are scoped or
+Only as real needs are established: background jobs, attach, logs,
+stop, respawn, MCP, hooks, plugins, a TUI. None of these are scoped or
 designed yet.

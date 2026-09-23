@@ -9,6 +9,19 @@ document does not hide anything found during that run, including a real
 engine defect — that defect, and its fix, are themselves part of the
 value this run produced.
 
+## Summary
+
+- **Result**: `DONE` — all 7 WorkItems reached `completed`.
+- **WorkItems**: WI-01 through WI-07.
+- **Workers**: Alice (DEV A), Victor (DEV B).
+- **Tests**: 32 offline tests passing.
+- **Important finding**: a real engine QA-determinism gap (WI-02): two
+  QA attempts at the identical head SHA silently turned a `FAIL` into a
+  trusted `PASS` after an environment-only fix.
+- **Current correction status**: fixed in `ai-dev-orchestrator` PR #9
+  (merged after this run); this run's own commits are unchanged and
+  were not re-validated retroactively.
+
 ## What ran
 
 Engine: `ai-dev-orchestrator` at `main`

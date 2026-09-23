@@ -6,6 +6,21 @@ never part of M2. This document does not hide anything found during
 this run, including a real engine defect it found (Git commit identity
 attribution) — see "A real engine defect found by this run" below.
 
+## Summary
+
+- **Result**: `DONE` — all 4 WorkItems reached `completed`
+  (`cycles_run=4 all_terminal=True`).
+- **WorkItems**: WI-M1.1-01 through WI-M1.1-04.
+- **Workers**: Alice (DEV A), Victor (DEV B).
+- **Tests**: 47 offline tests passing (up from 32).
+- **Important finding**: a real Git-commit-identity engine defect —
+  WI-M1.1-01's substantive implementation commit landed under the
+  maintainer's ambient identity instead of Alice's.
+- **Current correction status**: fixed in `ai-dev-orchestrator` PR #11
+  (merged after this run); this run's own commits, including the
+  misattributed one, are unchanged and were not re-validated
+  retroactively.
+
 ## What ran
 
 Engine: `ai-dev-orchestrator` at `main`
