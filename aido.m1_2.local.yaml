@@ -1,0 +1,88 @@
+# AIDO Code — governed configuration for AI Dev Orchestrator (schema v1),
+# M1.2 ("Rich provider quota status"). See
+# ai-dev-orchestrator/docs/PROJECT_CONFIG.md for the full schema
+# reference, and this project's own CONTRIBUTING.md for how to use this
+# file locally.
+#
+# This is the tracked, portable M1.2 template — analogous to
+# aido.example.yaml (M1), aido.m1_1.example.yaml (M1.1), and
+# aido.m2.example.yaml (M2), never a replacement for any of them. Copy
+# it to `aido.yaml` (already in .gitignore) before running `aido
+# validate`/`aido run` against it; never commit a real aido.yaml, since
+# state_dir/workspace paths are machine-specific.
+#
+# Runtime transition note (same reasoning already verified for M1.1/M2 —
+# see ROADMAP.md, M2, "Runtime transition"): this file targets the SAME
+# project.id (aido-code) as every prior milestone's own template, with
+# its own mvp.id (mvp-0.1.2), inserted after mvp-0.1.1 (DONE) and before
+# mvp-0.2 (not started). AI Dev Orchestrator's ProjectRuntime.
+# bootstrap() creates this new MVP under the same persisted project/
+# state_dir without disturbing any prior MVP's own already-completed
+# WorkItems.
+#
+# No `aido run` has been executed against this file by the task that
+# prepared it; see ROADMAP.md, "Status" / M1.2.
+
+schema_version: 1
+
+project:
+  id: aido-code
+  name: AIDO Code
+  workspace: .
+  # state_dir omitted on purpose: defaults deterministically to
+  # ~/.local/state/ai-dev-orchestrator/projects/aido-code/ — the SAME
+  # state_dir every prior milestone already uses, by design; their own
+  # persisted WorkItems are untouched by this.
+
+workers:
+  # Reference (never a copy) to the sibling ai-dev-orchestrator checkout's
+  # own real worker pool — identical to aido.example.yaml (M1).
+  registry: ../ai-dev-orchestrator/config/workers.yaml
+
+execution:
+  # unrestricted: consistent with the maintainer's current environment for
+  # this project (see aido.example.yaml). Prints a visible warning on
+  # every `aido run`; see ai-dev-orchestrator's docs/PROJECT_CONFIG.md
+  # security warning before ever changing this for a shared/untrusted
+  # environment.
+  permission_mode: unrestricted
+
+git:
+  base_branch: main
+
+mvp:
+  id: mvp-0.1.2
+  objective: "Consume ai-dev-orchestrator's richer ProviderSnapshot (P13.3: quota_windows/reset_credits) so /status --probe and /workers --probe render real utilization/remaining/reset/reset-credit facts, grouped by provider; see M1_2_SPEC.yaml for the full acceptance contract."
+  acceptance_criteria:
+    - "See M1_2_SPEC.yaml for the complete, authoritative list. This field intentionally stays short; the governed WorkItems below carry the real per-WorkItem criteria."
+
+work_items:
+  - id: WI-M1.2-01
+    title: "Consume richer ProviderSnapshot"
+    required_capabilities: [development]
+    dependencies: []
+    acceptance_criteria:
+      - "pyproject.toml's engine dependency minimum is raised to ai-dev-orchestrator>=0.1.3 (the version that introduced ProviderSnapshot.quota_windows/reset_credits) — never left at a version too old to have these fields."
+      - "EngineClient exposes whatever is needed for /status --probe and /workers --probe to render OrchestratorEngine.probe_workers()'s real quota_windows/reset_credits, with no provider-specific logic of its own — a thin delegation only."
+      - "/status --probe renders, per provider actually probed: each quota window's utilization (as a percentage), remaining (1 - utilization), reset_at, and any reset credits observed — never consumed, never fabricated when the engine reports None/unknown."
+      - "/workers --probe uses the exact same rendering path as /status --probe for this — no duplicated quota-rendering logic between the two commands."
+      - "Quota is rendered once per provider actually probed, never once per worker (e.g. Alice/Bob sharing anthropic show one quota block, not two)."
+      - "Offline tests inject fake provider adapters with explicit quota_windows/reset_credits (including deliberately-unknown fields) through OrchestratorEngine.open()'s own provider_adapters seam; pytest -q never performs a real provider call."
+
+  - id: WI-M1.2-02
+    title: "Regression and clean-install UX"
+    required_capabilities: [development]
+    dependencies: [WI-M1.2-01]
+    acceptance_criteria:
+      - "/status and /workers (no flags) are unregressed: still zero provider calls, still exactly what M1.1 already renders (project/MVP/work-items/full worker list with display names/models)."
+      - "/run remains project start/resume, exactly as M1/M1.1 specified; session-level resume (M2) remains entirely unimplemented and unaffected."
+      - "All of M1's and M1.1's existing commands and acceptance criteria (MVP_SPEC.yaml, M1_1_SPEC.yaml) remain passing, unregressed."
+      - "docs/CLI_SPEC.md and docs/ENGINE_CONTRACT.md are updated to document the richer --probe rendering, consistent with this milestone's behavior."
+      - "pytest -q passes for the whole package, offline, with zero real provider/Ralph calls anywhere in the suite; this WorkItem's own QA is the final gate for MVP 0.1.2."
+
+qa:
+  - id: qa-tests
+    kind: unit_test
+    argv: ["pytest", "-q"]
+    timeout_seconds: 300
+    required: true
