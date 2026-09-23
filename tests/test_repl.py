@@ -231,7 +231,10 @@ class TestStatus:
                     utilization=None, reset_at=None,
                 ),
             ),
-            reset_credits=(ResetCredit(title="weekly bonus", status=ResetCreditStatus.AVAILABLE, available_count=2),),
+            reset_credits=(
+                ResetCredit(title="weekly bonus", status=ResetCreditStatus.AVAILABLE, available_count=2),
+                ResetCredit(title="mystery credit", status=ResetCreditStatus.UNKNOWN, available_count=None),
+            ),
         )
         transcript = _run(
             "/status --probe\n/exit\n", config_path=str(config_path), provider_adapters={"anthropic": adapter},
@@ -242,6 +245,7 @@ class TestStatus:
         assert reset_at.isoformat() in transcript
         assert "seven_day: utilization=unknown remaining=unknown reset_at=unknown" in transcript
         assert "reset credit weekly bonus: available (available=2)" in transcript
+        assert "reset credit mystery credit: unknown (available=unknown)" in transcript
 
     def test_probe_renders_quota_once_per_provider_not_per_worker(self, tmp_path: Path) -> None:
         config_path = write_config(tmp_path, registry=REGISTRY_TWO_WORKERS)
