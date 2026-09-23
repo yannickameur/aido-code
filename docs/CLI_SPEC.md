@@ -10,6 +10,10 @@ what each milestone actually delivers and its acceptance criteria).
   `aido.m1_1.example.yaml`) and built: `--probe` on `/status`/`/workers`
   is real, tested, and shipped; a small increment between M1 and M2, not
   part of M2.
+- **M1.2: `IMPLEMENTED`/`DONE`** — specified (`M1_2_SPEC.yaml`,
+  `aido.m1_2.example.yaml`) and built: `--probe` on `/status`/`/workers`
+  now also renders real per-provider quota windows and reset credits; a
+  small increment after M1.1, not part of M2.
 - **M2: `READY FOR GOVERNED DEVELOPMENT`, not started** — specified
   (`M2_SPEC.yaml`, `docs/SESSION_CONTRACT.md`) but not yet built.
 - **M3-M8: `PLANNED`/`À VOTER`** — not specified in detail yet, nothing
@@ -65,6 +69,28 @@ both flags share one probe/rendering code path (no duplicated logic).
 `/run` is unaffected and stays project start/resume — M1.1 adds no
 project-level `/resume` command; session-level resume (M2) remains
 entirely unimplemented and unaffected by M1.1.
+
+## M1.2 — Rich provider quota status on `--probe` (`IMPLEMENTED`/`DONE`)
+
+Full functional contract: `M1_2_SPEC.yaml` and `aido.m1_2.example.yaml`.
+
+`/status --probe` and `/workers --probe` keep M1.1's per-worker
+`probe=...` state and, through that same shared rendering path (see
+`_format_workers_section()`/`format_provider_quotas()` in `repl.py`),
+now also render a `provider quotas:` section: for each provider actually
+probed (once per provider, never once per worker — two workers sharing
+one provider render one quota block), every observed quota window's
+`window_type`, `utilization` (as a percentage), `remaining` (as a
+percentage), and `reset_at`, plus any reset credits observed (`title`,
+`status`, `available` count). A quota window or reset-credit field the
+engine reports as `None`/unknown is rendered as the literal text
+`unknown`, never coerced to a fabricated `0%`/`100%`/count. A provider
+with no quota windows at all renders `quota: unknown` under its heading
+instead of an empty list.
+
+`/status` and `/workers` (no flags) are entirely unaffected by M1.2:
+still zero provider calls, still exactly M1.1's rendering. `/run` stays
+project start/resume, unchanged; M1.2 adds no new command.
 
 ## M2 — Session commands and flags (`READY FOR GOVERNED DEVELOPMENT`, not implemented)
 

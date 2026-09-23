@@ -88,7 +88,19 @@ SQLite connection, or any dataclass from `orchestrator.project_state`/
 - **`ProviderSnapshot`**: `provider`, `available`, `reason`
   (`"available"`, an `UnavailabilityReason` value, or
   `"probe_error: ..."`, never fabricated), `reset_at` (ISO timestamps,
-  possibly empty).
+  possibly empty), `quota_windows` (`tuple[QuotaWindowSnapshot, ...]`,
+  possibly empty), `reset_credits` (`tuple[ResetCreditSnapshot, ...]`,
+  possibly empty). The latter two (P13.3) are what `/status --probe` and
+  `/workers --probe` render as of M1.2 (see `docs/CLI_SPEC.md`, "M1.2");
+  `EngineClient` re-exports both nested types unchanged, with no
+  provider-specific logic of its own.
+- **`QuotaWindowSnapshot`**: `window_type`, `utilization` (`float | None`,
+  a 0-1 fraction, never fabricated when unknown), `remaining`
+  (`float | None`, also 0-1), `reset_at` (`str | None`, ISO timestamp),
+  `source`.
+- **`ResetCreditSnapshot`**: `title`, `status`, `available_count`
+  (`int | None`, never fabricated when unknown). Purely descriptive —
+  this contract never consumes or proposes consuming a reset credit.
 - **`ExecutionSnapshot`**: `execution_id`, `worker_id`, `provider`,
   `status`, `permission_mode`, `started_at`, `finished_at`.
 - **`WaitSnapshot`**: `wait_id`, `phase`, `eligible_at`, `providers`.
