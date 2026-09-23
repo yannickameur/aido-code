@@ -16,8 +16,11 @@ dependency now points at the renamed `ai-dev-orchestrator` package,
 `/status`/`/workers` gained a shared `--probe` opt-in, 47 offline tests
 pass. See [`docs/M1_1_REFERENCE_RUN.md`](docs/M1_1_REFERENCE_RUN.md)
 for the full factual record, including a real Git-commit-identity
-engine defect it found. **M1.2 (rich provider quota status) is `READY
-FOR GOVERNED DEVELOPMENT`, not started** — see
+engine defect it found. **M1.2 (rich provider quota status) is
+`DONE`.** WI-M1.2-01/02 were completed by AI Dev Orchestrator's real,
+governed WorkItem Flow: `/status --probe`/`/workers --probe` now render
+real utilization/remaining/reset/reset-credit facts per provider
+(P13.3), 53 offline tests pass. See
 [`M1_2_SPEC.yaml`](M1_2_SPEC.yaml). M2 (sessions/resume) and later are
 `PLANNED`, not started.
 

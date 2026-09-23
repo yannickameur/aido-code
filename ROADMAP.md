@@ -30,18 +30,20 @@ the acceptance contract and `docs/M1_1_REFERENCE_RUN.md` for the full
 factual record (including a real Git-commit-identity engine defect it
 found). It is not part of M2 and did not start M2.
 
-`M1.2 READY FOR GOVERNED DEVELOPMENT`, not started: a small technical
-increment after M1.1 and before M2, consuming ai-dev-orchestrator's
-richer `ProviderSnapshot` (P13.3: `quota_windows`/`reset_credits`) so
-`/status --probe`/`/workers --probe` render real utilization/remaining/
-reset/reset-credit facts, grouped by provider; see `M1_2_SPEC.yaml`,
-`aido.m1_2.example.yaml`. It is not part of M2 and does not start M2.
+`M1.2 DONE`: WI-M1.2-01/02 (`aido.m1_2.example.yaml`'s governed
+WorkItems) were completed by AI Dev Orchestrator's real WorkItem Flow —
+a small technical increment after M1.1 and before M2, consuming
+ai-dev-orchestrator's richer `ProviderSnapshot` (P13.3:
+`quota_windows`/`reset_credits`) so `/status --probe`/`/workers --probe`
+render real utilization/remaining/reset/reset-credit facts, grouped by
+provider; see `M1_2_SPEC.yaml`. It is not part of M2 and did not start
+M2.
 
 | Milestone | Status |
 |---|---|
 | M1 — Minimal interactive shell | `DONE` (see `docs/M1_REFERENCE_RUN.md`) |
 | M1.1 — CLI conventions and standalone install | `DONE` (see `docs/M1_1_REFERENCE_RUN.md`) |
-| M1.2 — Rich provider quota status | `READY FOR GOVERNED DEVELOPMENT`, not started (see `M1_2_SPEC.yaml`) |
+| M1.2 — Rich provider quota status | `DONE` (see `M1_2_SPEC.yaml`) |
 | M2 — Sessions and resume | `READY FOR GOVERNED DEVELOPMENT`, not started (see `M2_SPEC.yaml`, `docs/SESSION_CONTRACT.md`) |
 | M3 — Natural-language piloting | `À VOTER` |
 | M4 — Non-interactive mode | `À VOTER` |
@@ -117,17 +119,15 @@ functional contract these WorkItems build toward: `M1_1_SPEC.yaml`.
 
 ## M1.2 — Rich provider quota status
 
-**Status: `READY FOR GOVERNED DEVELOPMENT`, not started.** Fully
-specified — acceptance contract in `M1_2_SPEC.yaml`, 2 governed
-WorkItems drafted below (portable template: `aido.m1_2.example.yaml`,
-same `project.id`/`state_dir` as every prior milestone, its own
-`mvp.id: mvp-0.1.2`) — but not yet created in any orchestrator runtime
-state, and no code has been written. A human GO is required before
-launching this milestone's governed WorkItem Flow, exactly like M1.1's.
-A small technical increment after M1.1 (`DONE`) and before M2 (not
-started); it is not part of M2 and does not start M2.
+**Status: `DONE`.** WI-M1.2-01/02 (portable template:
+`aido.m1_2.example.yaml`, same `project.id`/`state_dir` as every prior
+milestone, its own `mvp.id: mvp-0.1.2`) were completed by AI Dev
+Orchestrator's real, governed WorkItem Flow — see `M1_2_SPEC.yaml` for
+the acceptance contract they satisfy. A small technical increment after
+M1.1 (`DONE`) and before M2 (not started); it is not part of M2 and did
+not start M2.
 
-Must cover:
+Covers:
 
 - `pyproject.toml`'s engine dependency minimum raised to
   `ai-dev-orchestrator>=0.1.3` (the version that introduced
