@@ -105,8 +105,11 @@ live Store, SQLite connection, or any dataclass from
 - **`ResetCreditSnapshot`**: `title`, `status`, `available_count`
   (`int | None`, never fabricated when unknown). Purely descriptive —
   this contract never consumes or proposes consuming a reset credit.
-- **`ExecutionSnapshot`**: `execution_id`, `worker_id`, `provider`,
-  `status`, `permission_mode`, `started_at`, `finished_at`.
+- **`ExecutionSnapshot`**: `execution_id`, `worker_id`,
+  `worker_display_name` (`str | None`, the worker's `display_name`
+  resolved from the *current* worker registry — `None` if that
+  `worker_id` no longer exists there, never fabricated/guessed),
+  `provider`, `status`, `permission_mode`, `started_at`, `finished_at`.
 - **`WaitSnapshot`**: `wait_id`, `phase`, `eligible_at`, `providers`.
 - **`WorkItemSnapshot`**: `work_item_id`, `status`, `blocked_reason`,
   `last_execution` (`ExecutionSnapshot | None`), `wait`
