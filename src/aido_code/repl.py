@@ -16,6 +16,7 @@ on either command is the only thing that ever calls
 
 from __future__ import annotations
 
+import re
 from typing import TextIO
 
 from aido_code.engine_client import (
@@ -42,6 +43,27 @@ COMMANDS: dict[str, str] = {
 
 DEFAULT_CONFIG_PATH = "aido.yaml"
 
+_CONTROL_CHAR_RE = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+_CONTROL_CHAR_ESCAPES = {"\r": "\\r", "\n": "\\n", "\t": "\\t"}
+
+
+def sanitize_for_terminal(value: object) -> str:
+    """Neutralizes ESC/ANSI sequences, bare CR, injected LF, and every other
+    C0/C1 control character in a value read from an OrchestratorEngine
+    snapshot, so it can never manipulate the terminal it is printed to.
+    Every dynamic snapshot-derived value rendered anywhere in this module
+    passes through this one function — never a second, duplicated one.
+    Ordinary Unicode text (accents, emoji, non-Latin scripts) is returned
+    unchanged; the snapshot value itself is never mutated, only the string
+    handed back for printing."""
+    text = value if isinstance(value, str) else str(value)
+
+    def _escape(match: re.Match[str]) -> str:
+        char = match.group()
+        return _CONTROL_CHAR_ESCAPES.get(char, f"\\x{ord(char):02x}")
+
+    return _CONTROL_CHAR_RE.sub(_escape, text)
+
 
 def format_help() -> str:
     lines = ["Available commands:"]
@@ -50,18 +72,22 @@ def format_help() -> str:
 
 
 def format_config(snapshot: ProjectSnapshot) -> str:
-    providers = ", ".join(snapshot.providers) if snapshot.providers else "(none)"
+    providers = (
+        ", ".join(sanitize_for_terminal(provider) for provider in snapshot.providers)
+        if snapshot.providers
+        else "(none)"
+    )
     lines = [
-        f"project: {snapshot.project_id} ({snapshot.name})",
-        f"workspace: {snapshot.workspace}",
-        f"state_dir: {snapshot.state_dir}",
-        f"mvp: {snapshot.mvp_id}",
+        f"project: {sanitize_for_terminal(snapshot.project_id)} ({sanitize_for_terminal(snapshot.name)})",
+        f"workspace: {sanitize_for_terminal(snapshot.workspace)}",
+        f"state_dir: {sanitize_for_terminal(snapshot.state_dir)}",
+        f"mvp: {sanitize_for_terminal(snapshot.mvp_id)}",
         f"work_items: {snapshot.work_item_count}",
         f"qa_commands: {snapshot.qa_command_count}",
         f"enabled_workers: {snapshot.enabled_worker_count}",
         f"providers: {providers}",
-        f"permission_mode: {snapshot.permission_mode.upper()}",
-        f"base_branch: {snapshot.base_branch}",
+        f"permission_mode: {sanitize_for_terminal(snapshot.permission_mode.upper())}",
+        f"base_branch: {sanitize_for_terminal(snapshot.base_branch)}",
     ]
     return "\n".join(lines)
 
@@ -70,34 +96,46 @@ def format_status(snapshot: ProjectStatusSnapshot) -> str:
     if not snapshot.initialized:
         return "NOT_INITIALIZED\nRun /run to initialize and start this project."
 
-    lines = [f"project: {snapshot.project_id} ({snapshot.project_name})"]
+    lines = [
+        f"project: {sanitize_for_terminal(snapshot.project_id)} "
+        f"({sanitize_for_terminal(snapshot.project_name)})"
+    ]
     if snapshot.mvp is None:
         lines.append("mvp: (not configured)")
     elif snapshot.mvp.status is None:
-        lines.append(f"mvp: {snapshot.mvp.mvp_id} (not yet created)")
+        lines.append(f"mvp: {sanitize_for_terminal(snapshot.mvp.mvp_id)} (not yet created)")
     else:
-        lines.append(f"mvp: {snapshot.mvp.mvp_id} status={snapshot.mvp.status}")
+        lines.append(
+            f"mvp: {sanitize_for_terminal(snapshot.mvp.mvp_id)} "
+            f"status={sanitize_for_terminal(snapshot.mvp.status)}"
+        )
 
     if snapshot.work_items:
         lines.append("")
         lines.append("work items:")
         for work_item in snapshot.work_items:
-            line = f"  {work_item.work_item_id}: {work_item.status}"
+            line = (
+                f"  {sanitize_for_terminal(work_item.work_item_id)}: "
+                f"{sanitize_for_terminal(work_item.status)}"
+            )
             if work_item.blocked_reason:
-                line += f" (blocked_reason={work_item.blocked_reason})"
+                line += f" (blocked_reason={sanitize_for_terminal(work_item.blocked_reason)})"
             lines.append(line)
 
             if work_item.last_execution is not None:
                 execution = work_item.last_execution
                 lines.append(
-                    f"      last execution: worker={execution.worker_id} "
-                    f"provider={execution.provider} status={execution.status}"
+                    f"      last execution: worker={sanitize_for_terminal(execution.worker_id)} "
+                    f"provider={sanitize_for_terminal(execution.provider)} "
+                    f"status={sanitize_for_terminal(execution.status)}"
                 )
             if work_item.wait is not None:
                 wait = work_item.wait
+                providers = ",".join(sanitize_for_terminal(provider) for provider in wait.providers) or "(any)"
                 lines.append(
-                    f"      wait: phase={wait.phase} eligible_at={wait.eligible_at} "
-                    f"providers={','.join(wait.providers) or '(any)'}"
+                    f"      wait: phase={sanitize_for_terminal(wait.phase)} "
+                    f"eligible_at={sanitize_for_terminal(wait.eligible_at)} "
+                    f"providers={providers}"
                 )
     return "\n".join(lines)
 
@@ -113,16 +151,22 @@ def format_run(result: RunResult) -> str:
         lines.append("")
         lines.append("work items:")
         for work_item in result.work_items:
-            line = f"  {work_item.work_item_id}: {work_item.status}"
+            line = (
+                f"  {sanitize_for_terminal(work_item.work_item_id)}: "
+                f"{sanitize_for_terminal(work_item.status)}"
+            )
             if work_item.blocked_reason:
-                line += f" (blocked_reason={work_item.blocked_reason})"
+                line += f" (blocked_reason={sanitize_for_terminal(work_item.blocked_reason)})"
             lines.append(line)
 
     if result.events:
         lines.append("")
         lines.append("events:")
         for event in result.events:
-            lines.append(f"  {event.kind}: work_item={event.work_item_id}")
+            lines.append(
+                f"  {sanitize_for_terminal(event.kind)}: "
+                f"work_item={sanitize_for_terminal(event.work_item_id)}"
+            )
 
     return "\n".join(lines)
 
@@ -140,11 +184,11 @@ def _worker_probe_state(worker: WorkerSnapshot, provider_states: dict[str, Provi
     if state.available:
         return "available"
     if state.reason.startswith("probe_error"):
-        return state.reason
+        return sanitize_for_terminal(state.reason)
     if state.reason == "quota_exhausted":
         return "quota"
     if state.reason in ("auth_error", "provider_error"):
-        return f"unavailable ({state.reason})"
+        return f"unavailable ({sanitize_for_terminal(state.reason)})"
     return "unknown"
 
 
@@ -163,15 +207,17 @@ def format_workers(
     for worker in snapshots:
         state = "enabled" if worker.enabled else "disabled"
         line = (
-            f"  {worker.worker_id} ({worker.display_name}): {state} "
-            f"provider={worker.provider} backend={worker.backend} priority={worker.priority}"
+            f"  {sanitize_for_terminal(worker.worker_id)} ({sanitize_for_terminal(worker.display_name)}): "
+            f"{state} provider={sanitize_for_terminal(worker.provider)} "
+            f"backend={sanitize_for_terminal(worker.backend)} priority={worker.priority}"
         )
         if worker.model:
-            line += f" model={worker.model}"
+            line += f" model={sanitize_for_terminal(worker.model)}"
         if provider_states is not None:
             line += f" probe={_worker_probe_state(worker, provider_states)}"
         lines.append(line)
-        lines.append(f"      capabilities: {', '.join(worker.capabilities) or '(none)'}")
+        capabilities = ", ".join(sanitize_for_terminal(capability) for capability in worker.capabilities) or "(none)"
+        lines.append(f"      capabilities: {capabilities}")
     return "\n".join(lines)
 
 
@@ -185,19 +231,23 @@ def format_provider_quotas(providers: tuple[ProviderSnapshot, ...]) -> str:
         return ""
     lines = ["provider quotas:"]
     for snapshot in sorted(providers, key=lambda p: p.provider):
-        lines.append(f"  {snapshot.provider}:")
+        lines.append(f"  {sanitize_for_terminal(snapshot.provider)}:")
         if not snapshot.quota_windows:
             lines.append("    quota: unknown")
         for window in snapshot.quota_windows:
             utilization = f"{window.utilization:.0%}" if window.utilization is not None else "unknown"
             remaining = f"{window.remaining:.0%}" if window.remaining is not None else "unknown"
-            reset_at = window.reset_at if window.reset_at is not None else "unknown"
+            reset_at = sanitize_for_terminal(window.reset_at) if window.reset_at is not None else "unknown"
             lines.append(
-                f"    {window.window_type}: utilization={utilization} remaining={remaining} reset_at={reset_at}"
+                f"    {sanitize_for_terminal(window.window_type)}: utilization={utilization} "
+                f"remaining={remaining} reset_at={reset_at}"
             )
         for credit in snapshot.reset_credits:
             count = credit.available_count if credit.available_count is not None else "unknown"
-            lines.append(f"    reset credit {credit.title}: {credit.status} (available={count})")
+            lines.append(
+                f"    reset credit {sanitize_for_terminal(credit.title)}: "
+                f"{sanitize_for_terminal(credit.status)} (available={count})"
+            )
     return "\n".join(lines)
 
 
