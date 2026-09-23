@@ -30,10 +30,18 @@ the acceptance contract and `docs/M1_1_REFERENCE_RUN.md` for the full
 factual record (including a real Git-commit-identity engine defect it
 found). It is not part of M2 and did not start M2.
 
+`M1.2 READY FOR GOVERNED DEVELOPMENT`, not started: a small technical
+increment after M1.1 and before M2, consuming ai-dev-orchestrator's
+richer `ProviderSnapshot` (P13.3: `quota_windows`/`reset_credits`) so
+`/status --probe`/`/workers --probe` render real utilization/remaining/
+reset/reset-credit facts, grouped by provider; see `M1_2_SPEC.yaml`,
+`aido.m1_2.example.yaml`. It is not part of M2 and does not start M2.
+
 | Milestone | Status |
 |---|---|
 | M1 — Minimal interactive shell | `DONE` (see `docs/M1_REFERENCE_RUN.md`) |
 | M1.1 — CLI conventions and standalone install | `DONE` (see `docs/M1_1_REFERENCE_RUN.md`) |
+| M1.2 — Rich provider quota status | `READY FOR GOVERNED DEVELOPMENT`, not started (see `M1_2_SPEC.yaml`) |
 | M2 — Sessions and resume | `READY FOR GOVERNED DEVELOPMENT`, not started (see `M2_SPEC.yaml`, `docs/SESSION_CONTRACT.md`) |
 | M3 — Natural-language piloting | `À VOTER` |
 | M4 — Non-interactive mode | `À VOTER` |
@@ -106,6 +114,43 @@ Must cover:
 
 Full acceptance criteria per WorkItem: `aido.m1_1.example.yaml`. Full
 functional contract these WorkItems build toward: `M1_1_SPEC.yaml`.
+
+## M1.2 — Rich provider quota status
+
+**Status: `READY FOR GOVERNED DEVELOPMENT`, not started.** Fully
+specified — acceptance contract in `M1_2_SPEC.yaml`, 2 governed
+WorkItems drafted below (portable template: `aido.m1_2.example.yaml`,
+same `project.id`/`state_dir` as every prior milestone, its own
+`mvp.id: mvp-0.1.2`) — but not yet created in any orchestrator runtime
+state, and no code has been written. A human GO is required before
+launching this milestone's governed WorkItem Flow, exactly like M1.1's.
+A small technical increment after M1.1 (`DONE`) and before M2 (not
+started); it is not part of M2 and does not start M2.
+
+Must cover:
+
+- `pyproject.toml`'s engine dependency minimum raised to
+  `ai-dev-orchestrator>=0.1.3` (the version that introduced
+  `ProviderSnapshot.quota_windows`/`reset_credits`);
+- `EngineClient` exposing whatever `/status --probe`/`/workers --probe`
+  need directly from `OrchestratorEngine.probe_workers()`'s own richer
+  `ProviderSnapshot`, no provider-specific logic of its own;
+- `/status --probe` rendering utilization/remaining/reset_at/reset
+  credits per quota window, never fabricated when unknown;
+- `/workers --probe` sharing the exact same rendering path — no
+  duplicated quota-rendering logic (KISS, same rule M1.1 already
+  established for the plain probe state);
+- quota rendered once per provider actually probed, never once per
+  worker;
+- `/status`/`/workers` (no flags) and `/run` entirely unregressed.
+
+### M1.2 WorkItems (drafted, portable template only — see `aido.m1_2.example.yaml`; not created in any orchestrator runtime state)
+
+1. **WI-M1.2-01** — Consume richer `ProviderSnapshot`.
+2. **WI-M1.2-02** — Regression and clean-install UX.
+
+Full acceptance criteria per WorkItem: `aido.m1_2.example.yaml`. Full
+functional contract these WorkItems build toward: `M1_2_SPEC.yaml`.
 
 ## M2 — Sessions and resume
 

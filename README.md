@@ -16,8 +16,10 @@ dependency now points at the renamed `ai-dev-orchestrator` package,
 `/status`/`/workers` gained a shared `--probe` opt-in, 47 offline tests
 pass. See [`docs/M1_1_REFERENCE_RUN.md`](docs/M1_1_REFERENCE_RUN.md)
 for the full factual record, including a real Git-commit-identity
-engine defect it found. M2 (sessions/resume) and later are `PLANNED`,
-not started.
+engine defect it found. **M1.2 (rich provider quota status) is `READY
+FOR GOVERNED DEVELOPMENT`, not started** — see
+[`M1_2_SPEC.yaml`](M1_2_SPEC.yaml). M2 (sessions/resume) and later are
+`PLANNED`, not started.
 
 ## What AIDO Code is
 
@@ -63,6 +65,8 @@ P13, for the full decoupling rationale.
 - [`docs/M1_1_REFERENCE_RUN.md`](docs/M1_1_REFERENCE_RUN.md): the
   factual record of M1.1's real, governed build — including a real
   Git-commit-identity engine defect it found.
+- [`M1_2_SPEC.yaml`](M1_2_SPEC.yaml): the acceptance contract for MVP
+  0.1.2 (M1.2, rich provider quota status).
 - [`docs/M1_REFERENCE_RUN.md`](docs/M1_REFERENCE_RUN.md): the factual
   record of M1's real, governed build — including a real engine defect
   it found and its fix.

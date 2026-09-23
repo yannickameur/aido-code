@@ -1,0 +1,54 @@
+# M1.2 acceptance contract: AIDO Code, milestone M1.2 (rich provider
+# quota status). See ROADMAP.md for the full milestone list and
+# docs/ENGINE_CONTRACT.md/docs/CLI_SPEC.md for the exact engine API and
+# command surface this milestone builds on.
+#
+# M1.2 is a small technical increment after M1.1 (DONE) and before M2
+# (READY FOR GOVERNED DEVELOPMENT, not started) — it is not part of M2
+# and does not start M2. It exists because ai-dev-orchestrator's own
+# P13.3 (ROADMAP.md) enriched OrchestratorEngine.ProviderSnapshot with
+# real quota_windows/reset_credits that this project's own --probe
+# rendering does not consume yet. This file does not itself execute
+# anything; the governed WorkItems that implement it live in
+# aido.m1_2.example.yaml's work_items section, driven by AI Dev
+# Orchestrator (see CONTRIBUTING.md), never by a human/assistant writing
+# code directly into this repository.
+
+schema_version: 1
+
+mvp:
+  id: mvp-0.1.2
+  name: Rich provider quota status
+  objective: >
+    Consume ai-dev-orchestrator's richer ProviderSnapshot (P13.3:
+    quota_windows/reset_credits) so /status --probe and /workers --probe
+    render real utilization/remaining/reset/reset-credit facts, grouped
+    by provider (never duplicated per worker), on top of the real
+    OrchestratorEngine facade M1/M1.1 already established — never a
+    second, duplicated quota/provider implementation, and never a
+    fabricated percentage when the engine reports unknown.
+
+acceptance_criteria:
+  - "pyproject.toml's engine dependency minimum is raised to ai-dev-orchestrator>=0.1.3 (the version that introduced ProviderSnapshot.quota_windows/reset_credits)."
+  - "EngineClient exposes whatever DTO(s) /status --probe and /workers --probe need directly from OrchestratorEngine.probe_workers()'s own ProviderSnapshot (quota_windows/reset_credits), with no provider-specific logic of its own — a thin delegation, exactly like EngineClient.probe_workers() already is."
+  - "/status --probe renders, per provider actually probed: utilization (as a percentage) and remaining (1 - utilization) for each quota window, its reset_at, and any reset credits observed — never consumed, never a fabricated value when the engine reports None/unknown."
+  - "/workers --probe renders the exact same provider-quota facts as /status --probe, through the exact same rendering code path — no duplicated quota-rendering logic between the two commands (this was already true for the plain available/quota/unavailable/probe_error/disabled/unknown state in M1.1; M1.2 extends the same single path, never adds a second one)."
+  - "Quota is rendered once per PROVIDER actually probed, never once per worker — two workers sharing one provider (e.g. Alice/Bob on anthropic) show that provider's one quota block, never two independent-looking ones."
+  - "An unknown utilization/reset/reset-credit-count stays rendered as unknown text, never coerced to a fabricated 0%/100% or a fabricated count."
+  - "A worker whose provider was never probed (disabled workers; M1.1's existing rule) shows no quota block for that provider unless another enabled worker on the same provider was actually probed."
+  - "/status (no flags) and /workers (no flags) are entirely unaffected: still zero provider calls, still exactly what M1.1 already renders."
+  - "/run remains project start/resume, exactly as M1/M1.1 specified; no new command added in this milestone."
+  - "No command in this milestone ever constructs MVPManager, WorkerSelector, QuotaManager, or a ProviderAdapter directly, and probe_workers() is still only ever called by /status --probe and /workers --probe."
+  - "All tests are offline: fake provider adapters passed through OrchestratorEngine.open()'s own provider_adapters injection seam (including quota_windows/reset_credits fixtures), never a real Claude/Codex/Vibe/DeepSeek/Kimi invocation; pytest -q never performs a real provider call."
+  - "M1's and M1.1's existing acceptance criteria (MVP_SPEC.yaml, M1_1_SPEC.yaml) are not regressed: every command from both milestones still behaves exactly as specified for every case they already covered."
+
+out_of_scope_for_this_mvp:
+  - "Sessions, /resume, /new, --resume, -r, --continue, -c (M2) — unaffected and unstarted by this milestone."
+  - "Natural-language piloting (M3)."
+  - "Non-interactive mode, -p (M4)."
+  - "json/stream-json structured output (M5)."
+  - "Doctor/diagnostics (M6)."
+  - "Real-time timeline rendering of engine events (M7)."
+  - "Claiming the `aido` command name (M8)."
+  - "Consuming/proposing consumption of a reset credit — purely descriptive, exactly like the engine's own contract."
+  - "A second quota-tracking store or cache — every quota fact rendered here comes straight from that one probe_workers() call, nothing persisted."
