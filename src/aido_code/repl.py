@@ -82,9 +82,9 @@ def format_config(snapshot: ProjectSnapshot) -> str:
         f"workspace: {sanitize_for_terminal(snapshot.workspace)}",
         f"state_dir: {sanitize_for_terminal(snapshot.state_dir)}",
         f"mvp: {sanitize_for_terminal(snapshot.mvp_id)}",
-        f"work_items: {snapshot.work_item_count}",
-        f"qa_commands: {snapshot.qa_command_count}",
-        f"enabled_workers: {snapshot.enabled_worker_count}",
+        f"work_items: {sanitize_for_terminal(snapshot.work_item_count)}",
+        f"qa_commands: {sanitize_for_terminal(snapshot.qa_command_count)}",
+        f"enabled_workers: {sanitize_for_terminal(snapshot.enabled_worker_count)}",
         f"providers: {providers}",
         f"permission_mode: {sanitize_for_terminal(snapshot.permission_mode.upper())}",
         f"base_branch: {sanitize_for_terminal(snapshot.base_branch)}",
@@ -142,9 +142,9 @@ def format_status(snapshot: ProjectStatusSnapshot) -> str:
 
 def format_run(result: RunResult) -> str:
     lines = [
-        f"cycles_run: {result.cycles_run}",
-        f"all_terminal: {result.all_terminal}",
-        f"reached_max_cycles: {result.reached_max_cycles}",
+        f"cycles_run: {sanitize_for_terminal(result.cycles_run)}",
+        f"all_terminal: {sanitize_for_terminal(result.all_terminal)}",
+        f"reached_max_cycles: {sanitize_for_terminal(result.reached_max_cycles)}",
     ]
 
     if result.work_items:
@@ -209,7 +209,7 @@ def format_workers(
         line = (
             f"  {sanitize_for_terminal(worker.worker_id)} ({sanitize_for_terminal(worker.display_name)}): "
             f"{state} provider={sanitize_for_terminal(worker.provider)} "
-            f"backend={sanitize_for_terminal(worker.backend)} priority={worker.priority}"
+            f"backend={sanitize_for_terminal(worker.backend)} priority={sanitize_for_terminal(worker.priority)}"
         )
         if worker.model:
             line += f" model={sanitize_for_terminal(worker.model)}"
@@ -235,15 +235,15 @@ def format_provider_quotas(providers: tuple[ProviderSnapshot, ...]) -> str:
         if not snapshot.quota_windows:
             lines.append("    quota: unknown")
         for window in snapshot.quota_windows:
-            utilization = f"{window.utilization:.0%}" if window.utilization is not None else "unknown"
-            remaining = f"{window.remaining:.0%}" if window.remaining is not None else "unknown"
+            utilization = sanitize_for_terminal(f"{window.utilization:.0%}") if window.utilization is not None else "unknown"
+            remaining = sanitize_for_terminal(f"{window.remaining:.0%}") if window.remaining is not None else "unknown"
             reset_at = sanitize_for_terminal(window.reset_at) if window.reset_at is not None else "unknown"
             lines.append(
                 f"    {sanitize_for_terminal(window.window_type)}: utilization={utilization} "
                 f"remaining={remaining} reset_at={reset_at}"
             )
         for credit in snapshot.reset_credits:
-            count = credit.available_count if credit.available_count is not None else "unknown"
+            count = sanitize_for_terminal(credit.available_count) if credit.available_count is not None else "unknown"
             lines.append(
                 f"    reset credit {sanitize_for_terminal(credit.title)}: "
                 f"{sanitize_for_terminal(credit.status)} (available={count})"

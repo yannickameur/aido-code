@@ -9,13 +9,14 @@ from __future__ import annotations
 import io
 import subprocess
 import sys
+from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from orchestrator.engine import ProjectStatusSnapshot, WorkerSnapshot, WorkItemSnapshot
+from orchestrator.engine import ProjectSnapshot, ProjectStatusSnapshot, WorkerSnapshot, WorkItemSnapshot
 from orchestrator.providers.contracts import QuotaWindow, ResetCredit, ResetCreditStatus, UnavailabilityReason
 
 from aido_code.engine_client import EngineClient
@@ -627,3 +628,47 @@ class TestTerminalRenderingSafety:
         )
         rendered = format_status(snapshot)
         assert "café \U0001f600" in rendered
+
+    def test_repl_output_neutralizes_snapshot_text_without_mutating_snapshots(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        payload = "label\x1b[31mred\rreplace\nfake: line"
+        project = ProjectSnapshot(
+            project_id="café あいう \U0001f600", name=payload, workspace="/tmp",
+            state_dir="/tmp/state", mvp_id="mvp-1", work_item_count=1,
+            qa_command_count=0, enabled_worker_count=1, providers=("anthropic",),
+            permission_mode="safe", base_branch="main",
+        )
+        worker = WorkerSnapshot(
+            worker_id="alice", display_name=payload, enabled=True,
+            provider="anthropic", backend="cli", capabilities=(), priority=1,
+            default_profile_id=None, model=None,
+        )
+        item = WorkItemSnapshot(
+            work_item_id="wi-1", status="blocked", blocked_reason=payload,
+        )
+        status = ProjectStatusSnapshot(
+            initialized=True, project_id=project.project_id,
+            project_name=payload, mvp=None, work_items=(item,),
+        )
+
+        class FakeClient:
+            def validate(self) -> ProjectSnapshot:
+                return project
+
+            def status(self) -> ProjectStatusSnapshot:
+                return status
+
+            def workers(self) -> tuple[WorkerSnapshot, ...]:
+                return (worker,)
+
+        monkeypatch.setattr(EngineClient, "open", lambda *args, **kwargs: nullcontext(FakeClient()))
+        transcript = _run("/config\n/status\n/workers\n/exit\n")
+
+        safe = "label\\x1b[31mred\\rreplace\\nfake: line"
+        assert transcript.count(safe) == 5
+        assert "\x1b" not in transcript
+        assert "\r" not in transcript
+        assert "replace\nfake: line" not in transcript
+        assert project.project_id in transcript
+        assert project.name == worker.display_name == item.blocked_reason == payload
