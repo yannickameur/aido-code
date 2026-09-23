@@ -122,6 +122,59 @@ Covers:
 Full criteria: `aido.m1_2.example.yaml`. Full contract:
 `M1_2_SPEC.yaml`.
 
+## M1.3 — Audit hardening (`READY FOR GOVERNED DEVELOPMENT`, not started)
+
+A small technical increment after M1.2 and before M2; not part of M2.
+Prepared in response to a real technical audit (external review,
+2026-09-23) of AIDO Code at SHA `e916cfa8a247bc9ac848e59729dc9da4b5f25e7e`,
+which found:
+
+| ID | Severity | Finding |
+|---|---|---|
+| F-01 | LOW | Unknown CLI launch arguments are silently ignored instead of rejected. |
+| F-02 | MEDIUM | ANSI/control characters from engine snapshot values reach the terminal unneutralized. |
+| F-03 | LOW | `docs/ENGINE_CONTRACT.md` omits `worker_display_name` (a real `ExecutionSnapshot` field, P13.3). |
+
+The audit also raised six M2 design risks (DR-1 through DR-6) —
+resolved directly in `docs/SESSION_CONTRACT.md`, `M2_SPEC.yaml`, and
+`aido.m2.example.yaml` as documentation/spec work (see M2's own section
+below); no code changes were needed for that part, since M2 has no code
+yet.
+
+**Not manually coded**: per `CONTRIBUTING.md`, F-01/F-02 require real
+functional code (`src/aido_code/*`) and must be produced by AI Dev
+Orchestrator's own governed WorkItem Flow, never written directly here.
+F-03 is documentation-only and may be fixed directly by the maintainer,
+but is instead folded into WI-M1.3-03's own acceptance criteria below
+to avoid two contradictory commits touching the same file.
+
+Must cover:
+
+- unknown CLI launch arguments rejected with a clear message and a
+  non-zero exit code, never silently ignored; normal, no-argument
+  launch stays unchanged; no M2 flags (`--resume`/`-r`/`--continue`/
+  `-c`) implemented yet — only the validation groundwork for them;
+- every dynamic value rendered to the terminal that originates from an
+  engine snapshot is sanitized against ESC/ANSI sequences, bare CR, and
+  injected LF/other control characters, through one shared
+  sanitization function reused everywhere — never a package if the
+  standard library suffices; engine DTOs themselves are never mutated,
+  only the rendering layer;
+- `docs/ENGINE_CONTRACT.md` corrected to document `worker_display_name`
+  (F-03), as part of this milestone's own QA rather than a separate
+  maintainer commit;
+- M1/M1.1/M1.2 entirely unregressed, tests entirely offline, no real
+  provider call anywhere in this milestone's own QA.
+
+### WorkItems (drafted, portable template only — see `aido.m1_3.example.yaml`; not created in any orchestrator runtime state)
+
+1. **WI-M1.3-01** — CLI launch argument validation (F-01).
+2. **WI-M1.3-02** — Terminal rendering safety (F-02).
+3. **WI-M1.3-03** — Regression + engine contract fix (F-03).
+
+Full acceptance criteria per WorkItem: `aido.m1_3.example.yaml`. Full
+functional contract these WorkItems build toward: `M1_3_SPEC.yaml`.
+
 ## M2 — Sessions and resume (`READY FOR GOVERNED DEVELOPMENT`, not started)
 
 Fully specified: acceptance contract in `M2_SPEC.yaml`, the session
@@ -153,6 +206,22 @@ Must cover:
 - resume after this process restarts;
 - concurrency/corruption/error handling, fail-closed;
 - tests entirely offline (`M2_SPEC.yaml`, criterion 17).
+
+**Design hardening (DR-1 through DR-6, external audit 2026-09-23)**:
+resolved directly in `docs/SESSION_CONTRACT.md`/`M2_SPEC.yaml`/
+`aido.m2.example.yaml`, before any governed implementation starts —
+session file as sole source of truth with a rebuildable index and
+atomic (temp-file + `os.replace`) writes (DR-1); a real OS-level lock
+(`fcntl.flock()`, releases automatically on process death, no stale-lock
+cleanup logic) rather than a vague "lock file" (DR-2); `updated_at`
+bumped on successful open/resume, not only on command receipt, ties
+broken by `session_id` (DR-3); `session_id` format validated before any
+disk access, path confinement, symlinks never followed (DR-4); an
+explicit never-stored list (env, credentials, raw provider output) for
+interaction history, distinct from terminal rendering safety (M1.3)
+(DR-5); AIDO Code starts and serves `resume`/`-c`/`/new`/`/help` with no
+project bound, an explicit `UNBOUND` session state (DR-6). See
+`docs/SESSION_CONTRACT.md` for the full contract.
 
 ### Runtime transition (mvp-0.1 -> mvp-0.2)
 

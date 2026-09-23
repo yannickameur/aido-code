@@ -1,0 +1,56 @@
+# M1.3 acceptance contract: AIDO Code, milestone M1.3 (audit hardening).
+# See ROADMAP.md for the full milestone list and docs/CLI_SPEC.md/
+# docs/ENGINE_CONTRACT.md for the exact command surface and engine API
+# this milestone builds on.
+#
+# M1.3 is a small technical increment after M1.2 (DONE) and before M2
+# (READY FOR GOVERNED DEVELOPMENT, not started) — it is not part of M2
+# and does not start M2. It exists because a real technical audit
+# (external review, 2026-09-23, SHA
+# e916cfa8a247bc9ac848e59729dc9da4b5f25e7e) found three real findings
+# (F-01 unknown CLI arguments silently ignored, F-02 ANSI/control
+# characters from engine snapshots reaching the terminal unneutralized,
+# F-03 docs/ENGINE_CONTRACT.md omitting worker_display_name). This file
+# does not itself execute anything; the governed WorkItems that
+# implement it live in aido.m1_3.example.yaml's work_items section,
+# driven by AI Dev Orchestrator (see CONTRIBUTING.md), never by a
+# human/assistant writing code directly into this repository.
+
+schema_version: 1
+
+mvp:
+  id: mvp-0.1.3
+  name: Audit hardening
+  objective: >
+    Correct three real findings from an external technical audit
+    (F-01: unknown CLI arguments silently ignored; F-02: ANSI/control
+    characters from engine snapshot values reaching the terminal
+    unneutralized; F-03: docs/ENGINE_CONTRACT.md omitting
+    worker_display_name) on top of the real OrchestratorEngine facade
+    M1/M1.1/M1.2 already established — never a second CLI parser, never
+    a second rendering path, never a security theater fix that mutates
+    engine DTOs themselves.
+
+acceptance_criteria:
+  - "An unknown/unrecognized CLI launch argument is rejected with a clear, explicit error message and a non-zero, standard exit code — never silently ignored."
+  - "Normal launch with no arguments, and every already-documented M1/M1.1/M1.2 flag (--probe), behave exactly as before — this criterion only tightens the unknown-argument case."
+  - "This validation lays a clean foundation for M2's own future flags (--resume/-r/--continue/-c) without implementing any of them — M1.3 recognizes no M2 flag, and does not claim to."
+  - "Every dynamic value that originates from an OrchestratorEngine snapshot (project/worker/execution/provider fields — e.g. a project name, a worker display_name, a blocked_reason) is sanitized against ESC/ANSI escape sequences, bare carriage return, and injected line-feed/other control characters before it reaches the terminal."
+  - "Sanitization happens through one single, shared function reused by every rendering call site — never duplicated, never a second parallel implementation for a different command."
+  - "Sanitization never mutates the engine snapshot/DTO itself — it is applied only at the point of terminal rendering, and only to the printed representation."
+  - "Ordinary, well-formed Unicode text (accents, emoji, non-Latin scripts) in a snapshot value is preserved exactly, unaltered by sanitization."
+  - "No new external package is introduced for sanitization if the standard library (e.g. Python's own str/unicodedata facilities) is sufficient — REUSE FIRST/KISS."
+  - "docs/ENGINE_CONTRACT.md documents ExecutionSnapshot.worker_display_name (F-03), matching the real field ai-dev-orchestrator's P13.3 already added."
+  - "M1's, M1.1's, and M1.2's existing acceptance criteria (MVP_SPEC.yaml, M1_1_SPEC.yaml, M1_2_SPEC.yaml) are not regressed: every command from all three milestones still behaves exactly as specified for every case they already covered."
+  - "All tests are offline: fake provider adapters and a fake/scripted Ralph subprocess runner passed through OrchestratorEngine.open()'s own provider_adapters/subprocess_runner seams, never a real Claude/Codex/Vibe/DeepSeek/Kimi/Ralph invocation."
+  - "pytest -q passes for the whole package, offline, with zero real provider/Ralph calls anywhere in the suite; this milestone's own QA additionally runs with qa_protected_paths covering tests/test_e2e.py and tests/test_repl.py (ai-dev-orchestrator's AUD-1 remediation), so this milestone is itself the first real, governed proof that protection is active end to end."
+
+out_of_scope_for_this_mvp:
+  - "Sessions, /resume, /new, --resume, -r, --continue, -c (M2) — unaffected and unstarted by this milestone."
+  - "Natural-language piloting (M3)."
+  - "Non-interactive mode, -p (M4)."
+  - "json/stream-json structured output (M5)."
+  - "Doctor/diagnostics (M6)."
+  - "Real-time timeline rendering of engine events (M7)."
+  - "Claiming the `aido` command name (M8)."
+  - "A general-purpose secrets-scrubbing mechanism — terminal rendering safety (this milestone) and never persisting a secret in the first place (M2's own session contract, docs/SESSION_CONTRACT.md) are two distinct concerns, and this milestone addresses only the first."

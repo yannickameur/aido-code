@@ -1,0 +1,110 @@
+# AIDO Code — governed configuration for AI Dev Orchestrator (schema v1),
+# M1.3 ("Audit hardening"). See
+# ai-dev-orchestrator/docs/PROJECT_CONFIG.md for the full schema
+# reference, and this project's own CONTRIBUTING.md for how to use this
+# file locally.
+#
+# This is the tracked, portable M1.3 template — analogous to
+# aido.example.yaml (M1), aido.m1_1.example.yaml (M1.1),
+# aido.m1_2.example.yaml (M1.2), and aido.m2.example.yaml (M2), never a
+# replacement for any of them. Copy it to `aido.yaml` (already in
+# .gitignore) before running `aido validate`/`aido run` against it;
+# never commit a real aido.yaml, since state_dir/workspace paths are
+# machine-specific.
+#
+# Runtime transition note (same reasoning already verified for M1.1/M1.2/
+# M2 — see ROADMAP.md, M2, "Runtime transition"): this file targets the
+# SAME project.id (aido-code) as every prior milestone's own template,
+# with its own mvp.id (mvp-0.1.3), inserted after mvp-0.1.2 (DONE) and
+# before mvp-0.2 (not started). AI Dev Orchestrator's
+# ProjectRuntime.bootstrap() creates this new MVP under the same
+# persisted project/state_dir without disturbing any prior MVP's own
+# already-completed WorkItems.
+#
+# qa_protected_paths (new in ai-dev-orchestrator's own P13.4 audit
+# remediation, AUD-1): this is the first real, governed run in this
+# repository to activate regression-test protection. It protects the
+# two test files carrying this project's own hardest safety invariants
+# (no provider call from a non --probe command, full offline
+# end-to-end acceptance) — a small, explicit, hand-picked list, never
+# an attempt to auto-detect "every test file" for every ecosystem.
+#
+# No `aido run` has been executed against this file by the task that
+# prepared it; see ROADMAP.md, "Status" / M1.3.
+
+schema_version: 1
+
+project:
+  id: aido-code
+  name: AIDO Code
+  workspace: .
+  # state_dir omitted on purpose: defaults deterministically to
+  # ~/.local/state/ai-dev-orchestrator/projects/aido-code/ — the SAME
+  # state_dir every prior milestone already uses, by design; their own
+  # persisted WorkItems are untouched by this.
+
+workers:
+  # Reference (never a copy) to the sibling ai-dev-orchestrator checkout's
+  # own real worker pool — identical to aido.example.yaml (M1).
+  registry: ../ai-dev-orchestrator/config/workers.yaml
+
+execution:
+  # unrestricted: consistent with the maintainer's current environment for
+  # this project (see aido.example.yaml). Prints a visible warning on
+  # every `aido run`; see ai-dev-orchestrator's docs/PROJECT_CONFIG.md
+  # security warning before ever changing this for a shared/untrusted
+  # environment.
+  permission_mode: unrestricted
+
+git:
+  base_branch: main
+
+mvp:
+  id: mvp-0.1.3
+  objective: "Correct three real findings from an external technical audit (F-01: unknown CLI arguments silently ignored; F-02: ANSI/control characters from engine snapshots reaching the terminal unneutralized; F-03: docs/ENGINE_CONTRACT.md omitting worker_display_name); see M1_3_SPEC.yaml for the full acceptance contract."
+  acceptance_criteria:
+    - "See M1_3_SPEC.yaml for the complete, authoritative list. This field intentionally stays short; the governed WorkItems below carry the real per-WorkItem criteria."
+
+work_items:
+  - id: WI-M1.3-01
+    title: "CLI launch argument validation"
+    required_capabilities: [development]
+    dependencies: []
+    acceptance_criteria:
+      - "An unknown/unrecognized CLI launch argument is rejected with a clear, explicit error message and a non-zero, standard exit code — never silently ignored."
+      - "Normal, no-argument launch is unchanged; every already-documented M1/M1.1/M1.2 flag (--probe) still behaves exactly as before."
+      - "No M2 flag (--resume/-r/--continue/-c) is implemented or recognized by this WorkItem — only argument-validation groundwork that a future M2 WorkItem can build on."
+      - "No traceback is ever printed for an unrecognized argument — a clean, user-facing message only."
+      - "Offline tests cover: a valid launch (unchanged), an unrecognized flag, and an unrecognized positional argument."
+
+  - id: WI-M1.3-02
+    title: "Terminal rendering safety"
+    required_capabilities: [development]
+    dependencies: []
+    acceptance_criteria:
+      - "Every dynamic value rendered to the terminal that originates from an OrchestratorEngine snapshot is passed through one single, shared sanitization function before being printed — ESC/ANSI sequences, bare CR, injected LF, and other control characters are neutralized (e.g. stripped or escaped to a visible, inert representation)."
+      - "That one sanitization function is reused at every call site that renders a snapshot-derived value — never a second, duplicated implementation for a different command/section."
+      - "No package dependency is added if Python's own standard library is sufficient for this — REUSE FIRST/KISS."
+      - "Engine snapshot/DTO objects themselves are never mutated by sanitization — it applies only to the string actually printed."
+      - "Ordinary, well-formed Unicode text (accents, emoji, non-Latin scripts) already present in a snapshot value renders unchanged."
+      - "Offline tests cover: a worker display_name/project name/blocked_reason containing an ANSI escape sequence, a bare CR, and an injected LF, each proven neutralized in the captured output; plus a normal Unicode value proven unchanged."
+
+  - id: WI-M1.3-03
+    title: "Regression and engine contract fix"
+    required_capabilities: [development]
+    dependencies: [WI-M1.3-01, WI-M1.3-02]
+    acceptance_criteria:
+      - "docs/ENGINE_CONTRACT.md documents ExecutionSnapshot.worker_display_name (F-03), matching the real field ai-dev-orchestrator's P13.3 already added — this WorkItem's own commit is the only place this doc correction happens, never a separate maintainer commit touching the same lines."
+      - "M1's, M1.1's, and M1.2's existing commands and acceptance criteria (MVP_SPEC.yaml, M1_1_SPEC.yaml, M1_2_SPEC.yaml) remain passing, unregressed."
+      - "pytest -q passes for the whole package, offline, with zero real provider/Ralph calls anywhere in the suite; this WorkItem's own QA is the final gate for MVP 0.1.3."
+
+qa:
+  - id: qa-tests
+    kind: unit_test
+    argv: ["pytest", "-q"]
+    timeout_seconds: 300
+    required: true
+
+qa_protected_paths:
+  - tests/test_e2e.py
+  - tests/test_repl.py

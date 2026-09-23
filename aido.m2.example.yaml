@@ -63,8 +63,9 @@ work_items:
       - "A Session dataclass/model exists with, at minimum: schema_version, session_id, created_at, updated_at, a project/config binding placeholder, and an interaction-history placeholder — per docs/SESSION_CONTRACT.md."
       - "session_id is generated stable/opaque/unique/serializable (e.g. uuid4), never derived from project_id/mvp_id/work_item_id/provider/worker."
       - "A session is persisted as one versioned JSON file per session under $XDG_STATE_HOME/aido-code/sessions/ (falling back to ~/.local/state/aido-code/sessions/ when XDG_STATE_HOME is unset) — never inside ai-dev-orchestrator's own state_dir/SQLite."
+      - "Every write to a session file is atomic: serialize to a temp file in the same directory, flush + os.fsync, then os.replace onto the target — stdlib only (tempfile/os/os.path), no new dependency. See docs/SESSION_CONTRACT.md, 'Atomic writes'."
       - "A session file that fails to parse or fails schema validation produces a clean, explicit error naming the session id and the problem — never a silent drop/repair, never a raw traceback."
-      - "No session field ever contains an API key, token, or credential."
+      - "No session field, at any level (including interaction history), ever contains a process environment variable/os.environ dump, an API key/token/credential, raw provider stderr/stdout, or a raw subprocess log. See docs/SESSION_CONTRACT.md, 'Interaction history'."
       - "Offline tests only: no real filesystem location outside a test's own tmp directory is touched by this WorkItem's own tests."
 
   - id: WI-M2-02
@@ -75,7 +76,9 @@ work_items:
       - "A session index (e.g. sessions/index.json) records, per known session, at minimum its session_id and updated_at, kept in sync whenever a session is created/updated."
       - "A most-recent-session lookup (needed by --continue/-c, WI-M2-06) returns the session with the latest updated_at, ties broken deterministically by session_id — never by filesystem iteration/mtime order."
       - "The index never duplicates full session content (interaction history, project binding) — it is a lightweight lookup structure only."
-      - "Offline tests cover: empty index, single session, multiple sessions with distinct updated_at, and a tie-breaking case."
+      - "The index is a derived, rebuildable cache, never a second source of truth: a missing/corrupted/stale index.json is silently rebuilt by scanning sessions/*.json directly, and an index inconsistency never fails a resume the session file alone can satisfy. See docs/SESSION_CONTRACT.md, 'The index is a derived cache'."
+      - "Index writes are atomic (same temp-file + os.replace mechanism as WI-M2-01's session writes) — one shared helper, never a second, duplicated atomic-write implementation."
+      - "Offline tests cover: empty index, single session, multiple sessions with distinct updated_at, a tie-breaking case, and rebuild from session files after the index is deleted/corrupted."
 
   - id: WI-M2-03
     title: "Session-to-project/config binding"
@@ -93,9 +96,12 @@ work_items:
     dependencies: [WI-M2-01, WI-M2-03]
     acceptance_criteria:
       - "aido-code resume <session-id> loads that exact session (interaction history + project binding) and makes it the active session for the current process."
+      - "The supplied <session-id> is validated against AIDO Code's own opaque session-id format (e.g. UUID4 shape) before any filesystem path is constructed — a malformed id is rejected with a clean 'invalid session id' error, never passed through to a path lookup. See docs/SESSION_CONTRACT.md, 'Path safety'."
+      - "The resolved session file path is confined to sessions/ under this project's own state directory; a symlink found at that path is never followed for read or write — a clean, explicit error instead."
       - "Resuming an unknown/nonexistent session id produces a clean, explicit 'unknown session' error — never a silently created empty session standing in for it."
       - "This resume path never calls OrchestratorEngine.run()/.probe_workers(), never selects a worker, and never mutates engine state — proven by an offline test using a fake subprocess runner scripted to raise if called (mirrors ai-dev-orchestrator's own test conventions)."
-      - "Offline tests cover: successful resume restoring prior interaction history, and unknown-session-id failure."
+      - "A successful resume updates the session's own updated_at (per docs/SESSION_CONTRACT.md, 'When updated_at changes') even if the user issues no further command before exiting."
+      - "Offline tests cover: successful resume restoring prior interaction history, unknown-session-id failure, malformed-session-id rejection (before any disk access), and a symlinked session file being refused."
 
   - id: WI-M2-05
     title: "Interactive resume picker"
@@ -122,9 +128,11 @@ work_items:
     dependencies: [WI-M2-01, WI-M2-03, WI-M2-05]
     acceptance_criteria:
       - "REPL /resume offers the same picker as aido-code resume (WI-M2-05), invoked from inside an already-running session; switches the REPL's active session context on selection."
-      - "REPL /new creates a fresh session (new session_id, empty interaction history, bound to the current project/config if detected) without creating any engine-side Project/MVP/WorkItem and without triggering any provider call or OrchestratorEngine.run()."
+      - "REPL /new creates a fresh session (new session_id, empty interaction history, bound to the current project/config if detected, else explicitly UNBOUND) without creating any engine-side Project/MVP/WorkItem and without triggering any provider call or OrchestratorEngine.run()."
+      - "aido-code with no aido.yaml detected in the working directory, aido-code resume, and aido-code -c/--continue all start successfully into an UNBOUND (or, for resume/-c, whatever the resumed session's own binding already was) session rather than failing — see docs/SESSION_CONTRACT.md, 'Unbound sessions'."
+      - "A project-requiring REPL command (/status, /workers, /validate, /run) issued from an UNBOUND session prints a clean, consistent 'no project bound' message — never a crash, never a fabricated project, never a filesystem search for one, never a provider call."
       - "The originating session's own file on disk is left untouched by either /resume or /new (no overwrite, no deletion)."
-      - "Offline tests cover both REPL commands, including that the prior session file is unchanged afterward."
+      - "Offline tests cover both REPL commands, an UNBOUND /new, each project-requiring command's behavior from an UNBOUND session, and that the prior session file is unchanged afterward."
 
   - id: WI-M2-08
     title: "Session/engine isolation acceptance"
@@ -140,9 +148,11 @@ work_items:
     required_capabilities: [development]
     dependencies: [WI-M2-01]
     acceptance_criteria:
-      - "Two processes attempting to open the exact same session concurrently never silently corrupt it: an exclusive local advisory lock (e.g. a lock file) makes the second attempt fail explicitly with an 'already in use' error — no session broker/server is built."
+      - "Two processes attempting to open the exact same session concurrently never silently corrupt it: a real OS-level advisory lock (fcntl.flock(LOCK_EX | LOCK_NB) on Linux/macOS, the platforms this project targets — stdlib only, no new dependency) makes the second attempt fail explicitly with an 'already in use' error — no session broker/server is built."
+      - "A process holding a session lock that is killed (SIGKILL, crash), not just cleanly exited, never leaves a stale lock behind: the kernel releases a flock() held against that process's own file descriptor automatically on process death, so a subsequent legitimate open is never blocked by a dead process's lock. No separate stale-lock detection/cleanup logic exists or is needed."
       - "A hand-corrupted session file (invalid JSON, or valid JSON failing schema validation) produces the clean, explicit error already required by WI-M2-01 — this WorkItem adds test coverage for realistic corruption shapes (truncated file, wrong schema_version, missing required field)."
-      - "Offline tests cover: concurrent-open lock contention (simulated within the test process, no real second OS process required to prove the locking primitive) and each corruption shape above."
+      - "A corrupted or missing sessions/index.json is silently rebuilt from the real session files rather than treated as an error (WI-M2-02's own contract) — this WorkItem adds the corruption-shape test coverage for that rebuild."
+      - "Offline tests cover: concurrent-open lock contention with two REAL, independent OS processes (e.g. via multiprocessing/subprocess against the same session_id — not only simulated contention within one test process), a killed-holder process releasing its lock (verified by starting a second real process and confirming it can then acquire the lock), and each corruption shape above."
 
   - id: WI-M2-10
     title: "Resume-after-process-restart acceptance"

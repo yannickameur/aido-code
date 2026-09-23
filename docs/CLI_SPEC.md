@@ -110,6 +110,14 @@ project run/resume" in `ARCHITECTURE.md`. Resuming a session only
 restores AIDO Code's own UX state; advancing the project always
 requires a separate, explicit `/run`.
 
+**Works without a project (`aido.yaml`) present**: `aido-code` with no
+project detected, `aido-code resume`/`-c`, and REPL `/new`/`/help` all
+start a session in the `UNBOUND` state rather than failing — see
+`docs/SESSION_CONTRACT.md`, "Unbound sessions". A project-requiring
+command (`/status`, `/workers`, `/validate`, `/run`) issued from an
+unbound session replies with a clean "no project bound" message; it
+never crashes, fabricates a project, or searches for one.
+
 ## M3 — Natural-language piloting
 
 Free-form questions/requests handled in the REPL, e.g.:
