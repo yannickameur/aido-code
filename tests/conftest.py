@@ -13,7 +13,13 @@ from pathlib import Path
 from textwrap import dedent
 
 from orchestrator.providers.adapter import ProviderAdapter
-from orchestrator.providers.contracts import ProviderAvailability, ProviderState, UnavailabilityReason
+from orchestrator.providers.contracts import (
+    ProviderAvailability,
+    ProviderState,
+    QuotaWindow,
+    ResetCredit,
+    UnavailabilityReason,
+)
 
 from aido_code.engine_client import EngineClient
 
@@ -68,8 +74,16 @@ class NeverCalledAdapter(ProviderAdapter):
 
 
 class FakeAdapter(ProviderAdapter):
-    def __init__(self, *, available: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        available: bool = True,
+        quota_windows: tuple[QuotaWindow, ...] = (),
+        reset_credits: tuple[ResetCredit, ...] = (),
+    ) -> None:
         self._available = available
+        self._quota_windows = quota_windows
+        self._reset_credits = reset_credits
         self.calls = 0
 
     async def probe(self) -> ProviderState:
@@ -78,6 +92,8 @@ class FakeAdapter(ProviderAdapter):
             provider="anthropic",
             availability=ProviderAvailability(available=self._available, observed_at=UTC_T0, reason=None),
             observed_at=UTC_T0,
+            quota_windows=self._quota_windows,
+            reset_credits=self._reset_credits,
         )
 
 

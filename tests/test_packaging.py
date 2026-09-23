@@ -13,12 +13,15 @@ PYPROJECT_TEXT = (Path(__file__).resolve().parent.parent / "pyproject.toml").rea
 
 
 class TestEngineDependencyMetadata:
-    def test_declares_ai_dev_orchestrator_at_or_above_0_1_2(self) -> None:
+    def test_declares_ai_dev_orchestrator_at_or_above_0_1_3(self) -> None:
+        """0.1.3 is the version that introduced
+        ``ProviderSnapshot.quota_windows``/``reset_credits`` (see
+        M1_2_SPEC.yaml); this project's --probe rendering depends on them."""
         match = re.search(r'dependencies\s*=\s*\[([^\]]*)\]', PYPROJECT_TEXT)
         assert match is not None, "pyproject.toml has no [project.dependencies] list"
         dependencies = match.group(1)
-        assert re.search(r'"ai-dev-orchestrator\s*>=\s*0\.1\.2"', dependencies), (
-            f"expected an 'ai-dev-orchestrator>=0.1.2' dependency, found: {dependencies!r}"
+        assert re.search(r'"ai-dev-orchestrator\s*>=\s*0\.1\.3"', dependencies), (
+            f"expected an 'ai-dev-orchestrator>=0.1.3' dependency, found: {dependencies!r}"
         )
 
     def test_never_declares_the_old_orchestrator_pypi_package_name(self) -> None:

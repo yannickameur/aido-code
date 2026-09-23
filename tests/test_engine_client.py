@@ -10,9 +10,12 @@ CONTRIBUTING.md).
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+
+from orchestrator.providers.contracts import QuotaWindow, ResetCredit, ResetCreditStatus
 
 from aido_code.engine_client import (
     EngineClient,
@@ -22,6 +25,7 @@ from aido_code.engine_client import (
     ProviderSnapshot,
 )
 from tests.conftest import (
+    UTC_T0,
     FakeAdapter as _FakeAdapter,
     NeverCalledAdapter as _NeverCalledAdapter,
     ScriptedRalphRunner as _ScriptedRalphRunner,
@@ -77,6 +81,44 @@ class TestProbeWorkers:
         assert isinstance(snapshots[0], ProviderSnapshot)
         assert snapshots[0].provider == "anthropic"
         assert snapshots[0].available is True
+
+    def test_probe_workers_surfaces_quota_windows_and_reset_credits_from_injected_adapter(
+        self, tmp_path: Path
+    ) -> None:
+        config_path = _write_config(tmp_path)
+        reset_at = datetime(2026, 9, 21, 15, 0, tzinfo=timezone.utc)
+        adapter = _FakeAdapter(
+            available=True,
+            quota_windows=(
+                QuotaWindow(
+                    window_type="five_hour", source="claude_code", observed_at=UTC_T0,
+                    utilization=0.25, reset_at=reset_at,
+                ),
+                QuotaWindow(
+                    window_type="seven_day", source="claude_code", observed_at=UTC_T0,
+                    utilization=None, reset_at=None,
+                ),
+            ),
+            reset_credits=(
+                ResetCredit(title="weekly bonus", status=ResetCreditStatus.AVAILABLE, available_count=2),
+                ResetCredit(title="mystery credit", status=ResetCreditStatus.UNKNOWN, available_count=None),
+            ),
+        )
+        client = EngineClient.open(str(config_path), provider_adapters={"anthropic": adapter})
+        snapshot = client.probe_workers()[0]
+        known, unknown = snapshot.quota_windows
+        assert known.window_type == "five_hour"
+        assert known.utilization == 0.25
+        assert known.remaining == 0.75
+        assert known.reset_at == reset_at.isoformat()
+        assert unknown.window_type == "seven_day"
+        assert unknown.utilization is None
+        assert unknown.remaining is None
+        assert unknown.reset_at is None
+        credited, uncredited = snapshot.reset_credits
+        assert credited.title == "weekly bonus"
+        assert credited.available_count == 2
+        assert uncredited.available_count is None
 
 
 class TestStatus:

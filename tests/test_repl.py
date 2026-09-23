@@ -9,17 +9,20 @@ from __future__ import annotations
 import io
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from orchestrator.providers.contracts import UnavailabilityReason
+from orchestrator.providers.contracts import QuotaWindow, ResetCredit, ResetCreditStatus, UnavailabilityReason
 
 from aido_code.engine_client import EngineClient
 from aido_code.repl import DEFAULT_CONFIG_PATH, format_help, run
 from tests.conftest import (
     REGISTRY_ENABLED_AND_DISABLED,
+    REGISTRY_TWO_WORKERS,
+    UTC_T0,
     FakeAdapter,
     ScriptedRalphRunner,
     UnavailableAdapter,
@@ -211,6 +214,57 @@ class TestStatus:
         assert "bob" in transcript
         assert transcript.count("probe=quota") == 2
 
+    def test_probe_renders_real_quota_windows_and_reset_credits_never_fabricated(
+        self, tmp_path: Path
+    ) -> None:
+        config_path = write_config(tmp_path)
+        reset_at = datetime(2026, 9, 21, 15, 0, tzinfo=timezone.utc)
+        adapter = FakeAdapter(
+            available=True,
+            quota_windows=(
+                QuotaWindow(
+                    window_type="five_hour", source="claude_code", observed_at=UTC_T0,
+                    utilization=0.25, reset_at=reset_at,
+                ),
+                QuotaWindow(
+                    window_type="seven_day", source="claude_code", observed_at=UTC_T0,
+                    utilization=None, reset_at=None,
+                ),
+            ),
+            reset_credits=(ResetCredit(title="weekly bonus", status=ResetCreditStatus.AVAILABLE, available_count=2),),
+        )
+        transcript = _run(
+            "/status --probe\n/exit\n", config_path=str(config_path), provider_adapters={"anthropic": adapter},
+        )
+        assert "provider quotas:" in transcript
+        assert "  anthropic:" in transcript
+        assert "five_hour: utilization=25% remaining=75%" in transcript
+        assert reset_at.isoformat() in transcript
+        assert "seven_day: utilization=unknown remaining=unknown reset_at=unknown" in transcript
+        assert "reset credit weekly bonus: available (available=2)" in transcript
+
+    def test_probe_renders_quota_once_per_provider_not_per_worker(self, tmp_path: Path) -> None:
+        config_path = write_config(tmp_path, registry=REGISTRY_TWO_WORKERS)
+        adapter = FakeAdapter(
+            available=True,
+            quota_windows=(
+                QuotaWindow(
+                    window_type="five_hour", source="claude_code", observed_at=UTC_T0,
+                    utilization=0.5, reset_at=None,
+                ),
+            ),
+        )
+        transcript = _run(
+            "/status --probe\n/exit\n", config_path=str(config_path), provider_adapters={"anthropic": adapter},
+        )
+        assert transcript.count("  anthropic:") == 1
+        assert transcript.count("five_hour") == 1
+
+    def test_plain_status_never_renders_a_quota_section(self, tmp_path: Path) -> None:
+        config_path = write_config(tmp_path)
+        transcript = _run("/status\n/exit\n", config_path=str(config_path))
+        assert "provider quotas:" not in transcript
+
     def test_probe_missing_aido_yaml_prints_clear_error_not_a_traceback(self, tmp_path: Path) -> None:
         transcript = _run("/status --probe\n/exit\n", config_path=str(tmp_path / "does-not-exist.yaml"))
         assert "Error:" in transcript
@@ -355,6 +409,33 @@ class TestWorkers:
         assert adapter.calls == 1
         assert "project:" not in transcript
         assert "Traceback" not in transcript
+
+    def test_probe_renders_the_same_quota_section_as_status_probe(self, tmp_path: Path) -> None:
+        config_path = write_config(tmp_path)
+        quota_windows = (
+            QuotaWindow(
+                window_type="five_hour", source="claude_code", observed_at=UTC_T0,
+                utilization=0.4, reset_at=None,
+            ),
+        )
+        status_transcript = _run(
+            "/status --probe\n/exit\n",
+            config_path=str(config_path),
+            provider_adapters={"anthropic": FakeAdapter(available=True, quota_windows=quota_windows)},
+        )
+        workers_transcript = _run(
+            "/workers --probe\n/exit\n",
+            config_path=str(config_path),
+            provider_adapters={"anthropic": FakeAdapter(available=True, quota_windows=quota_windows)},
+        )
+        status_quota_section = status_transcript.split("provider quotas:", 1)[1]
+        workers_quota_section = workers_transcript.split("provider quotas:", 1)[1]
+        assert status_quota_section == workers_quota_section
+
+    def test_plain_workers_never_renders_a_quota_section(self, tmp_path: Path) -> None:
+        config_path = write_config(tmp_path)
+        transcript = _run("/workers\n/exit\n", config_path=str(config_path))
+        assert "provider quotas:" not in transcript
 
     def test_probe_missing_aido_yaml_prints_clear_error_not_a_traceback(self, tmp_path: Path) -> None:
         transcript = _run("/workers --probe\n/exit\n", config_path=str(tmp_path / "does-not-exist.yaml"))

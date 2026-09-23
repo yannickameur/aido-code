@@ -175,17 +175,49 @@ def format_workers(
     return "\n".join(lines)
 
 
+def format_provider_quotas(providers: tuple[ProviderSnapshot, ...]) -> str:
+    """Renders each provider's real quota facts exactly once per provider
+    actually probed (``providers`` already has at most one ``ProviderSnapshot``
+    per provider — see ``OrchestratorEngine.probe_workers()``), never once
+    per worker. Unknown utilization/remaining/reset_at/reset-credit counts
+    stay rendered as ``unknown`` text, never coerced to a fabricated value."""
+    if not providers:
+        return ""
+    lines = ["provider quotas:"]
+    for snapshot in sorted(providers, key=lambda p: p.provider):
+        lines.append(f"  {snapshot.provider}:")
+        if not snapshot.quota_windows:
+            lines.append("    quota: unknown")
+        for window in snapshot.quota_windows:
+            utilization = f"{window.utilization:.0%}" if window.utilization is not None else "unknown"
+            remaining = f"{window.remaining:.0%}" if window.remaining is not None else "unknown"
+            reset_at = window.reset_at if window.reset_at is not None else "unknown"
+            lines.append(
+                f"    {window.window_type}: utilization={utilization} remaining={remaining} reset_at={reset_at}"
+            )
+        for credit in snapshot.reset_credits:
+            count = credit.available_count if credit.available_count is not None else "unknown"
+            lines.append(f"    reset credit {credit.title}: {credit.status} (available={count})")
+    return "\n".join(lines)
+
+
 def _format_workers_section(
     workers: tuple[WorkerSnapshot, ...], providers: tuple[ProviderSnapshot, ...] | None
 ) -> str:
     """The one probe/rendering code path `/status --probe` and
     `/workers --probe` both call: `providers=None` renders the static
     view, otherwise it maps `probe_workers()`'s own ``ProviderSnapshot``
-    tuple onto the workers that use each provider."""
+    tuple onto the workers that use each provider, plus that same tuple's
+    quota facts (see `format_provider_quotas()`) — the single shared path
+    for both commands, never a second, duplicated one."""
     if providers is None:
         return format_workers(workers)
     provider_states = {snapshot.provider: snapshot for snapshot in providers}
-    return format_workers(workers, provider_states)
+    sections = [format_workers(workers, provider_states)]
+    quotas = format_provider_quotas(providers)
+    if quotas:
+        sections.append(quotas)
+    return "\n\n".join(sections)
 
 
 def _run_status(

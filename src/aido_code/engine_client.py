@@ -20,6 +20,8 @@ from orchestrator.engine import (
     ProjectSnapshot,
     ProjectStatusSnapshot,
     ProviderSnapshot,
+    QuotaWindowSnapshot,
+    ResetCreditSnapshot,
     RunResult,
     WorkerSnapshot,
 )
@@ -31,6 +33,8 @@ __all__ = [
     "ProjectSnapshot",
     "ProjectStatusSnapshot",
     "ProviderSnapshot",
+    "QuotaWindowSnapshot",
+    "ResetCreditSnapshot",
     "RunResult",
     "WorkerSnapshot",
 ]
