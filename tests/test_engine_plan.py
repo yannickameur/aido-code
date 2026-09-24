@@ -27,7 +27,7 @@ from aido_code.engine_plan import MissingGitWorkspaceError, build_engine_plan
 from aido_code.project_manifest import load_project_manifest
 from aido_code.project_resources import resolve_project_resources
 from aido_code.roadmap import parse_roadmap
-from tests.conftest import REGISTRY_TWO_WORKERS, NeverCalledAdapter
+from tests.conftest import REGISTRY_TWO_WORKERS, NeverCalledAdapter, ScriptedRalphRunner
 
 _GIT_ENV = ["-c", "user.email=e2e@example.invalid", "-c", "user.name=E2E"]
 
@@ -199,6 +199,7 @@ class TestWorkerRegistryInjectionReachesEngine:
 
         client = EngineClient.from_config(
             config, worker_registry=registry, provider_adapters={"anthropic": NeverCalledAdapter()},
+            subprocess_runner=ScriptedRalphRunner([]),
         )
 
         workers = client.workers()
@@ -216,6 +217,7 @@ class TestWorkerRegistryInjectionReachesEngine:
 class TestSharedWorkerRegistryAcrossProjects:
     def test_two_projects_share_one_registry_instance_independently(self, tmp_path: Path) -> None:
         registry = _load_registry(tmp_path)
+        runner = ScriptedRalphRunner([])
 
         first_manifest = _make_project(tmp_path, project_id="project-a", project_name="Project A")
         second_manifest = _make_project(tmp_path, project_id="project-b", project_name="Project B")
@@ -224,9 +226,11 @@ class TestSharedWorkerRegistryAcrossProjects:
 
         first_client = EngineClient.from_config(
             first_config, worker_registry=registry, provider_adapters={"anthropic": NeverCalledAdapter()},
+            subprocess_runner=runner,
         )
         second_client = EngineClient.from_config(
             second_config, worker_registry=registry, provider_adapters={"anthropic": NeverCalledAdapter()},
+            subprocess_runner=runner,
         )
 
         first_snapshot = first_client.validate()
@@ -234,6 +238,9 @@ class TestSharedWorkerRegistryAcrossProjects:
 
         assert first_snapshot.project_id == "project-a"
         assert second_snapshot.project_id == "project-b"
+        assert first_snapshot.state_dir == str(first_config.project.state_dir)
+        assert second_snapshot.state_dir == str(second_config.project.state_dir)
+        assert first_snapshot.state_dir != second_snapshot.state_dir
         assert first_snapshot.enabled_worker_count == 2
         assert second_snapshot.enabled_worker_count == 2
         assert {w.worker_id for w in first_client.workers()} == {"alice", "bob"}
@@ -241,11 +248,16 @@ class TestSharedWorkerRegistryAcrossProjects:
 
 
 class TestStateDirNonRegression:
-    def test_state_dir_matches_the_convention_prior_milestones_already_use(self, tmp_path: Path) -> None:
+    def test_state_dir_matches_the_convention_prior_milestones_already_use(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        fake_home = tmp_path / "fixed-home"
+        fake_home.mkdir()
+        monkeypatch.setenv("HOME", str(fake_home))
         manifest_path = _make_project(tmp_path, project_id="aido-code", project_name="AIDO Code")
 
         config = _build_plan(manifest_path)
 
         assert config.project.state_dir == (
-            Path.home() / ".local" / "state" / "ai-dev-orchestrator" / "projects" / "aido-code"
+            fake_home / ".local" / "state" / "ai-dev-orchestrator" / "projects" / "aido-code"
         )
