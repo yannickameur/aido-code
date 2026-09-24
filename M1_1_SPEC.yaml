@@ -1,3 +1,8 @@
+# HISTORICAL RECORD (as of M1.4, see ROADMAP.md): kept as proof of what
+# M1.1 actually built and was accepted against, no longer the model for
+# a future milestone's contract — see docs/PROJECT_CONTRACT.md. Never
+# deleted, never edited to match a newer schema.
+#
 # M1.1 acceptance contract: AIDO Code, milestone M1.1 (CLI conventions +
 # standalone install). See ROADMAP.md for the full milestone list and
 # docs/ENGINE_CONTRACT.md/docs/CLI_SPEC.md for the exact engine API and

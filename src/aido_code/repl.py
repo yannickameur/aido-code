@@ -12,7 +12,27 @@ renders the full worker list, still with zero provider probes; `--probe`
 on either command is the only thing that ever calls
 `EngineClient.probe_workers()`, and both share the exact same
 `format_workers()` rendering path (see `_format_workers_section()`).
-"""
+
+WI-M1.4-07C moved `/workers` and `/config` onto the modern project
+loading path: `aido_code.project_command.load_project_command_context`
+(manifest -> `ROADMAP.md` -> resources -> AIDO's own global
+`WorkerRegistry`, see `docs/PROJECT_CONTRACT.md` §§2-4) plus
+`aido_code.engine_plan.build_engine_plan` (§6), the exact same path
+`aido-code validate`/`run` already use
+(`aido_code.project_command`/`aido_code.__main__`). `aido.yaml` no
+longer carries a `workers:` section at all, so neither command ever
+reads one from a project; `/workers --probe` still shares
+`_format_workers_section()`/`format_workers()` with `/status --probe`
+— no second worker-rendering implementation.
+
+WI-M1.4-07D moves `/status` onto that same modern loading path
+(`_open_project_command_engine()`, shared with `/workers`/`/config`).
+`format_status()` combines the roadmap's own current-milestone id/status
+(`ROADMAP.md`'s "## Current milestone" — intended work) with the real,
+unchanged `OrchestratorEngine.status()` snapshot (actual persisted
+work) — never inventing a WorkItem/MVP status from `ROADMAP.md` itself:
+before a project's first `/run`, `.status()` reports `initialized=False`
+and nothing about work items is fabricated to fill the gap."""
 
 from __future__ import annotations
 
@@ -28,6 +48,12 @@ from aido_code.engine_client import (
     RunResult,
     WorkerSnapshot,
 )
+from aido_code.engine_plan import EnginePlanError, build_engine_plan
+from aido_code.project_command import ProjectCommandContext, load_project_command_context
+from aido_code.project_manifest import ProjectManifestError
+from aido_code.project_resources import ProjectResourcesError
+from aido_code.roadmap import CurrentMilestone, RoadmapError
+from orchestrator.worker_registry import WorkerRegistryError
 
 COMMANDS: dict[str, str] = {
     "/help": "List available commands.",
@@ -71,35 +97,60 @@ def format_help() -> str:
     return "\n".join(lines)
 
 
-def format_config(snapshot: ProjectSnapshot) -> str:
+def format_config(context: ProjectCommandContext, snapshot: ProjectSnapshot) -> str:
+    """Renders the manifest/roadmap facts (`docs/PROJECT_CONTRACT.md` §7)
+    plus the same engine-derived facts `/config` already showed —
+    `initial_prompt` passes through `sanitize_for_terminal()`, the same
+    terminal-safety convention every other snapshot-derived value here
+    uses (M1.3, WI-M1.3-02). Never a raw file dump, never a credential,
+    never a project-owned worker registry (`aido.yaml` has none, §2)."""
     providers = (
         ", ".join(sanitize_for_terminal(provider) for provider in snapshot.providers)
         if snapshot.providers
         else "(none)"
     )
+    manifest = context.manifest
+    milestone = context.roadmap.milestone
     lines = [
-        f"project: {sanitize_for_terminal(snapshot.project_id)} ({sanitize_for_terminal(snapshot.name)})",
-        f"workspace: {sanitize_for_terminal(snapshot.workspace)}",
-        f"state_dir: {sanitize_for_terminal(snapshot.state_dir)}",
-        f"mvp: {sanitize_for_terminal(snapshot.mvp_id)}",
-        f"work_items: {sanitize_for_terminal(snapshot.work_item_count)}",
-        f"qa_commands: {sanitize_for_terminal(snapshot.qa_command_count)}",
+        f"project: {sanitize_for_terminal(manifest.project.id)} ({sanitize_for_terminal(manifest.project.name)})",
+        f"workspace: {sanitize_for_terminal(manifest.project.workspace)}",
+        f"roadmap: {sanitize_for_terminal(manifest.roadmap)}",
+        f"resources: {sanitize_for_terminal(manifest.resources)}",
+        f"initial_prompt: {sanitize_for_terminal(manifest.initial_prompt)}",
+        f"current_milestone_id: {sanitize_for_terminal(milestone.id)}",
+        f"current_milestone_status: {sanitize_for_terminal(milestone.status)}",
         f"enabled_workers: {sanitize_for_terminal(snapshot.enabled_worker_count)}",
         f"providers: {providers}",
         f"permission_mode: {sanitize_for_terminal(snapshot.permission_mode.upper())}",
         f"base_branch: {sanitize_for_terminal(snapshot.base_branch)}",
+        f"qa_commands: {sanitize_for_terminal(snapshot.qa_command_count)}",
     ]
     return "\n".join(lines)
 
 
-def format_status(snapshot: ProjectStatusSnapshot) -> str:
-    if not snapshot.initialized:
-        return "NOT_INITIALIZED\nRun /run to initialize and start this project."
-
+def format_status(milestone: CurrentMilestone, snapshot: ProjectStatusSnapshot) -> str:
+    """Combines `ROADMAP.md`'s own current-milestone facts (intended
+    work: `milestone.id`/`.status`, DRAFT/APPROVED) with the real,
+    persisted `OrchestratorEngine.status()` snapshot (actual work: what
+    has genuinely run). The engine snapshot is the only source for
+    project/MVP/WorkItem status — before a project's first `/run`,
+    `snapshot.initialized` is `False` and nothing else is fabricated to
+    fill the gap."""
     lines = [
+        f"current_milestone_id: {sanitize_for_terminal(milestone.id)}",
+        f"current_milestone_status: {sanitize_for_terminal(milestone.status)}",
+        "",
+    ]
+
+    if not snapshot.initialized:
+        lines.append("NOT_INITIALIZED")
+        lines.append("Run /run to initialize and start this project.")
+        return "\n".join(lines)
+
+    lines.append(
         f"project: {sanitize_for_terminal(snapshot.project_id)} "
         f"({sanitize_for_terminal(snapshot.project_name)})"
-    ]
+    )
     if snapshot.mvp is None:
         lines.append("mvp: (not configured)")
     elif snapshot.mvp.status is None:
@@ -270,6 +321,48 @@ def _format_workers_section(
     return "\n\n".join(sections)
 
 
+# Every domain error the modern project-command loading path
+# (`load_project_command_context()`) or the typed engine plan builder
+# (`build_engine_plan()`) can raise, plus the plain-constructor engine's
+# own `EngineError` — the same set `aido_code.__main__._project_command`
+# already catches for `validate`/`run`, reused here rather than
+# duplicated for `/workers`/`/config`.
+_PROJECT_COMMAND_ERRORS: tuple[type[Exception], ...] = (
+    ProjectManifestError,
+    RoadmapError,
+    ProjectResourcesError,
+    WorkerRegistryError,
+    EnginePlanError,
+    EngineError,
+    OSError,
+    ValueError,
+)
+
+
+def _open_project_command_engine(
+    config_path: str,
+    *,
+    provider_adapters: dict[str, object] | None = None,
+    subprocess_runner: object | None = None,
+) -> tuple[ProjectCommandContext, EngineClient]:
+    """The one loading path `/status`, `/workers`, and `/config` share:
+    manifest -> `ROADMAP.md` -> resources -> AIDO's own global
+    `WorkerRegistry` (`aido_code.project_command.
+    load_project_command_context`), then the typed engine plan
+    (`aido_code.engine_plan.build_engine_plan`) injected into
+    `OrchestratorEngine` via `EngineClient.from_config()` — never
+    `EngineClient.open()`, since `aido.yaml` is no longer a
+    `ProjectConfig`-shaped file. Exactly the same path `aido-code
+    validate`/`run` already use (`aido_code.__main__`)."""
+    context = load_project_command_context(config_path)
+    plan = build_engine_plan(context.manifest, context.roadmap, context.resources)
+    client = EngineClient.from_config(
+        plan, worker_registry=context.worker_registry,
+        provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
+    )
+    return context, client
+
+
 def _run_status(
     config_path: str,
     *,
@@ -278,26 +371,32 @@ def _run_status(
     subprocess_runner: object | None = None,
 ) -> str:
     try:
-        with EngineClient.open(
+        context, client = _open_project_command_engine(
             config_path, provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
-        ) as client:
+        )
+        with client:
             snapshot = client.status()
             workers = client.workers()
             providers = client.probe_workers() if probe else None
-    except EngineError as exc:
+    except _PROJECT_COMMAND_ERRORS as exc:
         return f"Error: {exc}"
     return "\n\n".join(
-        [format_status(snapshot), "workers:", _format_workers_section(workers, providers)]
+        [
+            format_status(context.roadmap.milestone, snapshot),
+            "workers:",
+            _format_workers_section(workers, providers),
+        ]
     )
 
 
 def _run_config(config_path: str) -> str:
     try:
-        with EngineClient.open(config_path) as client:
+        context, client = _open_project_command_engine(config_path)
+        with client:
             snapshot = client.validate()
-    except EngineError as exc:
+    except _PROJECT_COMMAND_ERRORS as exc:
         return f"Error: {exc}"
-    return format_config(snapshot)
+    return format_config(context, snapshot)
 
 
 def _run_validate(config_path: str) -> str:
@@ -333,12 +432,13 @@ def _run_workers(
     subprocess_runner: object | None = None,
 ) -> str:
     try:
-        with EngineClient.open(
+        _context, client = _open_project_command_engine(
             config_path, provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
-        ) as client:
+        )
+        with client:
             snapshots = client.workers()
             providers = client.probe_workers() if probe else None
-    except EngineError as exc:
+    except _PROJECT_COMMAND_ERRORS as exc:
         return f"Error: {exc}"
     return _format_workers_section(snapshots, providers)
 
@@ -355,11 +455,13 @@ def run(
     """Read commands from ``input_stream`` until ``/exit`` or EOF.
 
     ``provider_adapters``/``subprocess_runner`` are forwarded to every
-    ``EngineClient.open()`` call this loop makes (``/run``, and
-    ``/status``/``/workers`` when ``--probe`` triggers a real
-    ``probe_workers()``); same test-only seams as ``EngineClient.open()``
-    itself (see ``engine_client.py``), production callers (``__main__.py``)
-    never set them.
+    engine construction this loop makes (``EngineClient.open()`` for
+    ``/run``/``/validate``; ``_open_project_command_engine()`` for
+    ``/status``/``/workers``/``/config``, and either way only reaching a
+    real ``probe_workers()`` call when ``--probe`` is given); same
+    test-only seams both construction paths accept (see
+    ``engine_client.py``), production callers (``__main__.py``) never set
+    them.
     """
     while True:
         output_stream.write(prompt)

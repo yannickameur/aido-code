@@ -6,7 +6,12 @@
 USER
   |
   v
-AIDO CODE                     (this project)
+AIDO CODE                     (this project — the product)
+  |
+  +-- AIDO global worker configuration (docs/PROJECT_CONTRACT.md §4)
+  +-- aido.yaml manifest parser (§2)
+  +-- ROADMAP.md deterministic parser (§3)
+  +-- resources/ resolution + initial_prompt (§5)
   |
   | orchestrator.engine.OrchestratorEngine
   | a public Python API, not a subprocess/RPC boundary
@@ -17,7 +22,7 @@ AI DEV ORCHESTRATOR            (the engine, a separate project/dependency)
   +-- ProjectConfig
   +-- OrchestratorEngine (facade)
   +-- ProjectStatusReader
-  +-- WorkerRegistry
+  +-- WorkerRegistry (type/runtime; instantiation now caller-supplied, P13.5)
   +-- WorkerSelector
   +-- QuotaManager
   +-- ProviderAdapters
@@ -32,6 +37,32 @@ AIDO Code talks to exactly one thing:
 `orchestrator.engine.OrchestratorEngine`. See `docs/ENGINE_CONTRACT.md`
 for its full method surface and the snapshot types it returns.
 
+## Product boundary (M1.4)
+
+**AIDO is the user product; `ai-dev-orchestrator` is its internal
+engine.** A user project governed by AIDO never knows a worker, a
+provider, a model, a `workers.yaml` path, or any path into
+`ai-dev-orchestrator` — it knows exactly four things: which project,
+which roadmap, which resources, which first instruction
+(`aido.yaml`'s manifest shape, `docs/PROJECT_CONTRACT.md` §2). AIDO
+resolves everything else:
+
+- its own global worker pool (`docs/PROJECT_CONTRACT.md` §4), never a
+  project-level concern, mirroring how `ai-dev-orchestrator`'s own
+  P13.5 (that project's `ROADMAP.md` §13) stopped requiring the engine
+  itself to own a project's worker configuration;
+- a project's own `ROADMAP.md`, parsed deterministically (no LLM, no
+  heuristic reading, fail closed — `docs/PROJECT_CONTRACT.md` §3) into
+  the typed engine plan the engine actually consumes.
+
+This is never a second orchestrator: the manifest/roadmap/resources
+parsing built here produces exactly one thing —
+`orchestrator.project_config.ProjectConfig`, constructed through its
+own plain Python constructor and handed to `OrchestratorEngine` with an
+AIDO-built `WorkerRegistry` injected
+(`OrchestratorEngine(config, worker_registry=registry)`). See
+`docs/PROJECT_CONTRACT.md` for the full contract.
+
 ## Who owns what
 
 | AIDO Code owns | AI Dev Orchestrator owns |
@@ -41,6 +72,7 @@ for its full method surface and the snapshot types it returns.
 | Commands (`/help`, `/status`, `/workers`, `/config`, `/validate`, `/run`, `/exit`, later `/resume`/`/new`) | Merge decisions |
 | Output rendering: text today, `json`/`stream-json` later (M5), built directly from typed snapshots, never by parsing this project's own stdout | WorkItem completion, all engine state transitions |
 | Natural-language interpretation of engine facts (M3): may explain, never a second authority on state (`LLM IS NOT ORACLE`, the same invariant the engine itself is built on) | SQLite / all persisted state |
+| AIDO's own global worker configuration/defaults, the `aido.yaml` manifest parser, the `ROADMAP.md` deterministic parser, `resources/` resolution (M1.4, `docs/PROJECT_CONTRACT.md`) | The `WorkerRegistry`/`WorkerSelector` *types/runtime* themselves, and every decision made from a `WorkerRegistry` once AIDO Code hands one in |
 
 AIDO Code never crosses these lines:
 
@@ -48,7 +80,10 @@ AIDO Code never crosses these lines:
 - never constructs `MVPManager`, `WorkerSelector`, or `QuotaManager`;
 - never knows the internal structure of any orchestrator Store;
 - never chooses a worker itself;
-- never decides whether a WorkItem is done.
+- never decides whether a WorkItem is done;
+- never re-implements worker selection just because it now builds the
+  `WorkerRegistry` object itself (M1.4) — that object is still handed to
+  the engine, which still owns every decision made from it.
 
 Every one of those decisions belongs to the engine. AIDO Code's own job
 is presentation, session/history management, and translating a user's

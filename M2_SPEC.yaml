@@ -1,3 +1,11 @@
+# MIGRATION DEBT (as of M1.4, see ROADMAP.md, M2): this file describes a
+# real, unimplemented future (M2) in the pre-M1.4 shape. Its relevant
+# content must be migrated into ROADMAP.md's own deterministic Markdown
+# grammar (docs/PROJECT_CONTRACT.md §3) before a future GO M2, so this
+# project never carries two sources of functional truth at once — real,
+# separate work, not started by M1.4, not a precondition M1.4 needed to
+# satisfy.
+#
 # M2 acceptance contract: AIDO Code, milestone M2 (sessions and resume).
 # See ROADMAP.md for the full milestone list, docs/SESSION_CONTRACT.md
 # for the full session data model/persistence/concurrency contract, and

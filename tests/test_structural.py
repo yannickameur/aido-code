@@ -6,11 +6,22 @@ directly (analogous to ai-dev-orchestrator's own
 
 ``aido_code``'s source is small enough that the strongest proof is
 static: walk every module's imports and assert the only ``orchestrator``
-submodule ever named is ``orchestrator.engine`` itself, and that
-``sqlite3`` is never imported at all. Anything reaching a
-``MVPManager``/``WorkerSelector``/``QuotaManager``/``ProviderAdapter``/
-``*Store`` would have to do so through one of those forbidden imports
-first.
+submodules ever named are ``orchestrator.engine`` and (as of M1.4,
+``ARCHITECTURE.md`` "Product boundary (M1.4)") ``orchestrator.
+worker_registry`` — AIDO's own global worker configuration
+(WI-M1.4-01) is explicitly allowed to construct a ``WorkerRegistry``
+itself and hand it to the engine, the exact P13.5 seam
+(``OrchestratorEngine(config, worker_registry=registry)``) — plus
+``orchestrator.project_config``/``orchestrator.validation``/
+``orchestrator.execution_policy`` (WI-M1.4-05, ``aido_code.
+engine_plan``, ``docs/PROJECT_CONTRACT.md`` §6): the typed engine plan
+is built through ``ProjectConfig``'s own plain Python constructor
+(``ProjectIdentity``/``ExecutionConfig``/``GitConfig``/``MVPConfig``/
+``WorkItemConfig``/``ValidationCommand``), never a second, parallel
+"engine plan" type — and that ``sqlite3`` is never imported at all.
+Anything reaching a ``MVPManager``/``WorkerSelector``/``QuotaManager``/
+``ProviderAdapter``/``*Store`` would have to do so through one of those
+forbidden imports first.
 """
 
 from __future__ import annotations
@@ -21,7 +32,14 @@ from pathlib import Path
 import aido_code
 
 FORBIDDEN_MODULE_PREFIXES = ("sqlite3",)
-ALLOWED_ORCHESTRATOR_MODULES = {"orchestrator", "orchestrator.engine"}
+ALLOWED_ORCHESTRATOR_MODULES = {
+    "orchestrator",
+    "orchestrator.engine",
+    "orchestrator.worker_registry",
+    "orchestrator.project_config",
+    "orchestrator.validation",
+    "orchestrator.execution_policy",
+}
 
 
 def _imported_module_names(tree: ast.Module) -> set[str]:
