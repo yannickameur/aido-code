@@ -6,31 +6,28 @@ import sys
 
 from aido_code.engine_client import EngineClient, EngineError
 from aido_code.engine_plan import EnginePlanError, build_engine_plan
+from aido_code.project_command import load_project_command_context
 from aido_code.project_init import run_init
-from aido_code.project_manifest import ProjectManifestError, load_project_manifest
-from aido_code.project_resources import ProjectResourcesError, resolve_project_resources
-from aido_code.roadmap import RoadmapError, parse_roadmap
-from aido_code.worker_config import load_worker_registry
+from aido_code.project_manifest import ProjectManifestError
+from aido_code.project_resources import ProjectResourcesError
+from aido_code.roadmap import RoadmapError
 from aido_code.repl import format_run, run
 from orchestrator.worker_registry import WorkerRegistryError
 
 
 def _project_command(command: str) -> int:
     try:
-        manifest = load_project_manifest("aido.yaml")
-        roadmap = parse_roadmap(manifest.roadmap)
-        resources = resolve_project_resources(manifest, roadmap)
-        registry = load_worker_registry()
+        context = load_project_command_context("aido.yaml")
         if command == "validate":
             print("VALID")
-            print(f"Current milestone: {roadmap.milestone.status}")
-            print("Executable." if roadmap.milestone.is_executable else "Not executable.")
+            print(f"Current milestone: {context.roadmap.milestone.status}")
+            print("Executable." if context.roadmap.milestone.is_executable else "Not executable.")
             return 0
-        if not roadmap.milestone.is_executable:
+        if not context.roadmap.milestone.is_executable:
             print("Error: Current milestone is DRAFT. Not executable.", file=sys.stderr)
             return 1
-        plan = build_engine_plan(manifest, roadmap, resources)
-        with EngineClient.from_config(plan, worker_registry=registry) as client:
+        plan = build_engine_plan(context.manifest, context.roadmap, context.resources)
+        with EngineClient.from_config(plan, worker_registry=context.worker_registry) as client:
             print(format_run(client.run()))
         return 0
     except (ProjectManifestError, RoadmapError, ProjectResourcesError,
