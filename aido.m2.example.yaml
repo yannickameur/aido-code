@@ -169,3 +169,7 @@ qa:
     argv: ["pytest", "-q"]
     timeout_seconds: 300
     required: true
+
+qa_protected_paths:
+  - tests/test_e2e.py
+  - tests/test_terminal_sanitizer.py
