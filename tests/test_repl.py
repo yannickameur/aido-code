@@ -2,6 +2,14 @@
 plus the engine-backed `/status`, `/config`, `/validate`, `/workers`,
 `/run` commands (WI-04, WI-05, WI-06). Offline only; see tests/conftest.py
 and CONTRIBUTING.md.
+
+`TestConfig`/`TestWorkers` (WI-M1.4-07C, see `docs/PROJECT_CONTRACT.md`
+§7) exercise the modern M1.4 project layout (`aido_code.project_init.
+run_init` + AIDO's own global `WorkerRegistry`) rather than the legacy
+`write_config()` fixture: `aido.yaml` no longer carries a `workers:`
+section, so the legacy fixture's `ProjectConfig`-shaped file is no
+longer valid input for either command. `/status` is untouched in this
+WorkItem and keeps using `write_config()`/`EngineClient.open()`.
 """
 
 from __future__ import annotations
@@ -17,6 +25,7 @@ import pytest
 
 from orchestrator.providers.contracts import QuotaWindow, ResetCredit, ResetCreditStatus, UnavailabilityReason
 
+from aido_code import project_init
 from aido_code.engine_client import EngineClient
 from aido_code.repl import DEFAULT_CONFIG_PATH, format_help, run
 from tests.conftest import (
@@ -47,6 +56,38 @@ def _run(
         subprocess_runner=subprocess_runner,
     )
     return output.getvalue()
+
+
+def _init_m14_project(tmp_path: Path, name: str = "roadmaplab") -> Path:
+    """Scaffolds a fresh M1.4 project (manifest + `ROADMAP.md` DRAFT +
+    `resources/` + a real Git repo, `aido_code.project_init.run_init`)
+    and returns its `aido.yaml` path — the same scaffold
+    `tests/test_project_command.py` uses for `aido-code validate`/`run`.
+    """
+    assert project_init.run_init(str(tmp_path), name) == 0
+    return tmp_path / name / "aido.yaml"
+
+
+def _set_worker_registry_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, registry: str) -> None:
+    xdg_home = tmp_path / "xdg"
+    aido_dir = xdg_home / "aido"
+    aido_dir.mkdir(parents=True, exist_ok=True)
+    (aido_dir / "workers.yaml").write_text(registry)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_home))
+
+
+def _pin_fake_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_home = tmp_path / "fake-home"
+    fake_home.mkdir(exist_ok=True)
+    monkeypatch.setenv("HOME", str(fake_home))
+
+
+def _use_packaged_default_registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """No override anywhere: ``aido_code.worker_config.
+    load_worker_registry()`` falls back to AIDO Code's own packaged
+    ``default_workers.yaml`` (WI-M1.4-01)."""
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    _pin_fake_home(tmp_path, monkeypatch)
 
 
 class TestHelp:
@@ -278,12 +319,28 @@ class TestStatus:
 
 
 class TestConfig:
-    def test_config_renders_project_snapshot_never_a_raw_file_dump(self, tmp_path: Path) -> None:
-        config_path = write_config(tmp_path)
+    def test_config_renders_manifest_roadmap_and_engine_facts_never_a_raw_file_dump(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        config_path = _init_m14_project(tmp_path)
+        _set_worker_registry_override(tmp_path, monkeypatch, registry=REGISTRY_TWO_WORKERS)
+        _pin_fake_home(tmp_path, monkeypatch)
+        project_dir = (tmp_path / "roadmaplab").resolve()
+
         transcript = _run("/config\n/exit\n", config_path=str(config_path))
-        assert "project: demo (Demo)" in transcript
+
+        assert "project: roadmaplab (roadmaplab)" in transcript
+        assert f"workspace: {project_dir}" in transcript
+        assert f"roadmap: {project_dir / 'ROADMAP.md'}" in transcript
+        assert f"resources: {project_dir / 'resources'}" in transcript
+        assert "initial_prompt: Read ROADMAP.md and the project resources referenced by it" in transcript
+        assert "current_milestone_id: m1" in transcript
+        assert "current_milestone_status: DRAFT" in transcript
         assert "enabled_workers: 2" in transcript
         assert "providers: anthropic" in transcript
+        assert "permission_mode: STANDARD" in transcript
+        assert "base_branch: main" in transcript
+        assert "qa_commands: 0" in transcript
         assert "schema_version" not in transcript
         assert "Traceback" not in transcript
 
@@ -371,13 +428,31 @@ class TestRun:
 
 
 class TestWorkers:
-    def test_lists_enabled_and_disabled_workers(self, tmp_path: Path) -> None:
-        config_path = write_config(tmp_path, registry=REGISTRY_ENABLED_AND_DISABLED)
+    def test_lists_enabled_and_disabled_workers_from_a_user_override_registry(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        config_path = _init_m14_project(tmp_path)
+        _set_worker_registry_override(tmp_path, monkeypatch, registry=REGISTRY_ENABLED_AND_DISABLED)
+        _pin_fake_home(tmp_path, monkeypatch)
+
         transcript = _run("/workers\n/exit\n", config_path=str(config_path))
+
         assert "alice" in transcript
         assert "enabled" in transcript
         assert "bob" in transcript
         assert "disabled" in transcript
+        assert "Traceback" not in transcript
+
+    def test_lists_workers_from_the_packaged_default_registry_when_no_override_exists(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        config_path = _init_m14_project(tmp_path)
+        _use_packaged_default_registry(tmp_path, monkeypatch)
+
+        transcript = _run("/workers\n/exit\n", config_path=str(config_path))
+
+        assert "alice" in transcript
+        assert "victor" in transcript
         assert "Traceback" not in transcript
 
     def test_missing_aido_yaml_prints_clear_error_not_a_traceback(self, tmp_path: Path) -> None:
@@ -395,13 +470,20 @@ class TestWorkers:
 
         monkeypatch.setattr(engine_module, "resolve_provider_adapters", _fail_resolve)
 
-        config_path = write_config(tmp_path, registry=REGISTRY_ENABLED_AND_DISABLED)
+        config_path = _init_m14_project(tmp_path)
+        _set_worker_registry_override(tmp_path, monkeypatch, registry=REGISTRY_ENABLED_AND_DISABLED)
+        _pin_fake_home(tmp_path, monkeypatch)
+
         transcript = _run("/workers\n/exit\n", config_path=str(config_path))
         assert "alice" in transcript
         assert "Traceback" not in transcript
 
-    def test_probe_renders_the_same_worker_states_as_status_probe(self, tmp_path: Path) -> None:
-        config_path = write_config(tmp_path, registry=REGISTRY_ENABLED_AND_DISABLED)
+    def test_probe_renders_the_same_worker_states_as_status_probe(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        config_path = _init_m14_project(tmp_path)
+        _set_worker_registry_override(tmp_path, monkeypatch, registry=REGISTRY_ENABLED_AND_DISABLED)
+        _pin_fake_home(tmp_path, monkeypatch)
         adapter = FakeAdapter(available=True)
         transcript = _run(
             "/workers --probe\n/exit\n",
@@ -416,8 +498,13 @@ class TestWorkers:
         assert "project:" not in transcript
         assert "Traceback" not in transcript
 
-    def test_probe_renders_the_same_quota_section_as_status_probe(self, tmp_path: Path) -> None:
-        config_path = write_config(tmp_path)
+    def test_probe_renders_the_same_quota_section_as_status_probe(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        legacy_config_path = write_config(tmp_path / "legacy")
+        m14_config_path = _init_m14_project(tmp_path / "m14")
+        _set_worker_registry_override(tmp_path, monkeypatch, registry=REGISTRY_TWO_WORKERS)
+        _pin_fake_home(tmp_path, monkeypatch)
         quota_windows = (
             QuotaWindow(
                 window_type="five_hour", source="claude_code", observed_at=UTC_T0,
@@ -426,20 +513,24 @@ class TestWorkers:
         )
         status_transcript = _run(
             "/status --probe\n/exit\n",
-            config_path=str(config_path),
+            config_path=str(legacy_config_path),
             provider_adapters={"anthropic": FakeAdapter(available=True, quota_windows=quota_windows)},
         )
         workers_transcript = _run(
             "/workers --probe\n/exit\n",
-            config_path=str(config_path),
+            config_path=str(m14_config_path),
             provider_adapters={"anthropic": FakeAdapter(available=True, quota_windows=quota_windows)},
         )
         status_quota_section = status_transcript.split("provider quotas:", 1)[1]
         workers_quota_section = workers_transcript.split("provider quotas:", 1)[1]
         assert status_quota_section == workers_quota_section
 
-    def test_plain_workers_never_renders_a_quota_section(self, tmp_path: Path) -> None:
-        config_path = write_config(tmp_path)
+    def test_plain_workers_never_renders_a_quota_section(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        config_path = _init_m14_project(tmp_path)
+        _set_worker_registry_override(tmp_path, monkeypatch, registry=REGISTRY_TWO_WORKERS)
+        _pin_fake_home(tmp_path, monkeypatch)
         transcript = _run("/workers\n/exit\n", config_path=str(config_path))
         assert "provider quotas:" not in transcript
 
@@ -449,16 +540,13 @@ class TestWorkers:
         assert "Traceback" not in transcript
 
 
-@pytest.mark.parametrize(
-    ("command", "expects_status"),
-    [("/status --probe", True), ("/workers --probe", False)],
-)
-def test_each_probe_command_calls_engine_probe_workers_exactly_once(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, command: str, expects_status: bool
+def test_status_probe_calls_engine_probe_workers_exactly_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Keep the M1.1 opt-in boundary structural: these commands must use
-    the engine's real snapshot tuple exactly once, rather than merely making
-    an equivalent-looking provider call or fabricating displayed states."""
+    """Keep the M1.1 opt-in boundary structural: `/status --probe` must
+    use the engine's real snapshot tuple exactly once, rather than merely
+    making an equivalent-looking provider call or fabricating displayed
+    states."""
     config_path = write_config(tmp_path, registry=REGISTRY_ENABLED_AND_DISABLED)
     adapter = FakeAdapter(available=True)
     original_probe_workers = EngineClient.probe_workers
@@ -471,7 +559,7 @@ def test_each_probe_command_calls_engine_probe_workers_exactly_once(
 
     monkeypatch.setattr(EngineClient, "probe_workers", count_and_delegate)
     transcript = _run(
-        f"{command}\n/exit\n",
+        "/status --probe\n/exit\n",
         config_path=str(config_path),
         provider_adapters={"anthropic": adapter},
     )
@@ -480,4 +568,35 @@ def test_each_probe_command_calls_engine_probe_workers_exactly_once(
     assert adapter.calls == 1
     assert "probe=available" in transcript
     assert "probe=disabled" in transcript
-    assert ("NOT_INITIALIZED" in transcript) is expects_status
+    assert "NOT_INITIALIZED" in transcript
+
+
+def test_workers_probe_calls_engine_probe_workers_exactly_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Same structural guarantee as `test_status_probe_calls_engine_probe_workers_exactly_once`,
+    for `/workers --probe` on the modern M1.4 project layout."""
+    config_path = _init_m14_project(tmp_path)
+    _set_worker_registry_override(tmp_path, monkeypatch, registry=REGISTRY_ENABLED_AND_DISABLED)
+    _pin_fake_home(tmp_path, monkeypatch)
+    adapter = FakeAdapter(available=True)
+    original_probe_workers = EngineClient.probe_workers
+    calls = 0
+
+    def count_and_delegate(client: EngineClient):
+        nonlocal calls
+        calls += 1
+        return original_probe_workers(client)
+
+    monkeypatch.setattr(EngineClient, "probe_workers", count_and_delegate)
+    transcript = _run(
+        "/workers --probe\n/exit\n",
+        config_path=str(config_path),
+        provider_adapters={"anthropic": adapter},
+    )
+
+    assert calls == 1
+    assert adapter.calls == 1
+    assert "probe=available" in transcript
+    assert "probe=disabled" in transcript
+    assert "NOT_INITIALIZED" not in transcript

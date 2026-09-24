@@ -14,12 +14,14 @@ from __future__ import annotations
 
 import io
 from contextlib import nullcontext
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
 from orchestrator.engine import ProjectSnapshot, ProjectStatusSnapshot, WorkerSnapshot, WorkItemSnapshot
 
+from aido_code import repl as repl_module
 from aido_code.engine_client import EngineClient
 from aido_code.repl import DEFAULT_CONFIG_PATH, format_status, format_workers, run, sanitize_for_terminal
 
@@ -221,7 +223,30 @@ class TestTerminalRenderingSafety:
             def workers(self) -> tuple[WorkerSnapshot, ...]:
                 return (worker,)
 
+            def __enter__(self) -> "FakeClient":
+                return self
+
+            def __exit__(self, *exc_info: object) -> bool:
+                return False
+
+        # `/config`/`/workers` (WI-M1.4-07C) no longer open their engine via
+        # `EngineClient.open()` — they go through
+        # `aido_code.repl._open_project_command_engine()` (manifest ->
+        # roadmap -> AIDO WorkerRegistry -> typed engine plan) instead, so
+        # that seam is stubbed here too, with `manifest.project.name`
+        # carrying the same malicious payload.
+        fake_manifest = SimpleNamespace(
+            project=SimpleNamespace(id="demo", name=payload, workspace="/tmp"),
+            roadmap="/tmp/ROADMAP.md", resources="/tmp/resources", initial_prompt="init",
+        )
+        fake_roadmap = SimpleNamespace(milestone=SimpleNamespace(id="m1", status="DRAFT"))
+        fake_context = SimpleNamespace(manifest=fake_manifest, roadmap=fake_roadmap)
+
         monkeypatch.setattr(EngineClient, "open", lambda *args, **kwargs: nullcontext(FakeClient()))
+        monkeypatch.setattr(
+            repl_module, "_open_project_command_engine",
+            lambda *args, **kwargs: (fake_context, FakeClient()),
+        )
         transcript = _run("/config\n/status\n/workers\n/exit\n")
 
         safe = "label\\x1b[31mred\\rreplace\\nfake: line"
