@@ -555,11 +555,28 @@ never committed (`CONTRIBUTING.md`, "Local configuration").
      no files touched); a path-like/unsafe project name (rejected).
 
 7. **WI-M1.4-07** — `validate`/`run`/`status`/`workers`/`config`
-   integration.
+   integration. **`FAILED` (real, historical) — superseded by
+   07A..07D, never redefined, never deleted.**
 
    Dependencies: WI-M1.4-05, WI-M1.4-06. Capabilities: development.
 
-   Acceptance criteria:
+   **Real outcome (first governed run, 2026-09-24)**: DEV A (Alice)
+   reached Ralph's own `max_iterations` limit (5 iterations, 8m06s,
+   exit code 2) without ever committing — this WorkItem's own scope
+   (five separate command integrations: `validate`/`run`/`status`/
+   `workers`/`config`) was too large for one Ralph loop budget. No
+   DEV B/DEV FIX/QA cycle was ever reached for it; its own branch has
+   zero diff from `main`. Alice's leftover uncommitted working-tree
+   changes were never reviewed, never QA'd, never committed — preserved
+   only as a local `git stash` for diagnostic inspection, never applied
+   or cherry-picked (`CONTRIBUTING.md`'s core rule: only the governed
+   flow's own accepted commits count as real product). This WorkItem's
+   own id is retired, never reused, never manually marked otherwise
+   than `FAILED` in persisted engine state — see §3 below for the
+   recovery split.
+
+   Acceptance criteria (as originally drafted, kept verbatim as the
+   historical record — never satisfied by this WorkItem itself):
    - `aido-code validate`: provider-free; validates manifest + roadmap
      structure + resources confinement + that the AIDO `WorkerRegistry`
      itself resolves; prints exactly the two example blocks in
@@ -589,11 +606,15 @@ never committed (`CONTRIBUTING.md`, "Local configuration").
      project's own existing test conventions).
 
 8. **WI-M1.4-08** — Regression, clean-install, and portability
-   acceptance.
+   acceptance. **`BLOCKED` (real, historical:
+   `dependency cannot complete: ['WI-M1.4-07']`) — superseded by 08R,
+   never redefined, never deleted.**
 
    Dependencies: WI-M1.4-07. Capabilities: development.
 
-   Acceptance criteria:
+   Acceptance criteria (as originally drafted, kept verbatim as the
+   historical record — never attempted, blocked by WI-M1.4-07's own
+   failure before any execution):
    - `pytest -q` passes for the whole package, offline, zero real
      provider/Ralph calls anywhere in the suite.
    - One offline acceptance test proves a clean-install shape (a fixed,
@@ -609,6 +630,154 @@ never committed (`CONTRIBUTING.md`, "Local configuration").
      necessarily changes what `aido.yaml`/`/config` mean.
    - This is the final gate for MVP 0.1.4: `pytest -q` green, `git diff
      --check` clean.
+
+### Recovery split (after the real WI-M1.4-07 failure, 2026-09-24)
+
+`WI-M1.4-07`'s own scope (five separate command integrations in one
+WorkItem) exceeded one Ralph loop's iteration budget. Recovery keeps
+`WI-M1.4-07`/`WI-M1.4-08`'s own ids **retired forever** — never reused,
+never manually redefined — and splits the remaining, still-real work
+into five smaller, independently-bounded WorkItems below, each scoped
+to fit comfortably inside one Ralph loop. This is still M1.4, not a new
+milestone.
+
+9. **WI-M1.4-07A** — Project command context + `validate` integration.
+
+   Dependencies: WI-M1.4-05, WI-M1.4-06. Capabilities: development.
+
+   Acceptance criteria:
+   - Introduces (or reuses, if WI-M1.4-05 already offers enough of it)
+     one cohesive project-command loading path for the modern AIDO
+     contract: loads the project `aido.yaml` manifest, the
+     deterministic `ROADMAP.md`, resources, and the AIDO global
+     `WorkerRegistry` — never constructs or probes a provider merely to
+     validate.
+   - `aido-code validate` is migrated onto this same path — never a
+     second, parallel validation implementation kept alongside it.
+   - Validates, in order: the manifest; the roadmap grammar; resources
+     confinement/existence; that the AIDO `WorkerRegistry` itself
+     resolves.
+   - `Status: DRAFT` → `Current milestone: DRAFT` / `Not executable`,
+     successful validation. `Status: APPROVED` → `Current milestone:
+     APPROVED` / `Executable`.
+   - No provider call. No `OrchestratorEngine.run()`. No parsing logic
+     already implemented by WI-M1.4-02/03/04/05 is duplicated — this
+     WorkItem wires existing pieces together, it does not re-implement
+     any of them.
+   - Kept narrowly scoped: no `run`/`status`/`workers`/`config` work
+     here beyond the minimal, reusable plumbing WI-M1.4-07B/C/D
+     genuinely need (e.g. the one project-command-context loader
+     itself) — never a preemptive implementation of their own scope.
+   - Offline tests cover: `DRAFT`; `APPROVED`; an invalid manifest; an
+     invalid roadmap; an invalid/missing resource; a malformed AIDO
+     workers override.
+
+10. **WI-M1.4-07B** — `run` integration + APPROVED gate.
+
+    Dependencies: WI-M1.4-07A. Capabilities: development.
+
+    Acceptance criteria:
+    - `aido-code run` uses the project context WI-M1.4-07A produces —
+      never a second, parallel loading path.
+    - `Status: DRAFT`: fails cleanly, non-zero exit, no provider probe,
+      no provider adapter execution, no `OrchestratorEngine` run
+      attempted.
+    - `Status: APPROVED`: loads the AIDO global `WorkerRegistry`; builds
+      the typed `ProjectConfig` through the existing WI-M1.4-05
+      transformation; injects the registry using the engine's P13.5
+      public seam (`worker_registry=`); calls only public
+      `OrchestratorEngine` APIs; invokes `.run()`.
+    - AIDO never implements worker selection, DEV A/DEV B scheduling,
+      QA verdicts, or Git merge logic — every one of those stays the
+      engine's own.
+    - Tests use fake provider adapters/a fake Ralph subprocess, exactly
+      this repository's own established convention.
+    - At least one offline test proves `APPROVED` reaches a real engine
+      WorkItem Flow boundary; at least one proves `DRAFT` reaches zero
+      provider calls.
+    - Does not modify `/status`/`/workers`/`/config` beyond strictly
+      necessary shared plumbing (the WI-M1.4-07A context loader).
+
+11. **WI-M1.4-07C** — Workers and config integration.
+
+    Dependencies: WI-M1.4-07A. Capabilities: development.
+
+    Acceptance criteria:
+    - `/workers` uses the AIDO global `WorkerRegistry` (never reads
+      workers from a project's own `aido.yaml`, which no longer has
+      any), stays provider-free; `/workers --probe` uses the existing
+      shared engine probe/rendering path — no second worker-rendering
+      implementation. Offline tests cover both a packaged-default
+      registry and a user-override registry.
+    - `/config` displays: project id/name/workspace; `roadmap` path;
+      `resources` path; `initial_prompt` indication/content per the
+      existing M1.3 terminal-safety conventions; current milestone id;
+      current milestone status; `enabled_worker_count`; `providers`;
+      `permission_mode`; `base_branch`; `qa_command_count`. Never a raw
+      file dump, never a credential, never a project-owned worker
+      registry (none exists).
+    - Does not modify `/status` in this WorkItem.
+
+12. **WI-M1.4-07D** — `status` integration.
+
+    Dependencies: WI-M1.4-07A, WI-M1.4-07B. Capabilities: development.
+
+    Acceptance criteria:
+    - `/status` combines modern roadmap facts (current milestone
+      id, `DRAFT`/`APPROVED` state) with the real, persisted engine
+      state from `OrchestratorEngine.status()` — never invents a
+      WorkItem status from `ROADMAP.md` itself: the roadmap describes
+      *intended* work, the engine snapshot describes *actual persisted*
+      work. Before a project's first `run`, no fake `COMPLETED`/
+      `PENDING` engine state is fabricated.
+    - Every dynamic, engine-originated value rendered still passes
+      through M1.3's existing terminal sanitizer — never a second,
+      parallel sanitization path.
+    - `/status --probe` keeps its existing, explicit probe semantics;
+      plain `/status` stays provider-free.
+    - Offline tests cover: before a project's first run; after an
+      offline, fake-engine persisted execution; a `DRAFT` project; an
+      `APPROVED` project; provider-free plain `/status`; explicit
+      `--probe`.
+    - Does not add unrelated timeline/session behavior (M7/M2, both out
+      of scope here).
+
+13. **WI-M1.4-08R** — Final regression, clean-install, and portability
+    acceptance.
+
+    Dependencies: WI-M1.4-07B, WI-M1.4-07C, WI-M1.4-07D.
+    Capabilities: development.
+
+    Acceptance criteria:
+    - `pytest -q` passes for the whole package, offline, zero real
+      provider/Ralph calls anywhere in the suite. `git diff --check`
+      clean.
+    - A clean-install-style acceptance test uses isolated `HOME`/
+      `XDG_CONFIG_HOME`, referencing neither
+      `~/.config/ai-dev-orchestrator/`, any sibling-checkout worker
+      path, nor any project-level worker path.
+    - One offline end-to-end scenario proves: `aido-code init` → a
+      fresh `DRAFT` project → `aido-code validate` → `DRAFT`/`Not
+      executable` → edit `ROADMAP.md` to a valid, `APPROVED` mini
+      milestone → `aido-code validate` → `APPROVED`/`Executable` →
+      `aido-code run` → the real `OrchestratorEngine` → a fake provider/
+      subprocess WorkItem Flow cycle. This same test proves: the
+      project's own `aido.yaml` contains no `workers`/`providers`/
+      `models`; AIDO's workers are global; `ROADMAP.md` is the
+      functional source of truth; `resources/` confinement works; the
+      engine receives an injected `WorkerRegistry`; no private engine
+      orchestration component (`MVPManager`/`WorkerSelector`/
+      `QuotaManager`/a `ProviderAdapter`/`InternalQAEngine`/
+      `GitGovernanceService`/a Store) is ever imported by `aido_code`.
+    - M1/M1.1/M1.2/M1.3's own already-covered command behaviors remain
+      passing, unregressed.
+    - A real, provider-free manual bootstrap is also run (not just an
+      offline test) — `aido-code init "$TMP" acceptance-project` into a
+      fresh temp directory, then `aido-code validate` — confirming a
+      `DRAFT` project's `run` is refused before any provider is ever
+      touched. This does not, by itself, consume a real provider unless
+      the governed WorkItem Flow building this WorkItem needs DEV A/
+      DEV B to implement it.
 
 Full functional contract every WorkItem above builds toward:
 `docs/PROJECT_CONTRACT.md`.
