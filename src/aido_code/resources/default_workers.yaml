@@ -1,0 +1,261 @@
+# AIDO's own global worker registry — packaged default (WI-M1.4-01).
+# See docs/PROJECT_CONTRACT.md §4 and src/aido_code/worker_config.py for
+# the loader/resolution order. This file is used directly from the
+# installed package (never auto-materialized to disk) whenever no
+# $XDG_CONFIG_HOME/aido/workers.yaml or ~/.config/aido/workers.yaml
+# override exists. A user who wants different workers creates that
+# override file themselves; AIDO Code's own packaged copy never changes
+# as a side effect.
+#
+# Self-contained copy: this is AIDO Code's own worker source of truth,
+# never a read of ai-dev-orchestrator's own packaged
+# orchestrator/resources/default_workers.yaml (that file stays that
+# project's legacy, CLI-only concern per its own P13.5 — see
+# docs/PROJECT_CONTRACT.md §4).
+#
+# No secrets here: authentication stays with the Claude Code / Codex /
+# Vibe CLIs themselves (already logged in outside this project) — never
+# an API key, token, or credential in this file.
+#
+# quality_tier: one of SIMPLE, STANDARD, COMPLEX, CRITICAL (see
+# orchestrator.worker_selector.QualityTier) — the minimum capability
+# level a profile satisfies.
+#
+# cost_rank: a configured, relative economic preference (lower = prefer
+# this profile) — never a real provider price.
+
+workers:
+  - worker_id: alice
+    display_name: Alice
+    enabled: true
+    provider: anthropic
+    backend: claude_code
+    priority: 100
+
+    capabilities:
+      - development
+      - release_planning
+      - roadmap_synthesis
+      - complexity_estimation
+      - qa_testing
+
+    default_profile_id: standard
+    estimator_profile_id: economy
+
+    profiles:
+      economy:
+        quality_tier: SIMPLE
+        model: haiku
+        cost_rank: 10
+
+      standard:
+        quality_tier: STANDARD
+        model: sonnet
+        cost_rank: 20
+
+      deep:
+        quality_tier: COMPLEX
+        model: sonnet
+        cost_rank: 30
+
+  # Worker pool fallback: a second, independent worker per participating
+  # provider. Same capabilities/profiles as the provider's primary
+  # worker — no artificial functional difference. priority=90 (< the
+  # primary's 100) so a fresh selection with no author still naturally
+  # prefers the primary worker.
+  - worker_id: bob
+    display_name: Lydie
+    enabled: true
+    provider: anthropic
+    backend: claude_code
+    priority: 90
+
+    capabilities:
+      - development
+      - release_planning
+      - roadmap_synthesis
+      - complexity_estimation
+      - qa_testing
+
+    default_profile_id: standard
+    estimator_profile_id: economy
+
+    profiles:
+      economy:
+        quality_tier: SIMPLE
+        model: haiku
+        cost_rank: 10
+
+      standard:
+        quality_tier: STANDARD
+        model: sonnet
+        cost_rank: 20
+
+      deep:
+        quality_tier: COMPLEX
+        model: sonnet
+        cost_rank: 30
+
+  - worker_id: victor
+    display_name: Victor
+    enabled: true
+    provider: openai
+    backend: codex
+    priority: 100
+
+    capabilities:
+      - development
+      - release_planning
+      - roadmap_synthesis
+      - complexity_estimation
+      - qa_testing
+
+    default_profile_id: standard
+    estimator_profile_id: economy
+
+    profiles:
+      economy:
+        quality_tier: SIMPLE
+        model: gpt-6-luna
+        reasoning_effort: low
+        cost_rank: 10
+
+      standard:
+        quality_tier: STANDARD
+        model: gpt-6-sol
+        reasoning_effort: medium
+        cost_rank: 20
+
+      deep:
+        quality_tier: COMPLEX
+        model: gpt-6-astra
+        reasoning_effort: high
+        cost_rank: 30
+
+  - worker_id: oscar
+    display_name: Yannick
+    enabled: true
+    provider: openai
+    backend: codex
+    priority: 90
+
+    capabilities:
+      - development
+      - release_planning
+      - roadmap_synthesis
+      - complexity_estimation
+      - qa_testing
+
+    default_profile_id: standard
+    estimator_profile_id: economy
+
+    profiles:
+      economy:
+        quality_tier: SIMPLE
+        model: gpt-6-luna
+        reasoning_effort: low
+        cost_rank: 10
+
+      standard:
+        quality_tier: STANDARD
+        model: gpt-6-sol
+        reasoning_effort: medium
+        cost_rank: 20
+
+      deep:
+        quality_tier: COMPLEX
+        model: gpt-6-astra
+        reasoning_effort: high
+        cost_rank: 30
+
+  # Mistral (Vibe). Priority deliberately below the validated Anthropic/
+  # OpenAI pool (100/90): this adds capacity/provider diversity, it
+  # never silently displaces an already-validated primary. Only
+  # `development` is granted — only development-shaped execution
+  # evidence exists for this provider.
+  - worker_id: milo
+    display_name: Nathaniel
+    enabled: true
+    provider: mistral
+    backend: vibe
+    priority: 60
+
+    capabilities:
+      - development
+
+    default_profile_id: standard
+    estimator_profile_id: standard
+
+    profiles:
+      standard:
+        quality_tier: STANDARD
+        model: vibe-default
+        cost_rank: 20
+
+  - worker_id: juno
+    display_name: Juno
+    enabled: true
+    provider: mistral
+    backend: vibe
+    priority: 60
+
+    capabilities:
+      - development
+
+    default_profile_id: standard
+    estimator_profile_id: standard
+
+    profiles:
+      standard:
+        quality_tier: STANDARD
+        model: vibe-default
+        cost_rank: 20
+
+  # DeepSeek. Status: IMPLEMENTED, real validation PENDING. `enabled:
+  # false`: DeepSeek is billed per token (unlike the subscription CLIs
+  # above) and reaching it requires a real DEEPSEEK_API_KEY, plus no
+  # real spike evidence of a successful execution exists yet. Flip to
+  # `true` only after both are established. Only `development` is
+  # granted, for the same reason: no evidence yet for any other
+  # capability.
+  - worker_id: dana
+    display_name: Dana
+    enabled: false
+    provider: deepseek
+    backend: claude_code
+    priority: 60
+
+    capabilities:
+      - development
+
+    default_profile_id: standard
+    estimator_profile_id: standard
+
+    profiles:
+      standard:
+        quality_tier: STANDARD
+        model: deepseek-flash
+        cost_rank: 20
+
+  # Kimi (Kimi Code). Status: IMPLEMENTED, real validation PENDING.
+  # `enabled: false` for the same reason as `dana` above: requires a
+  # real KIMI_API_KEY (Kimi Code subscription), and no real execution
+  # evidence exists yet.
+  - worker_id: kai
+    display_name: Kai
+    enabled: false
+    provider: kimi
+    backend: claude_code
+    priority: 60
+
+    capabilities:
+      - development
+
+    default_profile_id: standard
+    estimator_profile_id: standard
+
+    profiles:
+      standard:
+        quality_tier: STANDARD
+        model: kimi-for-coding
+        cost_rank: 20
