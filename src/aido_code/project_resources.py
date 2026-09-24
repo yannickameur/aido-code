@@ -50,19 +50,21 @@ class InvalidSourceError(ProjectResourcesError):
 def _resolve_confined_source(raw: str, *, workspace: Path) -> Path:
     """Same resolution/confinement shape as
     ``project_manifest._resolve_confined_path``: relative to ``workspace``
-    (never the caller's cwd), ``~`` expanded, symlinks fully followed —
-    then verified to still land inside ``workspace``, fail closed on any
-    ``..`` traversal or symlink escape anywhere along the path."""
-    expanded = Path(raw).expanduser()
-    candidate = expanded if expanded.is_absolute() else workspace / expanded
+    (never the caller's cwd). Sources must be workspace-relative and
+    contain no ``..`` segments. Symlinks are then followed and the result
+    must still be a file inside ``workspace``."""
+    source = Path(raw)
+    if source.is_absolute() or ".." in source.parts:
+        raise InvalidSourceError(f"{raw!r} must be a workspace-relative path without '..' traversal")
+    candidate = workspace / source
     resolved = candidate.resolve()
     if resolved != workspace and workspace not in resolved.parents:
         raise InvalidSourceError(
             f"{raw!r} resolves to {str(resolved)!r}, which is outside workspace "
             f"{str(workspace)!r} — no '..' traversal or symlink escape out of workspace is allowed"
         )
-    if not resolved.exists():
-        raise InvalidSourceError(f"{raw!r} (resolved to {str(resolved)!r}) does not exist on disk")
+    if not resolved.is_file():
+        raise InvalidSourceError(f"{raw!r} (resolved to {str(resolved)!r}) is not an existing file on disk")
     return resolved
 
 

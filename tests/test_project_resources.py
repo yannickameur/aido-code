@@ -112,7 +112,7 @@ class TestMissingDeclaredSourceFile:
         manifest = load_project_manifest(manifest_path)
         roadmap = parse_roadmap(manifest.roadmap)
 
-        with pytest.raises(InvalidSourceError, match="does not exist on disk"):
+        with pytest.raises(InvalidSourceError, match="not an existing file on disk"):
             resolve_project_resources(manifest, roadmap)
 
 
@@ -128,8 +128,34 @@ class TestDotDotTraversal:
         manifest = load_project_manifest(manifest_path)
         roadmap = parse_roadmap(manifest.roadmap)
 
-        with pytest.raises(InvalidSourceError, match="outside workspace"):
+        with pytest.raises(InvalidSourceError, match="without '..' traversal"):
             resolve_project_resources(manifest, roadmap)
+
+    def test_in_workspace_dotdot_traversal_rejected(self, tmp_path: Path) -> None:
+        manifest_path = _make_project(
+            tmp_path,
+            sources_block="## Sources\n\n- resources/../resources/specification.md\n\n",
+        )
+        manifest = load_project_manifest(manifest_path)
+        roadmap = parse_roadmap(manifest.roadmap)
+
+        with pytest.raises(InvalidSourceError, match="without '..' traversal"):
+            resolve_project_resources(manifest, roadmap)
+
+    def test_absolute_source_path_rejected(self, tmp_path: Path) -> None:
+        manifest_path = _make_project(tmp_path)
+        manifest = load_project_manifest(manifest_path)
+        source = manifest_path.parent / "resources" / "specification.md"
+
+        with pytest.raises(InvalidSourceError, match="workspace-relative"):
+            resolve_sources((str(source),), workspace=manifest.project.workspace)
+
+    def test_directory_source_rejected(self, tmp_path: Path) -> None:
+        manifest_path = _make_project(tmp_path)
+        manifest = load_project_manifest(manifest_path)
+
+        with pytest.raises(InvalidSourceError, match="not an existing file"):
+            resolve_sources(("resources",), workspace=manifest.project.workspace)
 
 
 class TestSymlinkEscape:
