@@ -15,6 +15,7 @@ WorkItem and keeps using `write_config()`/`EngineClient.open()`.
 from __future__ import annotations
 
 import io
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -148,6 +149,13 @@ class TestEntryPoints:
     ) -> None:
         config_path = _init_m14_project(tmp_path)
         _use_packaged_default_registry(tmp_path, monkeypatch)
+        # Pinning HOME above isolates the packaged-default-registry lookup
+        # from the real developer machine, but it can also hide this
+        # interpreter's editable-install site-packages (resolved against
+        # the *real* HOME at process startup) from the subprocess. Carry
+        # the parent's already-resolved sys.path across explicitly so the
+        # subprocess can still import aido_code/orchestrator.
+        child_env = {**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)}
         result = subprocess.run(
             [sys.executable, "-m", "aido_code"],
             input="/help\n/workers\n/config\n/bogus\n/exit\n",
@@ -155,6 +163,7 @@ class TestEntryPoints:
             capture_output=True,
             text=True,
             timeout=10,
+            env=child_env,
         )
         assert result.returncode == 0
         assert "/help" in result.stdout
