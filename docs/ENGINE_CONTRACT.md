@@ -20,11 +20,43 @@ from orchestrator.engine import OrchestratorEngine
 engine = OrchestratorEngine.open("path/to/aido.yaml")
 ```
 
-`.open()` loads and validates `aido.yaml` and its referenced worker
-registry eagerly. It is read-only: no `state_dir`, no SQLite file, no
-provider call. It raises `EngineConfigError` for any structural
-problem, never a bare `ProjectConfigError`/`WorkerRegistryError`
-(orchestrator-internal types AIDO Code must never import).
+`.open()` loads and validates `aido.yaml` eagerly. It is read-only: no
+`state_dir`, no SQLite file, no provider call. It raises
+`EngineConfigError` for any structural problem, never a bare
+`ProjectConfigError`/`WorkerRegistryError` (orchestrator-internal types
+AIDO Code must never import). This `config_path` shape is the engine's
+own legacy, file-based path (`ai-dev-orchestrator` P13.5) — **AIDO
+Code's own M1.4 product path never uses it** (see below).
+
+### `worker_registry=` injection (P13.5) — the path M1.4 uses
+
+Since `ai-dev-orchestrator`'s own P13.5, `workers:` is optional in a
+legacy `aido.yaml`, and both the constructor and `.open()` accept an
+already-built `orchestrator.worker_registry.WorkerRegistry` directly:
+
+```python
+from orchestrator.project_config import ProjectConfig
+from orchestrator.worker_registry import WorkerRegistry
+
+config: ProjectConfig = ...      # AIDO Code's own typed plan (M1.4, docs/PROJECT_CONTRACT.md §6)
+registry: WorkerRegistry = ...   # AIDO Code's own global worker configuration (M1.4, §4)
+
+engine = OrchestratorEngine(config, worker_registry=registry)
+```
+
+`config` here is a `ProjectConfig` built through its own **plain Python
+constructor** (`ProjectIdentity`/`ExecutionConfig`/`GitConfig`/
+`MVPConfig`/`WorkItemConfig`/`ValidationCommand`, all exported from
+`orchestrator.project_config`/`orchestrator.validation` unchanged) —
+never `ProjectConfig.load(path)` (there is no `ProjectConfig`-shaped
+YAML file in the M1.4 product path), and never a second, parallel
+"engine plan" type (REUSE FIRST). `config.workers_registry_path` stays
+`None`; `WorkerSelector` remains the engine's own, sole owner of *which*
+worker is picked — this seam only supplies *what's available*, from
+whatever source AIDO Code resolved it (its own global config, §4),
+never a caller-side selection decision. `.open(config_path,
+worker_registry=...)` accepts the same keyword for the legacy,
+file-based construction path too, but M1.4 never uses `.open()` at all.
 
 ## Methods
 
@@ -51,6 +83,12 @@ provider/quota/network logic, extra caching, or fabricated data of its
 own. `EngineClient.probe_workers()` is the only thing `/status --probe`
 and `/workers --probe` (see `docs/CLI_SPEC.md`) ever call to reach
 `OrchestratorEngine.probe_workers()`.
+
+M1.4 (WI-M1.4-05) extends `EngineClient`'s own construction to accept
+the already-built `ProjectConfig`/`WorkerRegistry` pair (the
+`worker_registry=` injection above) alongside its existing
+`provider_adapters`/`subprocess_runner` test seams — still a thin,
+1:1 wrapper, never local orchestration logic.
 
 ### `.run()` is also resume
 

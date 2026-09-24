@@ -12,7 +12,8 @@ there. This roadmap starts at M1.
 ## Where we stand
 
 DONE: M1, M1.1, M1.2, M1.3
-NEXT: M2, ready for governed development, not started
+CURRENT: M1.4 — Autonomous AIDO project contract
+NEXT: M2, entirely not started (unaffected/unblocked by M1.4)
 FUTURE: M3-M8
 
 | Milestone | Status |
@@ -21,7 +22,8 @@ FUTURE: M3-M8
 | M1.1 — CLI conventions and standalone install | `DONE` (see `docs/M1_1_REFERENCE_RUN.md`) |
 | M1.2 — Rich provider quota status | `DONE` (see `M1_2_SPEC.yaml`) |
 | M1.3 — Audit hardening | `DONE` (see `M1_3_SPEC.yaml`) |
-| M2 — Sessions and resume | `READY FOR GOVERNED DEVELOPMENT`, not started (see `M2_SPEC.yaml`, `docs/SESSION_CONTRACT.md`) |
+| M1.4 — Autonomous AIDO project contract | `CURRENT`, approved for governed development (see `docs/PROJECT_CONTRACT.md`) |
+| M2 — Sessions and resume | `SPECIFIED`, not started, entirely unaffected by M1.4 (see `M2_SPEC.yaml`, `docs/SESSION_CONTRACT.md`) |
 | M3 — Natural-language piloting | `À VOTER` |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
@@ -29,6 +31,16 @@ FUTURE: M3-M8
 | M7 — Real-time timeline | `À VOTER` |
 | M8 — `aido` command cutover | `À VOTER`, gated on functional parity |
 | M9+ | `À VOTER`, only per real, demonstrated need |
+
+**`MVP_SPEC.yaml`/`M1_1_SPEC.yaml`/`M1_2_SPEC.yaml`/`M1_3_SPEC.yaml` are
+historical acceptance records of M1/M1.1/M1.2/M1.3 as they were actually
+built — kept as proof, never deleted, but no longer the model for how a
+future milestone's contract is authored.** Starting at M1.4,
+`ROADMAP.md` is the single functional source of truth for a *project*
+this product governs (see M1.4 below and `docs/PROJECT_CONTRACT.md`);
+this file (AIDO Code's own roadmap) stays free-form prose by convention,
+not an instance of the deterministic grammar M1.4 defines for the
+projects AIDO governs.
 
 ## M1 — Minimal interactive shell (`DONE`)
 
@@ -215,7 +227,393 @@ any point.
 Full acceptance criteria per WorkItem: `aido.m1_3.example.yaml`. Full
 functional contract these WorkItems build toward: `M1_3_SPEC.yaml`.
 
-## M2 — Sessions and resume (`READY FOR GOVERNED DEVELOPMENT`, not started)
+## M1.4 — Autonomous AIDO project contract (`CURRENT`)
+
+**Decision**: AIDO is the user product; `ai-dev-orchestrator` is its
+internal engine. Before this milestone, a user project's `aido.yaml`
+duplicated the engine's own schema v1 — worker registry path,
+hand-written WorkItems in YAML, execution/git policy — the exact
+coupling that project's own P13.5 closed on the engine side (see
+`ai-dev-orchestrator`'s `ROADMAP.md` §13: `workers:` optional,
+`OrchestratorEngine`/`ProjectRuntime` accept an injected
+`WorkerRegistry`). M1.4 is AIDO Code's own side of that boundary:
+
+```
+AIDO
+├── CLI / UX
+├── AIDO global configuration (workers)
+├── aido.yaml parser (manifest)
+├── ROADMAP.md parser (deterministic)
+├── resources/
+│
+└── OrchestratorEngine
+       ↓
+   ai-dev-orchestrator
+```
+
+A user project knows **no worker, no provider, no model, no
+`workers.yaml`, no path into `ai-dev-orchestrator`.** It knows exactly
+four things: which project, which roadmap, which resources, which first
+instruction.
+
+**Full grammar/schema, authoritative**: `docs/PROJECT_CONTRACT.md`
+(manifest schema, `ROADMAP.md`'s deterministic Markdown grammar and
+APPROVED/DRAFT gate, resources confinement, `initial_prompt`
+combination, AIDO's own global worker configuration, and exactly how
+`validate`/`run`/`status`/`workers`/`config` behave). This section stays
+short and points there, the same way M2's own section points to
+`docs/SESSION_CONTRACT.md`.
+
+**New manifest shape** (`aido.yaml`, replacing the schema every prior
+milestone used):
+
+```yaml
+schema_version: 1
+
+project:
+  id: myproject
+  name: MyProject
+  workspace: "."
+
+roadmap: "./ROADMAP.md"
+
+resources: "./resources"
+
+initial_prompt: >
+  Read ROADMAP.md and the project resources referenced by it before doing
+  any work. Execute only the currently approved milestone. Respect its
+  scope, dependencies, acceptance criteria and explicit out-of-scope
+  decisions. Apply REUSE FIRST, KISS and YAGNI.
+```
+
+No `workers:`/`providers:`/`models:`/`mvp:`/`work_items:`/`qa:`, and no
+AIDO-global policy of any kind, ever belongs in this file — see
+`docs/PROJECT_CONTRACT.md` §2 for the exhaustive allowed-key list and
+where `execution.permission_mode`/`git.base_branch` now come from
+instead (explicit, documented defaults; no per-project override yet,
+`À VOTER` if a real need is ever established).
+
+**`ROADMAP.md` replaces `MVP_SPEC.yaml`'s future role**: one
+deterministic Markdown grammar (`docs/PROJECT_CONTRACT.md` §3) carries
+vision, sources, the current milestone (status/objective/acceptance
+criteria/WorkItems/dependencies/capabilities/QA/out-of-scope), and
+future milestones — fail-closed, no LLM parsing, no heuristic reading,
+exactly one `Current milestone`, unique WorkItem ids, validated
+dependencies, cycle detection (mirroring `ai-dev-orchestrator`'s own
+`project_config._validate_work_items` DFS), deterministic QA. A
+milestone only runs when `Status: APPROVED`; `DRAFT` validates but is
+refused cleanly by `run`.
+
+**AIDO's own worker configuration** (`docs/PROJECT_CONTRACT.md` §4):
+`$XDG_CONFIG_HOME/aido/workers.yaml`, falling back to
+`~/.config/aido/workers.yaml`, falling back — with no file ever
+auto-materialized — to AIDO Code's own packaged default workers (a
+self-contained copy, never a read of `ai-dev-orchestrator`'s own
+packaged `default_workers.yaml`, which stays legacy/CLI-only per
+P13.5). No project ever references a worker/provider/model/`workers.yaml`
+path again.
+
+**Typed engine plan** (`docs/PROJECT_CONTRACT.md` §6): the manifest +
+current milestone + resources/`initial_prompt` are transformed into a
+real `orchestrator.project_config.ProjectConfig`, built through its own
+plain Python constructor (never `.load()`, never a second, parallel
+"plan" type — REUSE FIRST) with `workers_registry_path=None` always, and
+the AIDO global `WorkerRegistry` injected directly:
+`OrchestratorEngine(config, worker_registry=registry)`. Exactly the
+engine seam `ai-dev-orchestrator`'s P13.5 built for this — never
+`.open(config_path)` (there is no more `ProjectConfig`-shaped YAML
+file). `WorkerSelector` remains the sole owner of selection
+(`ARCHITECTURE.md`, unchanged); nothing here re-implements it.
+
+**Commands** (`docs/PROJECT_CONTRACT.md` §7): `aido-code init . name`
+now scaffolds the new manifest shape plus a `DRAFT` `ROADMAP.md` and an
+empty `resources/`, same Git behavior as `ai-dev-orchestrator`'s own
+P1.1 guided bootstrap (Git absent/failed → scaffold kept, non-zero exit,
+manual instructions, nothing auto-installed). `validate` stays
+provider-free and validates manifest + roadmap structure + resources
+confinement + that the AIDO registry itself resolves. `run` requires
+`Status: APPROVED`, refused cleanly otherwise, before any provider call.
+`/workers`/`/workers --probe` need no new code path — the engine is
+always constructed with the AIDO registry injected, so they already show
+AIDO's own workers for free. `/config` shows manifest + roadmap facts
+alongside the existing engine-derived facts. `/status` combines
+roadmap-level facts with the real, unchanged `OrchestratorEngine.
+status()`.
+
+**Out of scope for M1.4, explicitly**: M2 sessions (untouched,
+unstarted, unblocked); `qa_protected_paths` authored from `ROADMAP.md`;
+a per-project `execution`/`git` override; any migration of
+`M2_SPEC.yaml`/`aido.m2.example.yaml`'s own content into this grammar.
+
+**SPEC migration debt, noted, not started**: `M2_SPEC.yaml` and
+`aido.m2.example.yaml` still describe a real, unimplemented future
+(M2). Once M1.4 lands, they are the last documents in this repository
+still shaped like the pre-M1.4 model. Their relevant content must be
+migrated into `ROADMAP.md`'s own deterministic grammar (`docs/
+PROJECT_CONTRACT.md` §3) **before** a future GO M2, so this project
+never maintains two sources of functional truth at once — that
+migration is real, separate work, not started by M1.4, and never a
+reason to delay or reshape M1.4 itself.
+
+### WorkItems
+
+Drafted for AI Dev Orchestrator's real, governed WorkItem Flow
+(`CONTRIBUTING.md`). Full acceptance criteria per WorkItem below; the
+local, untracked config that reproduces them for a real governed run is
+never committed (`CONTRIBUTING.md`, "Local configuration").
+
+1. **WI-M1.4-01** — AIDO global worker configuration + packaged
+   defaults.
+
+   Dependencies: none. Capabilities: development.
+
+   Acceptance criteria:
+   - A new module resolves, in order: `$XDG_CONFIG_HOME/aido/
+     workers.yaml`; else `~/.config/aido/workers.yaml`; else AIDO
+     Code's own packaged default workers (a real file bundled inside
+     this package's own distribution, resolved through
+     `importlib.resources`, never a read of `ai-dev-orchestrator`'s own
+     packaged `default_workers.yaml`).
+   - The resolved file (override or packaged default) is loaded with
+     `orchestrator.worker_registry.WorkerRegistry.load(path)` — no new
+     worker-parsing logic of AIDO Code's own.
+   - No file is ever auto-materialized on disk just to make this work;
+     the packaged default is used directly, in memory, when no override
+     exists.
+   - Never references `ai-dev-orchestrator`'s own `config/workers.yaml`,
+     `../ai-dev-orchestrator/config/workers.yaml`, or
+     `~/.config/ai-dev-orchestrator/workers.yaml` anywhere in this path.
+   - A malformed override file fails closed with a clear message
+     (reusing `WorkerRegistryError`'s existing taxonomy), never a silent
+     fallback to the packaged default.
+   - Offline tests cover: no override present (packaged default used);
+     `XDG_CONFIG_HOME` set with a real override file (used); `HOME`
+     fallback with a real override file (used); a malformed override
+     (fails closed); the packaged default itself loads successfully and
+     declares at least one enabled worker on at least one provider.
+
+2. **WI-M1.4-02** — Project manifest (`aido.yaml`) parser.
+
+   Dependencies: none. Capabilities: development.
+
+   Acceptance criteria:
+   - A new module parses the manifest shape in `docs/PROJECT_CONTRACT.md`
+     §2: `schema_version` (must be `1`), `project.id`/`name`/`workspace`,
+     `roadmap`, `resources`, `initial_prompt` — exhaustively, no other
+     top-level key accepted.
+   - `project.id` validated with the same character-safety pattern
+     `ai-dev-orchestrator`'s own `project_config._PROJECT_ID_PATTERN`
+     uses.
+   - `roadmap`/`resources`/`workspace` resolve relative to the directory
+     containing `aido.yaml` (never the caller's cwd), `~` expanded;
+     `roadmap`/`resources` must resolve to a location inside `workspace`
+     (no `..` traversal, no symlink escape) — fail closed otherwise.
+   - The same secret-substring guard-rail `ai-dev-orchestrator`'s own
+     `project_config`/`worker_registry` modules use is reproduced here.
+   - `workers`/`providers`/`models`/`mvp`/`work_items`/`qa`/`execution`/
+     `git`, or any other unknown top-level key, is rejected, fail
+     closed, before any field is trusted.
+   - Offline tests cover: a valid minimal manifest; each excluded key
+     present (rejected); a secret-like field (rejected); a `roadmap`/
+     `resources` path escaping `workspace` via `..` (rejected); a
+     symlink escaping `workspace` (rejected); a missing/non-directory
+     `workspace` (rejected); relative-path resolution proven relative to
+     the manifest's own directory, not the caller's cwd.
+
+3. **WI-M1.4-03** — Deterministic `ROADMAP.md` parser + APPROVED/DRAFT
+   gate.
+
+   Dependencies: none. Capabilities: development.
+
+   Acceptance criteria:
+   - A new module parses exactly the grammar in `docs/PROJECT_CONTRACT.md`
+     §3: exactly one `## Current milestone`; `Status: APPROVED` or
+     `Status: DRAFT` (byte-exact, any other value rejected); `### ID`/
+     `### Objective` required; `### Acceptance criteria` optional;
+     `### WorkItems` required, one or more `#### <id> — <title>` entries
+     (exact em-dash separator), each with `Dependencies:`/
+     `Capabilities:` lines and a non-empty `Acceptance criteria:` bullet
+     list; `### QA` optional, same `<id> — <title>` shape, each with
+     `Kind:`/`Required:`/`Timeout:`/`Argv:` (JSON array of non-empty
+     strings, parsed via the stdlib `json` module); `### Out of scope`
+     optional bullets; `## Sources` optional top-level bullets.
+   - WorkItem ids are unique within the document; a dependency
+     referencing an id not declared in the same `WorkItems` section
+     fails closed; a dependency cycle is detected and fails closed,
+     using the same fail-closed DFS (white/gray/black) algorithm shape
+     `ai-dev-orchestrator`'s own `project_config._validate_work_items`
+     already implements — mirrored here, not imported, and never a
+     different algorithm.
+   - Returns a typed, structured result (milestone status/id/objective/
+     acceptance criteria, WorkItems, QA commands, out-of-scope bullets,
+     sources) — never a raw dict, never re-parsed downstream.
+   - `validate` succeeds for both `DRAFT` and `APPROVED` as long as the
+     document is structurally valid; reports which one and whether it
+     is executable. `run`'s own APPROVED requirement is a separate,
+     later gate (WI-M1.4-07), not this WorkItem's own concern beyond
+     exposing the parsed `status` field.
+   - Offline tests cover: a valid `DRAFT` roadmap; a valid `APPROVED`
+     roadmap; zero/two `## Current milestone` sections (both rejected);
+     an unrecognized `Status:` value (rejected); a duplicate WorkItem id
+     (rejected); an unknown dependency (rejected); a dependency cycle
+     (rejected, 2-node and 3-node cases); a WorkItem with zero
+     acceptance criteria (rejected); a malformed `Argv:` (not JSON, not
+     an array, a non-string element — each rejected); a well-formed
+     `### Out of scope`/`## Sources` section (parsed, never dropped).
+
+4. **WI-M1.4-04** — Resources resolution/confinement + `initial_prompt`.
+
+   Dependencies: WI-M1.4-02, WI-M1.4-03. Capabilities: development.
+
+   Acceptance criteria:
+   - Each `## Sources` entry (WI-M1.4-03's parsed output) is resolved
+     relative to `workspace` (the manifest's own `resources` base, per
+     `docs/PROJECT_CONTRACT.md` §5), confined inside `workspace` (no
+     `..`, no symlink escape), and must exist on disk — a missing
+     declared source fails closed.
+   - No file under `resources/` is ever treated as normative unless
+     `## Sources` explicitly names it — an unreferenced file there is
+     inert, never auto-discovered/auto-included.
+   - Nothing in this path ever writes to a resource file.
+   - `initial_prompt` + the current milestone's own `### Objective` +
+     the resolved `## Sources` list are combined into one MVP objective
+     string via the exact, fixed, `---`-delimited template in
+     `docs/PROJECT_CONTRACT.md` §5 — never a second template, never a
+     per-WorkItem duplication of `initial_prompt`, provenance of each
+     section stays explicit in the resulting string.
+   - Offline tests cover: a missing `resources/` directory (rejected); a
+     missing declared `## Sources` file (rejected); a `..`-traversal
+     attempt in a `## Sources` entry (rejected); a symlink escaping
+     `workspace` (rejected); the combined objective string proven to
+     contain all three sections in order, for two different fixtures
+     (proving no hardcoding).
+
+5. **WI-M1.4-05** — Transform the AIDO project contract into a typed
+   engine plan + inject `WorkerRegistry`.
+
+   Dependencies: WI-M1.4-01, WI-M1.4-02, WI-M1.4-03, WI-M1.4-04.
+   Capabilities: development.
+
+   Acceptance criteria:
+   - Builds a real `orchestrator.project_config.ProjectConfig` via its
+     own plain Python constructor (`ProjectIdentity`/`ExecutionConfig`/
+     `GitConfig`/`MVPConfig`/`WorkItemConfig`/`ValidationCommand`,
+     imported from `ai-dev-orchestrator` unchanged) exactly per the
+     field-by-field mapping in `docs/PROJECT_CONTRACT.md` §6 —
+     `workers_registry_path` always `None`; `state_dir` computed with
+     the identical formula `ai-dev-orchestrator`'s own
+     `project_config._default_state_dir(project_id)` uses;
+     `permission_mode=ExecutionPermissionMode.STANDARD`;
+     `git.base_branch="main"`.
+   - `workspace` is confirmed to be inside a real Git work tree before
+     the plan is ever handed to the engine (the same fail-closed check
+     `ProjectConfig.load()` already performs, reproduced here since this
+     path never calls `.load()`).
+   - The plan is handed to `OrchestratorEngine(config,
+     worker_registry=registry, ...)` — the plain constructor, never
+     `.open(config_path)`.
+   - Offline tests cover: a full manifest+roadmap+resources fixture
+     produces a `ProjectConfig` with `workers_registry_path is None`;
+     the injected `WorkerRegistry` is proven to reach
+     `OrchestratorEngine.workers()`/`.validate()` (real engine call,
+     fake provider adapters/subprocess runner); two different project
+     fixtures (different `project.id`) sharing one injected
+     `WorkerRegistry` instance both work independently; the computed
+     `state_dir` for `project.id="aido-code"` equals the exact path
+     every prior milestone's own persisted state already uses (non-
+     regression: M1.4 must never orphan or duplicate M1-M1.3's own
+     persisted WorkItems); a non-Git `workspace` is rejected before any
+     engine call.
+
+6. **WI-M1.4-06** — Project bootstrap `init`.
+
+   Dependencies: WI-M1.4-02, WI-M1.4-03. Capabilities: development.
+
+   Acceptance criteria:
+   - `aido-code init <parent-path> <project-name>` (current, pre-M8
+     binary name) creates: `.git/`, `.gitignore`, `README.md`,
+     `ROADMAP.md` (one placeholder milestone, `Status: DRAFT`,
+     structurally valid per WI-M1.4-03's own grammar), `aido.yaml` (the
+     WI-M1.4-02 manifest shape), `resources/` (a short
+     `resources/README.md` stub, since Git does not track empty
+     directories).
+   - `aido-code validate` succeeds against the fresh scaffold,
+     reporting `Current milestone: DRAFT` / `Not executable`.
+     `aido-code run` refuses cleanly (non-zero exit, no provider call)
+     until the milestone is edited to `Status: APPROVED`.
+   - Git behavior identical to `ai-dev-orchestrator`'s own P1.1 guided
+     bootstrap: `git init -b main && git add . && git commit -m
+     "Initialize AIDO project"`; Git absent or any step failing keeps
+     the scaffold, returns non-zero exit, prints the exact manual
+     commands, installs nothing automatically. Target-path validation
+     (absent/empty only, no `--force`, `~` expansion, path-traversal/
+     symlink rejection for the project name) mirrors that same P1.1
+     contract.
+   - Offline tests cover: a full successful bootstrap (all files, Git
+     history); Git missing (scaffold kept, exit non-zero, instructions
+     printed); a Git step failing (same); a nonempty target (refused,
+     no files touched); a path-like/unsafe project name (rejected).
+
+7. **WI-M1.4-07** — `validate`/`run`/`status`/`workers`/`config`
+   integration.
+
+   Dependencies: WI-M1.4-05, WI-M1.4-06. Capabilities: development.
+
+   Acceptance criteria:
+   - `aido-code validate`: provider-free; validates manifest + roadmap
+     structure + resources confinement + that the AIDO `WorkerRegistry`
+     itself resolves; prints exactly the two example blocks in
+     `docs/PROJECT_CONTRACT.md` §7 (`DRAFT`/`Not executable` or
+     `APPROVED`/`Executable`).
+   - `aido-code run`: validates; requires `Status: APPROVED`, refused
+     cleanly otherwise (non-zero exit, no provider/engine construction
+     attempted); loads the AIDO `WorkerRegistry`; builds the typed plan
+     (WI-M1.4-05); calls `OrchestratorEngine(...).run()`. No
+     orchestration logic is duplicated.
+   - `/workers`/`/workers --probe`: no new rendering path — already show
+     the AIDO-injected registry via the existing engine-backed code
+     path (proven by a test that the AIDO packaged/overridden registry
+     is exactly what `/workers` renders).
+   - `/config`: shows manifest facts (project id/name/workspace,
+     resolved `roadmap`/`resources` paths, `initial_prompt`) plus the
+     current milestone id/status plus the existing engine-derived facts
+     (`enabled_worker_count`/`providers`/`permission_mode`/
+     `base_branch`/`qa_command_count`) — never a raw file dump.
+   - `/status`: combines roadmap-level facts (milestone id/status) with
+     the real, unchanged `OrchestratorEngine.status()` snapshot; never
+     fabricates a WorkItem/MVP status the engine has not actually
+     persisted.
+   - Offline tests cover each command's new/changed behavior, plus a
+     `DRAFT`-project `run` refusal proven to reach zero provider calls
+     (fake adapters scripted to raise if invoked, mirroring this
+     project's own existing test conventions).
+
+8. **WI-M1.4-08** — Regression, clean-install, and portability
+   acceptance.
+
+   Dependencies: WI-M1.4-07. Capabilities: development.
+
+   Acceptance criteria:
+   - `pytest -q` passes for the whole package, offline, zero real
+     provider/Ralph calls anywhere in the suite.
+   - One offline acceptance test proves a clean-install shape (a fixed,
+     fake `HOME`/`XDG_CONFIG_HOME`, no `~/.config/ai-dev-orchestrator/`
+     anywhere, no sibling-checkout worker path referenced anywhere) end
+     to end: `init` → `validate` (`DRAFT`) → edit to `APPROVED` →
+     `validate` (`Executable`) → `run` reaching a real (faked
+     provider/subprocess) WorkItem Flow cycle.
+   - M1/M1.1/M1.2/M1.3's own already-covered command behaviors
+     (`/help`, `/exit`, blank-line handling, `--probe` rendering, CLI
+     launch-argument validation, terminal sanitization) remain passing,
+     unregressed, adjusted only where this milestone's own contract
+     necessarily changes what `aido.yaml`/`/config` mean.
+   - This is the final gate for MVP 0.1.4: `pytest -q` green, `git diff
+     --check` clean.
+
+Full functional contract every WorkItem above builds toward:
+`docs/PROJECT_CONTRACT.md`.
+
+## M2 — Sessions and resume (`SPECIFIED`, not started, unaffected by M1.4)
 
 Fully specified: acceptance contract in `M2_SPEC.yaml`, the session
 data model/persistence/concurrency contract in
@@ -228,6 +626,16 @@ exactly like M1's.
 Current, pre-M8 binary name throughout (`docs/CLI_SPEC.md`): every
 command below is `aido-code ...`/`python -m aido_code ...`, never
 `aido ...` (that syntax is post-M8 only).
+
+**SPEC migration debt (noted by M1.4, not resolved by it)**:
+`M2_SPEC.yaml`/`aido.m2.example.yaml` still describe M2 in the
+pre-M1.4 shape (a `ProjectConfig`-style YAML `work_items:`/`qa:` list).
+Their relevant content — the acceptance contract, the 10 WorkItems
+below — must be migrated into `ROADMAP.md`'s own deterministic grammar
+(`docs/PROJECT_CONTRACT.md` §3) before a future GO M2, so this project
+never carries two sources of functional truth at once. That migration
+is real, separate work, not started here, and never a precondition M1.4
+itself needed to satisfy.
 
 Must cover:
 
@@ -335,11 +743,18 @@ per-step feed is real, separate, future engine-side work (see
 
 ## M8 — `aido` command cutover
 
-Only after this project demonstrates functional parity with the
-orchestrator's own existing `aido` CLI. Until then this project never
-claims the `aido` binary name (`python -m aido_code`/`aido-code`
-instead). The orchestrator retiring or renaming its own console script
-is a separate decision made in that project, not here.
+**Binary name only.** M8 gates when this project's own `aido-code`/
+`python -m aido_code` invocation may claim the `aido` name — nothing
+about the *product model* (manifest/`ROADMAP.md`/resources/AIDO global
+workers, `docs/PROJECT_CONTRACT.md`) waits for it. That model is already
+current as of M1.4, regardless of binary name. Only after this project
+demonstrates functional parity with the orchestrator's own existing
+legacy `aido` CLI (`init`/`validate`/`run`/`status`, that project's own
+transitional surface per its P13.5) does the cutover itself happen. Until
+then this project never claims the `aido` binary name (`python -m
+aido_code`/`aido-code` instead). The orchestrator retiring or renaming
+its own console script is a separate decision made in that project, not
+here.
 
 **Packaging requirement, gating this milestone** — status as of M1.1:
 

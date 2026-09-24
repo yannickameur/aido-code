@@ -1,3 +1,11 @@
+# HISTORICAL RECORD (as of M1.4, see ROADMAP.md): this file is kept as
+# proof of what M1 actually built and was accepted against — it is no
+# longer the model for how a future milestone's contract is authored.
+# Starting at M1.4, ROADMAP.md's own deterministic Markdown grammar
+# (docs/PROJECT_CONTRACT.md) is the single functional source of truth
+# for a project this product governs. Never deleted, never edited to
+# match a newer schema.
+#
 # MVP 0.1 acceptance contract: AIDO Code, milestone M1 (minimal
 # interactive shell). See ROADMAP.md for the full milestone list and
 # docs/ENGINE_CONTRACT.md for the exact engine API this MVP consumes.
