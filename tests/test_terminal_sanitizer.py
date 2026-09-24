@@ -25,6 +25,11 @@ from aido_code import repl as repl_module
 from aido_code.engine_client import EngineClient
 from aido_code.repl import DEFAULT_CONFIG_PATH, format_status, format_workers, run, sanitize_for_terminal
 
+# A benign, fixed milestone stand-in for `format_status()`'s own
+# `milestone` argument: these tests exercise snapshot-field
+# sanitization only, never the milestone facts themselves.
+_MILESTONE = SimpleNamespace(id="m1", status="APPROVED")
+
 
 def _run(
     commands: str,
@@ -151,7 +156,7 @@ class TestTerminalRenderingSafety:
             project_name="Demo\x1b[31mDANGER\x1b[0m",
             mvp=None,
         )
-        rendered = format_status(snapshot)
+        rendered = format_status(_MILESTONE, snapshot)
         assert "\x1b" not in rendered
         assert "\\x1b" in rendered
 
@@ -163,7 +168,7 @@ class TestTerminalRenderingSafety:
             initialized=True, project_id="demo", project_name="Demo", mvp=None,
             work_items=(work_item,),
         )
-        rendered = format_status(snapshot)
+        rendered = format_status(_MILESTONE, snapshot)
         assert "\r" not in rendered
         assert "bad\\rreason" in rendered
 
@@ -175,7 +180,7 @@ class TestTerminalRenderingSafety:
             initialized=True, project_id="demo", project_name="Demo", mvp=None,
             work_items=(work_item,),
         )
-        rendered = format_status(snapshot)
+        rendered = format_status(_MILESTONE, snapshot)
         assert "bad\\nfake: line" in rendered
         assert "fake: line\n" not in rendered
 
@@ -187,7 +192,7 @@ class TestTerminalRenderingSafety:
             initialized=True, project_id="demo", project_name="Demo", mvp=None,
             work_items=(work_item,),
         )
-        rendered = format_status(snapshot)
+        rendered = format_status(_MILESTONE, snapshot)
         assert "café \U0001f600" in rendered
 
     def test_repl_output_neutralizes_snapshot_text_without_mutating_snapshots(
