@@ -70,9 +70,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     try:
-        with EngineClient.open("aido.yaml"):
-            pass
-    except EngineError as exc:
+        load_project_command_context("aido.yaml")
+    except (ProjectManifestError, RoadmapError, ProjectResourcesError,
+            WorkerRegistryError, OSError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
     run(sys.stdin, sys.stdout)

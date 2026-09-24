@@ -143,18 +143,23 @@ class TestNoProjectLevelResumeCommand:
 
 
 class TestEntryPoints:
-    def test_python_dash_m_aido_code_starts_repl_and_accepts_commands(self, tmp_path: Path) -> None:
-        write_config(tmp_path)
+    def test_python_dash_m_aido_code_starts_repl_and_accepts_commands(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        config_path = _init_m14_project(tmp_path)
+        _use_packaged_default_registry(tmp_path, monkeypatch)
         result = subprocess.run(
             [sys.executable, "-m", "aido_code"],
-            input="/help\n/bogus\n/exit\n",
-            cwd=tmp_path,
+            input="/help\n/workers\n/config\n/bogus\n/exit\n",
+            cwd=config_path.parent,
             capture_output=True,
             text=True,
             timeout=10,
         )
         assert result.returncode == 0
         assert "/help" in result.stdout
+        assert "current_milestone_status: DRAFT" in result.stdout
+        assert "victor" in result.stdout
         assert "Unknown command: '/bogus'" in result.stdout
         assert "Traceback" not in result.stderr
 

@@ -9,7 +9,7 @@ ignored and never a traceback. A normal, no-argument launch is
 unchanged. No M2 flag (--resume/-r/--continue/-c) is implemented or
 recognized here (see docs/CLI_SPEC.md, ROADMAP.md "M1.3").
 
-Offline only: EngineClient.open()/repl.run()/run_init() are stubbed so
+Offline only: project-command loading/repl.run()/run_init() are stubbed so
 no real project/provider/Ralph/filesystem call happens anywhere in this
 file.
 """
@@ -19,16 +19,8 @@ from __future__ import annotations
 from aido_code import __main__ as entrypoint
 
 
-class _FakeEngineClient:
-    def __enter__(self) -> "_FakeEngineClient":
-        return self
-
-    def __exit__(self, *exc_info: object) -> bool:
-        return False
-
-
 def test_main_valid_no_argument_launch_is_unchanged(monkeypatch, capsys) -> None:
-    monkeypatch.setattr(entrypoint.EngineClient, "open", lambda *a, **k: _FakeEngineClient())
+    monkeypatch.setattr(entrypoint, "load_project_command_context", lambda *a, **k: object())
     ran: dict[str, bool] = {}
     monkeypatch.setattr(entrypoint, "run", lambda *a, **k: ran.__setitem__("called", True))
 
