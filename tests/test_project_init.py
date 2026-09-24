@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from aido_code import __main__ as entrypoint
 from aido_code import project_init
 from aido_code.engine_plan import build_engine_plan
 from aido_code.project_manifest import load_project_manifest
@@ -76,6 +77,56 @@ class TestSuccessfulBootstrap:
         # real Git work tree by the time this assertion runs.
         plan = build_engine_plan(manifest, roadmap, resolved)
         assert plan.mvp.id == "m1"
+
+    def test_real_cli_validates_and_refuses_draft_run(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        assert project_init.run_init(str(tmp_path), "roadmaplab") == 0
+        capsys.readouterr()
+        monkeypatch.chdir(tmp_path / "roadmaplab")
+        monkeypatch.setattr(
+            entrypoint.EngineClient, "from_config",
+            lambda *args, **kwargs: pytest.fail("DRAFT run constructed an engine"),
+        )
+
+        assert entrypoint.main(["validate"]) == 0
+        assert capsys.readouterr().out == "VALID\nCurrent milestone: DRAFT\nNot executable.\n"
+        assert entrypoint.main(["run"]) != 0
+        assert "Not executable" in capsys.readouterr().err
+
+    def test_approved_run_reaches_engine(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        assert project_init.run_init(str(tmp_path), "roadmaplab") == 0
+        target = tmp_path / "roadmaplab"
+        roadmap_path = target / "ROADMAP.md"
+        roadmap_path.write_text(
+            roadmap_path.read_text().replace("Status: DRAFT", "Status: APPROVED"),
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(target)
+        calls: list[object] = []
+
+        class FakeClient:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def run(self):
+                calls.append("run")
+                return object()
+
+        def fake_from_config(plan, *, worker_registry):
+            calls.append(plan)
+            assert worker_registry is not None
+            return FakeClient()
+
+        monkeypatch.setattr(entrypoint.EngineClient, "from_config", fake_from_config)
+        monkeypatch.setattr(entrypoint, "format_run", lambda result: "RUN COMPLETE")
+
+        assert entrypoint.main(["run"]) == 0
+        assert calls[0].mvp.id == "m1"
+        assert calls[1] == "run"
 
     def test_project_name_with_spaces_produces_valid_manifest(self, tmp_path: Path) -> None:
         exit_code = project_init.run_init(str(tmp_path), "My Project")
