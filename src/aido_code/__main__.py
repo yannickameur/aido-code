@@ -2,12 +2,12 @@
 
 WI-M1.3-01 scope: reject any unrecognized CLI launch argument (flag or
 positional) with a clear message and a non-zero exit code, never
-silently ignore it. No CLI launch flag is implemented yet — M1/M1.1/M1.2
-only ever added REPL-level commands/flags (e.g. ``/status --probe``),
-never a ``sys.argv`` one — so a normal, no-argument launch is the only
-recognized invocation; this is deliberately just the validation
-groundwork a future M2 WorkItem builds real flags (``--resume``/``-r``/
-``--continue``/``-c``) on top of, not those flags themselves.
+silently ignore it. WI-M1.4-06 adds the first real ``sys.argv``
+subcommand, ``init <parent-path> <project-name>`` (``docs/CLI_SPEC.md``,
+"M1.4") — project bootstrap, entirely provider-free (see
+``aido_code.project_init``). A normal, no-argument launch is otherwise
+unchanged; no M2 flag (``--resume``/``-r``/``--continue``/``-c``) is
+implemented or recognized here yet.
 """
 
 from __future__ import annotations
@@ -15,17 +15,29 @@ from __future__ import annotations
 import sys
 
 from aido_code.engine_client import EngineClient, EngineError
+from aido_code.project_init import run_init
 from aido_code.repl import run
 
 
 def main(argv: list[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
+
+    if argv and argv[0] == "init":
+        if len(argv) != 3:
+            print(
+                "Error: usage: aido-code init <parent-path> <project-name>",
+                file=sys.stderr,
+            )
+            return 2
+        return run_init(argv[1], argv[2])
+
     if argv:
         print(
             "Error: unrecognized argument(s): "
-            f"{' '.join(argv)}. aido-code does not accept any CLI launch "
-            "arguments yet; run it with none to start the REPL.",
+            f"{' '.join(argv)}. aido-code only accepts "
+            "'init <parent-path> <project-name>' as a CLI launch argument; "
+            "run it with none to start the REPL.",
             file=sys.stderr,
         )
         return 2
