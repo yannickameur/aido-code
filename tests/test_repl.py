@@ -102,10 +102,12 @@ class TestNoProjectLevelResumeCommand:
 
 
 class TestEntryPoints:
-    def test_python_dash_m_aido_code_starts_repl_and_accepts_commands(self) -> None:
+    def test_python_dash_m_aido_code_starts_repl_and_accepts_commands(self, tmp_path: Path) -> None:
+        write_config(tmp_path)
         result = subprocess.run(
             [sys.executable, "-m", "aido_code"],
             input="/help\n/bogus\n/exit\n",
+            cwd=tmp_path,
             capture_output=True,
             text=True,
             timeout=10,
