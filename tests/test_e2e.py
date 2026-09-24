@@ -31,7 +31,6 @@ from textwrap import dedent
 import pytest
 
 from aido_code import __main__ as entrypoint
-from aido_code import project_init
 from aido_code.repl import run
 from tests.conftest import REGISTRY_TWO_WORKERS, FakeAdapter, ScriptedRalphRunner, commit_action, init_git_repo
 
@@ -221,8 +220,9 @@ class TestInitDraftToApprovedLifecycle:
       rules themselves, including the clean-install case and every
       forbidden path ``docs/PROJECT_CONTRACT.md`` §4 names, are
       exhaustively covered in ``tests/test_worker_config.py``).
-    - ``resources/`` confinement has its own dedicated, exhaustive
-      coverage in ``tests/test_project_resources.py``.
+    - ``resources/`` confinement is exercised through ``validate``
+      below; edge cases have dedicated coverage in
+      ``tests/test_project_resources.py``.
     - no private engine orchestration component (``MVPManager``/
       ``WorkerSelector``/``QuotaManager``/a ``ProviderAdapter``/
       ``InternalQAEngine``/``GitGovernanceService``/a ``Store``) is ever
@@ -236,7 +236,7 @@ class TestInitDraftToApprovedLifecycle:
     ) -> None:
         # `aido-code init` — a fresh, real DRAFT project, exactly as a
         # user would create one.
-        assert project_init.run_init(str(tmp_path), "acceptance-project") == 0
+        assert entrypoint.main(["init", str(tmp_path), "acceptance-project"]) == 0
         target = tmp_path / "acceptance-project"
         _set_worker_registry_override(tmp_path, monkeypatch)
         _pin_fake_home(tmp_path, monkeypatch)
@@ -263,15 +263,26 @@ class TestInitDraftToApprovedLifecycle:
         assert entrypoint.main(["run"]) != 0
         assert "DRAFT" in capsys.readouterr().err
 
-        # Edit ROADMAP.md to a valid, APPROVED mini milestone — the exact
-        # same content TestFullProjectLifecycle above already proves
-        # reaches a real engine cycle. A trivial pyproject.toml is added
+        # Prepare an APPROVED mini milestone. A trivial pyproject.toml is added
         # alongside it (a real user's own stack file): the real engine's
         # QA phase needs a detectable stack even for a trivial,
         # already-passing QA command, or it fails closed before ever
         # reaching that command (see tests/conftest.py's init_git_repo()).
         (target / "pyproject.toml").write_text("[tool.pytest.ini_options]\n")
-        (target / "ROADMAP.md").write_text(_roadmap_text())
+        source = target / "resources" / "specification.md"
+        source.write_text("Ship only the first task.\n")
+        sources_heading = "## Sources\n\n- resources/specification.md\n\n"
+        approved_roadmap = _roadmap_text().replace("## Current milestone", sources_heading + "## Current milestone")
+        # The same CLI validation path must reject a source escaping the
+        # project, even when the milestone is otherwise executable.
+        (target / "ROADMAP.md").write_text(
+            approved_roadmap.replace("resources/specification.md", "../outside.md")
+        )
+        (tmp_path / "outside.md").write_text("outside\n")
+        capsys.readouterr()
+        assert entrypoint.main(["validate"]) != 0
+        assert "without '..' traversal" in capsys.readouterr().err
+        (target / "ROADMAP.md").write_text(approved_roadmap)
         subprocess.run(["git", "add", "-A"], cwd=target, check=True)
         subprocess.run(
             [
@@ -281,11 +292,12 @@ class TestInitDraftToApprovedLifecycle:
             cwd=target, check=True,
         )
 
-        # `aido-code validate` again: same aido.yaml, only ROADMAP.md
-        # changed — now APPROVED and executable.
+        # `aido-code validate` again: the unchanged aido.yaml and the
+        # now-valid ROADMAP.md yield APPROVED and executable.
         capsys.readouterr()
         assert entrypoint.main(["validate"]) == 0
         assert capsys.readouterr().out == "VALID\nCurrent milestone: APPROVED\nExecutable.\n"
+        assert (target / "aido.yaml").read_text() == manifest_text
 
         # `aido-code run`: a real OrchestratorEngine WorkItem Flow cycle,
         # offline fake provider/subprocess seams injected the same way
@@ -300,6 +312,8 @@ class TestInitDraftToApprovedLifecycle:
 
         def _fake_from_config(config, *, worker_registry, **kwargs):
             captured["worker_registry"] = worker_registry
+            assert config.workers_registry_path is None
+            assert "resources/specification.md" in config.mvp.objective
             return original_from_config(
                 config, worker_registry=worker_registry,
                 provider_adapters={"anthropic": FakeAdapter(available=True)},

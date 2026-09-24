@@ -168,6 +168,11 @@ def test_clean_install_never_reads_project_or_sibling_checkout_worker_paths(
     """
     home = tmp_path / "home"
     home.mkdir()
+    xdg_home = tmp_path / "xdg"
+    xdg_home.mkdir()
+    legacy_config = home / ".config" / "ai-dev-orchestrator"
+    legacy_config.mkdir(parents=True)
+    (legacy_config / "workers.yaml").write_text(VALID_OVERRIDE)
 
     project_dir = tmp_path / "checkout" / "myproject"
     project_config = project_dir / "config"
@@ -178,7 +183,7 @@ def test_clean_install_never_reads_project_or_sibling_checkout_worker_paths(
     sibling_checkout_config.mkdir(parents=True)
     (sibling_checkout_config / "workers.yaml").write_text(VALID_OVERRIDE)
 
-    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_home))
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.chdir(project_dir)
 
