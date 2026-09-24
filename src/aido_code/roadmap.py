@@ -28,6 +28,7 @@ parsed ``status``/``is_executable`` fields so a later WorkItem (the
 from __future__ import annotations
 
 import json
+import math
 import re
 from pathlib import Path
 from typing import Sequence
@@ -58,7 +59,7 @@ _HEADING_RE = re.compile(r"^(#+)\s+(.*?)\s*$")
 # '#### <id> — <title>' — an em dash (U+2014), exactly one space on each
 # side, byte-exact per docs/PROJECT_CONTRACT.md §3.1. Never a plain
 # hyphen, never guessed/normalized.
-_ID_TITLE_HEADING_RE = re.compile(r"^#### (\S+) — (.+)$")
+_ID_TITLE_HEADING_RE = re.compile(r"^#### (\S+) — (\S(?:.*\S)?)$")
 
 _BULLET_RE = re.compile(r"^- (.+)$")
 _NUMBER_RE = re.compile(r"^\d+(\.\d+)?$")
@@ -284,8 +285,9 @@ def _parse_dependencies_value(raw: str, *, item_id: str) -> tuple[str, ...]:
 
 
 def _parse_work_item_body(
-    non_blank_lines: list[str], *, item_id: str,
+    lines: list[str], *, item_id: str,
 ) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
+    non_blank_lines = _non_blank(lines)
     if len(non_blank_lines) < 3:
         raise InvalidRoadmapError(
             f"WorkItem {item_id!r}: body must contain 'Dependencies:', 'Capabilities:', and "
@@ -311,6 +313,10 @@ def _parse_work_item_body(
         raise InvalidRoadmapError(
             f"WorkItem {item_id!r}: expected 'Acceptance criteria:' as the third body line, got {acceptance_label!r}"
         )
+    capabilities_index = lines.index(capabilities_line)
+    acceptance_index = lines.index(acceptance_label, capabilities_index + 1)
+    if not any(not line.strip() for line in lines[capabilities_index + 1 : acceptance_index]):
+        raise InvalidRoadmapError(f"WorkItem {item_id!r}: expected a blank line before 'Acceptance criteria:'")
     if not bullet_lines:
         raise InvalidRoadmapError(
             f"WorkItem {item_id!r}: 'Acceptance criteria:' must have at least one '- ' bullet"
@@ -354,6 +360,8 @@ def _parse_work_items(lines: list[str]) -> tuple[WorkItemSpec, ...]:
     sections = _split_by_heading_level(lines, level=4)
     if not sections:
         raise InvalidRoadmapError("'### WorkItems' must contain at least one '#### <id> — <title>' entry")
+    if any(line.strip() for line in lines[:lines.index(sections[0][0])]):
+        raise InvalidRoadmapError("'### WorkItems' must begin with a '#### <id> — <title>' entry")
 
     items: list[WorkItemSpec] = []
     seen_ids: set[str] = set()
@@ -362,9 +370,7 @@ def _parse_work_items(lines: list[str]) -> tuple[WorkItemSpec, ...]:
         if item_id in seen_ids:
             raise InvalidRoadmapError(f"duplicate WorkItem id {item_id!r}")
         seen_ids.add(item_id)
-        dependencies, capabilities, acceptance_criteria = _parse_work_item_body(
-            _non_blank(content), item_id=item_id
-        )
+        dependencies, capabilities, acceptance_criteria = _parse_work_item_body(content, item_id=item_id)
         items.append(
             WorkItemSpec(
                 id=item_id, title=title, dependencies=dependencies,
@@ -420,7 +426,7 @@ def _parse_qa_body(non_blank_lines: list[str], *, qa_id: str, title: str) -> QAC
     if not _NUMBER_RE.match(timeout_value):
         raise InvalidRoadmapError(f"QA {qa_id!r}: 'Timeout:' must be a positive number, got {timeout_value!r}")
     timeout_seconds = float(timeout_value)
-    if timeout_seconds <= 0:
+    if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
         raise InvalidRoadmapError(f"QA {qa_id!r}: 'Timeout:' must be positive, got {timeout_value!r}")
 
     argv_match = re.match(r"^Argv:\s*(.*)$", argv_line)
@@ -455,6 +461,8 @@ def _parse_qa_commands(lines: list[str]) -> tuple[QACommandSpec, ...]:
     sections = _split_by_heading_level(lines, level=4)
     if not sections:
         raise InvalidRoadmapError("'### QA', if present, must contain at least one '#### <id> — <title>' entry")
+    if any(line.strip() for line in lines[:lines.index(sections[0][0])]):
+        raise InvalidRoadmapError("'### QA' must begin with a '#### <id> — <title>' entry")
 
     commands: list[QACommandSpec] = []
     seen_ids: set[str] = set()
@@ -471,6 +479,10 @@ def _parse_current_milestone(lines: list[str]) -> CurrentMilestone:
     status, status_index = _parse_status_line(lines)
     remainder = lines[status_index + 1 :]
     sections = _titled_sections(remainder, level=3)
+    if sections:
+        first_heading = next(i for i, line in enumerate(remainder) if _heading_level(line) and _heading_level(line)[0] == 3)
+        if any(line.strip() for line in remainder[:first_heading]):
+            raise InvalidRoadmapError("unexpected content between 'Status:' and the first milestone subsection")
 
     for title, _content in sections:
         if title not in _MILESTONE_SUBSECTION_TITLES:

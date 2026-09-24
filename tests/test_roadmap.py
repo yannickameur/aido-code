@@ -161,6 +161,25 @@ class TestWorkItemIdUniqueness:
             parse_roadmap(path)
 
 
+@pytest.mark.parametrize(
+    ("original", "replacement"),
+    [
+        ("### WorkItems\n\n", "### WorkItems\n\nUnexpected prose.\n\n"),
+        ("### QA\n\n", "### QA\n\nUnexpected prose.\n\n"),
+        ("Status: APPROVED\n\n", "Status: APPROVED\n\nUnexpected prose.\n\n"),
+        ("#### WI-01 — First task", "#### WI-01 —  First task"),
+        ("#### WI-01 — First task", "#### WI-01 — First task "),
+        ("#### QA-01 — Tests", "#### QA-01 —  Tests"),
+    ],
+)
+def test_unexpected_content_or_malformed_entry_heading_rejected(
+    tmp_path: Path, original: str, replacement: str,
+) -> None:
+    path = _write_roadmap(tmp_path, _valid_text().replace(original, replacement))
+    with pytest.raises(InvalidRoadmapError):
+        parse_roadmap(path)
+
+
 class TestDependencyValidation:
     def test_unknown_dependency_rejected(self, tmp_path: Path) -> None:
         text = _valid_text().replace("Dependencies: WI-01", "Dependencies: WI-99")
@@ -238,6 +257,15 @@ class TestWorkItemAcceptanceCriteria:
         with pytest.raises(InvalidRoadmapError, match="at least one"):
             parse_roadmap(path)
 
+    def test_missing_blank_line_before_acceptance_criteria_rejected(self, tmp_path: Path) -> None:
+        text = _valid_text().replace(
+            "Capabilities: development\n\nAcceptance criteria:",
+            "Capabilities: development\nAcceptance criteria:",
+        )
+        path = _write_roadmap(tmp_path, text)
+        with pytest.raises(InvalidRoadmapError, match="blank line"):
+            parse_roadmap(path)
+
 
 class TestMalformedArgv:
     def test_argv_not_json_rejected(self, tmp_path: Path) -> None:
@@ -263,6 +291,13 @@ class TestMalformedArgv:
         path = _write_roadmap(tmp_path, text)
         with pytest.raises(InvalidRoadmapError, match="non-empty strings"):
             parse_roadmap(path)
+
+
+def test_non_finite_timeout_rejected(tmp_path: Path) -> None:
+    text = _valid_text().replace("Timeout: 300", "Timeout: " + "9" * 400)
+    path = _write_roadmap(tmp_path, text)
+    with pytest.raises(InvalidRoadmapError, match="positive"):
+        parse_roadmap(path)
 
 
 class TestOutOfScopeAndSourcesParsed:
