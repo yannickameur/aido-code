@@ -89,8 +89,23 @@ class TestUnknownTopLevelKeys:
         with pytest.raises(InvalidProjectManifestError, match="unknown field"):
             load_project_manifest(manifest_path)
 
+    def test_mixed_type_unknown_keys_rejected(self, tmp_path: Path) -> None:
+        manifest_path = _make_valid_project(tmp_path)
+        manifest_path.write_text(_valid_manifest_text() + "\nother: 1\n42: value\n")
+        with pytest.raises(InvalidProjectManifestError, match="unknown field"):
+            load_project_manifest(manifest_path)
+
 
 class TestSchemaVersion:
+    @pytest.mark.parametrize("version", ["true", "1.0", "'1'"])
+    def test_non_integer_schema_version_rejected(self, tmp_path: Path, version: str) -> None:
+        manifest_path = _make_valid_project(tmp_path)
+        manifest_path.write_text(
+            _valid_manifest_text().replace("schema_version: 1", f"schema_version: {version}")
+        )
+        with pytest.raises(UnsupportedSchemaVersionError):
+            load_project_manifest(manifest_path)
+
     def test_missing_schema_version_rejected(self, tmp_path: Path) -> None:
         project_dir = tmp_path / "project"
         project_dir.mkdir()

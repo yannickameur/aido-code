@@ -123,7 +123,7 @@ def _reject_unknown_keys(data: Mapping, allowed: frozenset[str], *, context: str
     unknown = set(data.keys()) - allowed
     if unknown:
         raise InvalidProjectManifestError(
-            f"{context}: unknown field(s) {sorted(unknown)!r} — allowed: {sorted(allowed)!r}"
+            f"{context}: unknown field(s) {sorted(map(str, unknown))!r} — allowed: {sorted(allowed)!r}"
         )
 
 
@@ -213,7 +213,7 @@ def load_project_manifest(path: str | Path) -> ProjectManifest:
     _reject_secrets(top)
 
     schema_version = top.get("schema_version")
-    if schema_version != SUPPORTED_SCHEMA_VERSION:
+    if type(schema_version) is not int or schema_version != SUPPORTED_SCHEMA_VERSION:
         raise UnsupportedSchemaVersionError(schema_version)
 
     base_dir = source_path.parent
