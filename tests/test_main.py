@@ -87,3 +87,16 @@ def test_main_init_rejects_wrong_argument_count(capsys) -> None:
     err = capsys.readouterr().err
     assert "Traceback" not in err
     assert "usage" in err.lower()
+
+
+def test_main_init_handles_filesystem_error_without_traceback(tmp_path, capsys) -> None:
+    parent_file = tmp_path / "not-a-directory"
+    parent_file.write_text("keep me")
+
+    exit_code = entrypoint.main(["init", str(parent_file), "myproject"])
+
+    assert exit_code != 0
+    assert parent_file.read_text() == "keep me"
+    err = capsys.readouterr().err
+    assert "could not initialize project" in err
+    assert "Traceback" not in err

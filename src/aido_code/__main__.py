@@ -30,7 +30,11 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
-        return run_init(argv[1], argv[2])
+        try:
+            return run_init(argv[1], argv[2])
+        except (OSError, ValueError) as exc:
+            print(f"Error: could not initialize project: {exc}", file=sys.stderr)
+            return 1
 
     if argv:
         print(

@@ -185,9 +185,9 @@ def _run_git_bootstrap(target: Path) -> bool:
 
 def run_init(parent_path: str, project_name: str) -> int:
     """Scaffolds and Git-bootstraps a new AIDO project. Returns a process
-    exit code — ``0`` on full success, non-zero (never a traceback) on
-    any validation or Git failure. Fail-closed: a rejected target is
-    never partially written to."""
+    exit code — ``0`` on full success, non-zero on target validation or
+    Git failure. Filesystem errors are handled by the CLI entry point.
+    Fail-closed: a rejected target is never partially written to."""
     if not _validate_project_name(project_name):
         print(
             f"Error: project-name {project_name!r} must be a single, safe directory name "
