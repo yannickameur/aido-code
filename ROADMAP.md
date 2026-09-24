@@ -11,7 +11,7 @@ there. This roadmap starts at M1.
 
 ## Where we stand
 
-DONE: M1, M1.1, M1.2
+DONE: M1, M1.1, M1.2, M1.3
 NEXT: M2, ready for governed development, not started
 FUTURE: M3-M8
 
@@ -20,6 +20,7 @@ FUTURE: M3-M8
 | M1 — Minimal interactive shell | `DONE` (see `docs/M1_REFERENCE_RUN.md`) |
 | M1.1 — CLI conventions and standalone install | `DONE` (see `docs/M1_1_REFERENCE_RUN.md`) |
 | M1.2 — Rich provider quota status | `DONE` (see `M1_2_SPEC.yaml`) |
+| M1.3 — Audit hardening | `DONE` (see `M1_3_SPEC.yaml`) |
 | M2 — Sessions and resume | `READY FOR GOVERNED DEVELOPMENT`, not started (see `M2_SPEC.yaml`, `docs/SESSION_CONTRACT.md`) |
 | M3 — Natural-language piloting | `À VOTER` |
 | M4 — Non-interactive mode | `À VOTER` |
@@ -122,7 +123,7 @@ Covers:
 Full criteria: `aido.m1_2.example.yaml`. Full contract:
 `M1_2_SPEC.yaml`.
 
-## M1.3 — Audit hardening (`READY FOR GOVERNED DEVELOPMENT`, not started)
+## M1.3 — Audit hardening (`DONE`)
 
 A small technical increment after M1.2 and before M2; not part of M2.
 Prepared in response to a real technical audit (external review,
@@ -166,11 +167,50 @@ Must cover:
 - M1/M1.1/M1.2 entirely unregressed, tests entirely offline, no real
   provider call anywhere in this milestone's own QA.
 
-### WorkItems (drafted, portable template only — see `aido.m1_3.example.yaml`; not created in any orchestrator runtime state)
+### Real run (2026-09-23)
 
-1. **WI-M1.3-01** — CLI launch argument validation (F-01).
-2. **WI-M1.3-02** — Terminal rendering safety (F-02).
-3. **WI-M1.3-03** — Regression + engine contract fix (F-03).
+A human GO was given, then `aido run` was executed against a local
+config copied from `aido.m1_3.example.yaml` (preserved as
+`aido.m1_3.local.yaml`, same `project.id`/`state_dir` as every prior
+milestone, `mvp.id: mvp-0.1.3`, `qa_protected_paths` covering
+`tests/test_e2e.py`/`tests/test_repl.py`), letting AI Dev Orchestrator
+govern WI-M1.3-01 through WI-M1.3-03 itself. All 3 WorkItems reached
+`completed` in 4 cycles (`cycles_run=4 all_terminal=True`):
+
+| WorkItem | DEV A | DEV B | Final SHA |
+|---|---|---|---|
+| WI-M1.3-01 | Alice (anthropic) | Victor (openai) | `288bdde` |
+| WI-M1.3-02 | Alice (anthropic) | Victor (openai), then a real DEV FIX by Alice after a real QA FAIL | `51e9e32` |
+| WI-M1.3-03 | Alice (anthropic) | Victor (openai) | `4040976` |
+
+**`qa_protected_paths` (AUD-1, `ai-dev-orchestrator` P13.4) fired for
+real, for the first time, on WI-M1.3-02**: DEV A's first attempt added
+the new terminal-safety tests directly into the protected
+`tests/test_repl.py`. QA correctly recorded `FAIL` — `"a protected test
+changed without a versioned authorization"` — never a silent `PASS`.
+The resulting DEV FIX (commit `51e9e32`, "Move terminal-safety tests
+out of protected test_repl.py") moved the new tests to their own file
+instead of touching the protected one, and QA then passed. This is the
+governance invariant this repository's own `docs/PROJECT_CONFIG.md`
+describes working exactly as designed, on a real WorkItem, not a test
+fixture.
+
+Every commit above is correctly attributed to its real worker identity
+(`git log`; P13.2 attribution — verified, no
+`WorkerCommitIdentityMismatchError`). Final result: unknown CLI launch
+arguments now rejected explicitly (F-01); a shared sanitizer neutralizes
+ESC/ANSI/control characters from every engine-snapshot-derived terminal
+value (F-02); `docs/ENGINE_CONTRACT.md` documents
+`ExecutionSnapshot.worker_display_name` (F-03); 70 offline tests passing
+(was 53). No manual code correction was made by any human/assistant at
+any point.
+
+### WorkItems
+
+1. **WI-M1.3-01** — CLI launch argument validation (F-01). `completed`.
+2. **WI-M1.3-02** — Terminal rendering safety (F-02). `completed`
+   (real rework cycle: protected-test violation caught, corrected).
+3. **WI-M1.3-03** — Regression + engine contract fix (F-03). `completed`.
 
 Full acceptance criteria per WorkItem: `aido.m1_3.example.yaml`. Full
 functional contract these WorkItems build toward: `M1_3_SPEC.yaml`.

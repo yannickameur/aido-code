@@ -30,6 +30,7 @@ merge. AIDO Code never makes any of those decisions itself; see
 | M1 — Minimal interactive shell | `DONE` |
 | M1.1 — CLI conventions, standalone install | `DONE` |
 | M1.2 — Rich provider quota status | `DONE` |
+| M1.3 — Audit hardening | `DONE` |
 | M2 — Sessions and resume | `NEXT`, not started |
 | M3+ | `PLANNED` |
 

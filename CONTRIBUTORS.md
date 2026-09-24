@@ -3,12 +3,13 @@
 This project's functional code is written by AI Dev Orchestrator's
 governed WorkItem Flow, never directly by a human or an assistant — see
 `CONTRIBUTING.md`. This file credits who/what actually produced M1
-(WI-01 through WI-07), M1.1 (WI-M1.1-01 through WI-M1.1-04), and M1.2
-(WI-M1.2-01/02), factually, from the real runs' own persisted execution
-records — nothing here is inferred or aspirational. One exception:
-WI-M1.1-01's implementation commit landed under the maintainer's own
-Git identity due to a real engine defect, not maintainer authorship;
-see `docs/M1_1_REFERENCE_RUN.md`.
+(WI-01 through WI-07), M1.1 (WI-M1.1-01 through WI-M1.1-04), M1.2
+(WI-M1.2-01/02), and M1.3 (WI-M1.3-01 through WI-M1.3-03), factually,
+from the real runs' own persisted execution records — nothing here is
+inferred or aspirational. One exception: WI-M1.1-01's implementation
+commit landed under the maintainer's own Git identity due to a real
+engine defect, not maintainer authorship; see
+`docs/M1_1_REFERENCE_RUN.md`.
 
 ## Yannick Ameur
 
@@ -21,8 +22,12 @@ see `docs/M1_1_REFERENCE_RUN.md`.
 
 - AI Dev Orchestrator worker (`anthropic`/`claude_code`).
 - DEV A for every WorkItem in M1 (WI-01 through WI-07), M1.1
-  (WI-M1.1-01 through WI-M1.1-04), and M1.2 (WI-M1.2-01/02): first
-  implementation of each WorkItem's acceptance criteria.
+  (WI-M1.1-01 through WI-M1.1-04), M1.2 (WI-M1.2-01/02), and M1.3
+  (WI-M1.3-01 through WI-M1.3-03): first implementation of each
+  WorkItem's acceptance criteria, including the real DEV FIX on
+  WI-M1.3-02 after a real, correct QA `FAIL` (an unauthorized protected
+  test change caught by `ai-dev-orchestrator`'s AUD-1 remediation) — see
+  `ROADMAP.md`, M1.3, "Real run".
 - Also performed the DEV FIX execution for WI-02 (M1), which changed
   the execution environment without producing a Git commit; see
   `docs/M1_REFERENCE_RUN.md`.
@@ -35,8 +40,8 @@ see `docs/M1_1_REFERENCE_RUN.md`.
 ## Victor
 
 - AI Dev Orchestrator worker (`openai`/`codex`).
-- DEV B corrective review for every WorkItem in M1, M1.1, and M1.2:
-  independent review/correction of Alice's implementation before
+- DEV B corrective review for every WorkItem in M1, M1.1, M1.2, and
+  M1.3: independent review/correction of Alice's implementation before
   deterministic QA.
 
 ## Not contributors yet
