@@ -11,8 +11,7 @@ there. This roadmap starts at M1.
 
 ## Where we stand
 
-DONE: M1, M1.1, M1.2, M1.3
-CURRENT: M1.4 — Autonomous AIDO project contract
+DONE: M1, M1.1, M1.2, M1.3, M1.4
 NEXT: M2, entirely not started (unaffected/unblocked by M1.4)
 FUTURE: M3-M8
 
@@ -22,7 +21,7 @@ FUTURE: M3-M8
 | M1.1 — CLI conventions and standalone install | `DONE` (see `docs/M1_1_REFERENCE_RUN.md`) |
 | M1.2 — Rich provider quota status | `DONE` (see `M1_2_SPEC.yaml`) |
 | M1.3 — Audit hardening | `DONE` (see `M1_3_SPEC.yaml`) |
-| M1.4 — Autonomous AIDO project contract | `CURRENT`, approved for governed development (see `docs/PROJECT_CONTRACT.md`) |
+| M1.4 — Autonomous AIDO project contract | `DONE` (see `docs/PROJECT_CONTRACT.md`; real WI-M1.4-07 failure + recovery split, see M1.4 below) |
 | M2 — Sessions and resume | `SPECIFIED`, not started, entirely unaffected by M1.4 (see `M2_SPEC.yaml`, `docs/SESSION_CONTRACT.md`) |
 | M3 — Natural-language piloting | `À VOTER` |
 | M4 — Non-interactive mode | `À VOTER` |
@@ -227,7 +226,7 @@ any point.
 Full acceptance criteria per WorkItem: `aido.m1_3.example.yaml`. Full
 functional contract these WorkItems build toward: `M1_3_SPEC.yaml`.
 
-## M1.4 — Autonomous AIDO project contract (`CURRENT`)
+## M1.4 — Autonomous AIDO project contract (`DONE`)
 
 **Decision**: AIDO is the user product; `ai-dev-orchestrator` is its
 internal engine. Before this milestone, a user project's `aido.yaml`
@@ -781,6 +780,62 @@ milestone.
 
 Full functional contract every WorkItem above builds toward:
 `docs/PROJECT_CONTRACT.md`.
+
+### Real runs (2026-09-24)
+
+Two real, governed `aido run` executions, both against local, untracked
+configs (never committed — `CONTRIBUTING.md`, "Local configuration"),
+same `project.id`/`state_dir` as every prior milestone, different
+`mvp.id`s (`ProjectRuntime.bootstrap()` creates each new MVP without
+disturbing any other's persisted WorkItems — same verified precedent as
+every prior milestone). **All 8 WorkItems that AIDO Code's own product
+ended up needing are `completed`; no code was ever manually written or
+corrected by any human/assistant at any point.**
+
+**Run 1** (`mvp-0.1.4`, WI-M1.4-01..08):
+
+| WorkItem | DEV A | DEV B / DEV FIX | Final status |
+|---|---|---|---|
+| WI-M1.4-01 | Alice (anthropic) | Victor (openai) | `completed` |
+| WI-M1.4-02 | Alice (anthropic) | Victor (openai) | `completed` |
+| WI-M1.4-03 | Alice (anthropic) | Victor (openai) | `completed` |
+| WI-M1.4-04 | Alice (anthropic) | Victor (openai) | `completed` |
+| WI-M1.4-05 | Alice (anthropic) | Victor (openai) | `completed` |
+| WI-M1.4-06 | Alice (anthropic) | Victor (openai), 2 DEV FIX rounds | `completed` |
+| WI-M1.4-07 | Alice (anthropic) | — (Ralph `max_iterations=5` hit before any commit, 8m06s, exit code 2; DEV B/QA never reached) | **`FAILED`** |
+| WI-M1.4-08 | — | — (never attempted) | **`BLOCKED`** (`dependency cannot complete: ['WI-M1.4-07']`) |
+
+Alice's own leftover uncommitted work from the failed WI-M1.4-07
+attempt was preserved only as a local `git stash` for diagnostic
+inspection — never applied, never cherry-picked, never treated as
+accepted product (`CONTRIBUTING.md`'s core rule).
+
+**Run 2, recovery** (`mvp-0.1.4-recovery`, WI-M1.4-07A/07B/07C/07D/08R —
+the retired `WI-M1.4-07`/`WI-M1.4-08` ids were never reused, their
+`FAILED`/`BLOCKED` status never manually mutated):
+
+| WorkItem | DEV A | DEV B / DEV FIX | Final status |
+|---|---|---|---|
+| WI-M1.4-07A | Alice (anthropic) | Lydie (anthropic) | `completed` |
+| WI-M1.4-07B | Alice (anthropic) | Lydie (anthropic) | `completed` |
+| WI-M1.4-07C | Alice (anthropic) | Victor (openai), then a real DEV FIX by Alice after a real QA `FAIL` | `completed` |
+| WI-M1.4-07D | Alice (anthropic) | Victor (openai) | `completed` |
+| WI-M1.4-08R | Alice (anthropic) | Victor (openai) | `completed` |
+
+Splitting the original oversized scope into five independently-bounded
+WorkItems was sufficient on its own — no Ralph iteration-limit increase
+was made or needed (§5, "Do not increase Ralph iteration limits merely
+to force success").
+
+**Final state**: `pytest -q` — 209 passed, 0 failed, 0 skipped (189
+after Run 1's WI-01..06 alone, 70 before M1.4). `git diff --check`
+clean. A real, provider-free manual bootstrap
+(`python -m aido_code init "$TMP" acceptance-project`) was additionally
+run outside the offline test suite: the generated `aido.yaml` contains
+no `workers`/`providers`/`models`/`mvp`/`work_items`/`qa`; `validate`
+reports `Current milestone: DRAFT` / `Not executable`; `run` refuses
+cleanly (`Error: Current milestone is DRAFT. Not executable.`, exit 1)
+before any provider is touched.
 
 ## M2 — Sessions and resume (`SPECIFIED`, not started, unaffected by M1.4)
 

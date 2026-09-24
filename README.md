@@ -31,7 +31,7 @@ merge. AIDO Code never makes any of those decisions itself; see
 | M1.1 — CLI conventions, standalone install | `DONE` |
 | M1.2 — Rich provider quota status | `DONE` |
 | M1.3 — Audit hardening | `DONE` |
-| M1.4 — Autonomous AIDO project contract | `CURRENT` |
+| M1.4 — Autonomous AIDO project contract | `DONE` |
 | M2 — Sessions and resume | `SPECIFIED`, not started, unaffected by M1.4 |
 | M3+ | `PLANNED` |
 
@@ -44,14 +44,12 @@ milestone detail and acceptance criteria: [`ROADMAP.md`](ROADMAP.md).
 ### Product model (M1.4)
 
 **AIDO is the user product; `ai-dev-orchestrator` is its internal
-engine.** As of M1.4, a project AIDO governs never references a worker,
-a provider, a model, or a `workers.yaml` path — it declares a project
-identity, a `ROADMAP.md` (the executable source of truth, parsed
-deterministically), a `resources/` directory, and a first instruction.
-AIDO resolves its own global worker pool separately. Full contract:
-[`docs/PROJECT_CONTRACT.md`](docs/PROJECT_CONTRACT.md). The commands and
-examples below describe M1-M1.3's already-shipped behavior; the Quick
-start section is updated once M1.4's own governed build lands.
+engine.** A project AIDO governs never references a worker, a provider,
+a model, or a `workers.yaml` path — it declares a project identity, a
+`ROADMAP.md` (the executable source of truth, parsed deterministically),
+a `resources/` directory, and a first instruction. AIDO resolves its own
+global worker pool separately. Full contract:
+[`docs/PROJECT_CONTRACT.md`](docs/PROJECT_CONTRACT.md).
 
 ## What AIDO Code is
 
@@ -82,29 +80,37 @@ cd aido-code
 python -m pip install -e .
 ```
 
-This installs `ai-dev-orchestrator` (the engine) as a dependency,
-including its own `aido` command — no separate checkout or manual
-worker configuration required.
+This installs `ai-dev-orchestrator` (the engine) as a dependency — no
+separate checkout, and no manual worker configuration: AIDO Code
+resolves its own global worker pool (see "Workers" below).
 
 ```bash
-aido init        # scaffold a project's aido.yaml
-aido validate    # check it before running anything
-aido-code        # launch the AIDO Code terminal
+aido-code init . myproject   # scaffold a new project (manifest, DRAFT ROADMAP.md, resources/, Git)
+cd myproject
+aido-code validate           # DRAFT / Not executable, until ROADMAP.md's milestone is marked APPROVED
+aido-code                    # launch the AIDO Code terminal
 ```
+
+(Equivalently: `python -m aido_code init . myproject`, etc.)
 
 Inside the terminal:
 
 ```
-/status           project + workers, no provider call
-/workers          configured workers
-/status --probe   project + workers, plus a live provider/quota probe
-/run               start or resume the project
+/status           project + roadmap milestone + all AIDO-configured workers, no provider call
+/workers          AIDO's own configured workers (never a project's)
+/status --probe   same, plus a live provider/quota probe
+/config           manifest + roadmap + resources + loaded engine facts
+/validate         same validation as the CLI-level `aido-code validate`
+/run              start or resume the project — requires the roadmap's Current milestone: Status: APPROVED
 ```
 
 `/run` starts or resumes *project* execution, the engine's own WorkItem
-flow. That is a different thing from session resume (M2, not built
-yet), which restores AIDO Code's own conversation state; see
-[`docs/SESSION_CONTRACT.md`](docs/SESSION_CONTRACT.md).
+flow — refused cleanly, before any provider call, while the current
+milestone is still `DRAFT`. That is a different thing from session
+resume (M2, not built yet), which restores AIDO Code's own conversation
+state; see [`docs/SESSION_CONTRACT.md`](docs/SESSION_CONTRACT.md). Full
+manifest/`ROADMAP.md` contract:
+[`docs/PROJECT_CONTRACT.md`](docs/PROJECT_CONTRACT.md).
 
 ## Status and quota
 
@@ -119,13 +125,11 @@ a provider reports them.
 
 ## Workers
 
-**As of M1.4** (`docs/PROJECT_CONTRACT.md` §4), workers belong to AIDO
-itself: `$XDG_CONFIG_HOME/aido/workers.yaml` (or `~/.config/aido/
-workers.yaml`), falling back — with nothing ever auto-materialized — to
-AIDO Code's own packaged default workers. A project never references a
-worker, provider, model, or `workers.yaml` path again. Until M1.4's own
-governed build lands, the table below (still accurate today) is sourced
-from `ai-dev-orchestrator`'s own `config/workers.yaml`:
+Workers belong to AIDO itself (`docs/PROJECT_CONTRACT.md` §4):
+`$XDG_CONFIG_HOME/aido/workers.yaml` (or `~/.config/aido/workers.yaml`),
+falling back — with nothing ever auto-materialized — to AIDO Code's own
+packaged default workers below. A project never references a worker,
+provider, model, or `workers.yaml` path again.
 
 | Worker ID | Name | Provider | Default model |
 |---|---|---|---|
