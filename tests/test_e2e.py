@@ -23,6 +23,7 @@ test_run_command.py (see CONTRIBUTING.md).
 from __future__ import annotations
 
 import io
+import subprocess
 import sys
 from pathlib import Path
 from textwrap import dedent
@@ -30,6 +31,7 @@ from textwrap import dedent
 import pytest
 
 from aido_code import __main__ as entrypoint
+from aido_code import project_init
 from aido_code.repl import run
 from tests.conftest import REGISTRY_TWO_WORKERS, FakeAdapter, ScriptedRalphRunner, commit_action, init_git_repo
 
@@ -191,3 +193,129 @@ class TestFullProjectLifecycle:
         assert "NOT_INITIALIZED" not in after_transcript
         assert "project: roadmaplab (RoadmapLab)" in after_transcript
         assert "wi-1: completed" in after_transcript
+
+
+class TestInitDraftToApprovedLifecycle:
+    """Final regression/clean-install/portability acceptance: the whole
+    product-boundary story chained through the *real* CLI entry points a
+    user actually runs — ``aido-code init`` (``aido_code.project_init``,
+    WI-M1.4-06), never a hand-crafted project directory — through a
+    genuine ``DRAFT`` scaffold, an edit to ``ROADMAP.md``, and on into a
+    real ``OrchestratorEngine`` WorkItem Flow cycle (offline fake
+    provider/subprocess seams only, per ``CONTRIBUTING.md``).
+
+    This single test proves, together with these already-dedicated,
+    exhaustive proofs elsewhere in this suite:
+    - ``ROADMAP.md``, not ``aido.yaml``, is the functional source of
+      truth for executability (below: identical ``aido.yaml``, DRAFT vs.
+      APPROVED ``ROADMAP.md`` content flips ``validate``'s verdict).
+    - a project's own ``aido.yaml`` can never carry a worker/provider/
+      model — structurally impossible, not just untested (``aido_code.
+      project_manifest``'s top-level key allowlist; exhaustively
+      unit-tested in ``tests/test_project_manifest.py``'s own
+      ``TestUnknownTopLevelKeys``) — checked again below directly against
+      the real, ``aido-code init``-generated file.
+    - AIDO's workers are global, resolved independently of this project
+      and injected into the engine (below: the injected
+      ``WorkerRegistry`` is asserted non-empty; the global resolution
+      rules themselves, including the clean-install case and every
+      forbidden path ``docs/PROJECT_CONTRACT.md`` §4 names, are
+      exhaustively covered in ``tests/test_worker_config.py``).
+    - ``resources/`` confinement has its own dedicated, exhaustive
+      coverage in ``tests/test_project_resources.py``.
+    - no private engine orchestration component (``MVPManager``/
+      ``WorkerSelector``/``QuotaManager``/a ``ProviderAdapter``/
+      ``InternalQAEngine``/``GitGovernanceService``/a ``Store``) is ever
+      importable from ``aido_code`` — a static, package-wide proof
+      stronger than any single runtime test could give, in
+      ``tests/test_structural.py``.
+    """
+
+    def test_real_init_draft_refuses_then_approved_reaches_real_engine(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        # `aido-code init` — a fresh, real DRAFT project, exactly as a
+        # user would create one.
+        assert project_init.run_init(str(tmp_path), "acceptance-project") == 0
+        target = tmp_path / "acceptance-project"
+        _set_worker_registry_override(tmp_path, monkeypatch)
+        _pin_fake_home(tmp_path, monkeypatch)
+        monkeypatch.chdir(target)
+
+        manifest_text = (target / "aido.yaml").read_text()
+        for forbidden in ("workers:", "providers:", "models:"):
+            assert forbidden not in manifest_text, f"aido.yaml must never carry {forbidden!r}"
+
+        original_from_config = entrypoint.EngineClient.from_config
+
+        # `aido-code validate` on the untouched scaffold: DRAFT, not
+        # executable.
+        capsys.readouterr()
+        assert entrypoint.main(["validate"]) == 0
+        assert capsys.readouterr().out == "VALID\nCurrent milestone: DRAFT\nNot executable.\n"
+
+        # `aido-code run` on that same DRAFT project: refused before any
+        # engine/provider is ever constructed.
+        monkeypatch.setattr(
+            entrypoint.EngineClient, "from_config",
+            lambda *a, **k: pytest.fail("DRAFT run constructed an engine"),
+        )
+        assert entrypoint.main(["run"]) != 0
+        assert "DRAFT" in capsys.readouterr().err
+
+        # Edit ROADMAP.md to a valid, APPROVED mini milestone — the exact
+        # same content TestFullProjectLifecycle above already proves
+        # reaches a real engine cycle. A trivial pyproject.toml is added
+        # alongside it (a real user's own stack file): the real engine's
+        # QA phase needs a detectable stack even for a trivial,
+        # already-passing QA command, or it fails closed before ever
+        # reaching that command (see tests/conftest.py's init_git_repo()).
+        (target / "pyproject.toml").write_text("[tool.pytest.ini_options]\n")
+        (target / "ROADMAP.md").write_text(_roadmap_text())
+        subprocess.run(["git", "add", "-A"], cwd=target, check=True)
+        subprocess.run(
+            [
+                "git", "-c", "user.email=e2e@example.invalid", "-c", "user.name=E2E",
+                "commit", "-q", "-m", "Approve first milestone",
+            ],
+            cwd=target, check=True,
+        )
+
+        # `aido-code validate` again: same aido.yaml, only ROADMAP.md
+        # changed — now APPROVED and executable.
+        capsys.readouterr()
+        assert entrypoint.main(["validate"]) == 0
+        assert capsys.readouterr().out == "VALID\nCurrent milestone: APPROVED\nExecutable.\n"
+
+        # `aido-code run`: a real OrchestratorEngine WorkItem Flow cycle,
+        # offline fake provider/subprocess seams injected the same way
+        # TestFullProjectLifecycle above does.
+        runner = ScriptedRalphRunner(
+            [
+                {"topic": "work.completed", "mutate": commit_action("feature.py", "x = 1\n", "DEV A")},
+                {"topic": "work.completed"},
+            ]
+        )
+        captured: dict[str, object] = {}
+
+        def _fake_from_config(config, *, worker_registry, **kwargs):
+            captured["worker_registry"] = worker_registry
+            return original_from_config(
+                config, worker_registry=worker_registry,
+                provider_adapters={"anthropic": FakeAdapter(available=True)},
+                subprocess_runner=runner,
+            )
+
+        monkeypatch.setattr(entrypoint.EngineClient, "from_config", _fake_from_config)
+
+        capsys.readouterr()
+        assert entrypoint.main(["run"]) == 0
+        run_out = capsys.readouterr().out
+        assert "all_terminal: True" in run_out
+        assert "wi-1: completed" in run_out
+        assert len(runner.calls) == 2
+
+        # The engine received AIDO's own globally-resolved WorkerRegistry
+        # — never one read from this project.
+        assert captured["worker_registry"] is not None
+        assert captured["worker_registry"].enabled_workers()

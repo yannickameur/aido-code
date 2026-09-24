@@ -149,3 +149,42 @@ def test_never_resolves_into_ai_dev_orchestrator_owned_paths(
     assert resolved is not None
     assert "ai-dev-orchestrator" not in str(resolved)
     assert resolved == aido_dir / "workers.yaml"
+
+
+def test_clean_install_never_reads_project_or_sibling_checkout_worker_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    """Clean-install acceptance (docs/PROJECT_CONTRACT.md §4): a fresh,
+    isolated ``HOME``/``XDG_CONFIG_HOME`` with no AIDO override present
+    must resolve to the packaged default — never a project's own
+    ``config/workers.yaml``, never a sibling ``ai-dev-orchestrator``
+    checkout's ``config/workers.yaml``, and never ``~/.config/
+    ai-dev-orchestrator/workers.yaml`` (covered by the test above). Both
+    decoy files below are real, readable, validly-shaped ``workers.yaml``
+    files — if either were consulted this test would silently pass by
+    resolving to a decoy instead of failing to resolve at all, so it
+    asserts against the decoys' own distinct worker id, not just against
+    ``None``.
+    """
+    home = tmp_path / "home"
+    home.mkdir()
+
+    project_dir = tmp_path / "checkout" / "myproject"
+    project_config = project_dir / "config"
+    project_config.mkdir(parents=True)
+    (project_config / "workers.yaml").write_text(VALID_OVERRIDE)
+
+    sibling_checkout_config = tmp_path / "checkout" / "ai-dev-orchestrator" / "config"
+    sibling_checkout_config.mkdir(parents=True)
+    (sibling_checkout_config / "workers.yaml").write_text(VALID_OVERRIDE)
+
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.chdir(project_dir)
+
+    assert resolve_workers_override_path() is None
+
+    registry = load_worker_registry()
+    worker_ids = {w.worker_id for w in registry.all_workers()}
+    assert worker_ids != {"override-worker"}
+    assert "alice" in worker_ids
