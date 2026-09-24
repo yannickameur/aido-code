@@ -15,14 +15,17 @@ syntax — the two are never mixed in the same example.
 
 | Command | Status | Purpose | Provider call |
 |---|---|---|---|
+| `init <parent-path> <name>` | `M1.4` | Bootstrap a new project (manifest + `ROADMAP.md` DRAFT + `resources/` + Git) | No |
+| `validate` | `M1.4` (CLI-level; also `/validate` in the REPL) | Manifest + roadmap + resources + AIDO registry validation | No |
+| `run` | `M1.4` (CLI-level; also `/run` in the REPL) | Start or resume project execution, requires `Status: APPROVED` | Potentially |
 | `/help` | `IMPLEMENTED` | List available commands | No |
-| `/status` | `IMPLEMENTED` | Project + MVP + work items + all configured workers | No |
+| `/status` | `IMPLEMENTED`, extended `M1.4` | Roadmap milestone facts + project + MVP + work items + all AIDO-configured workers | No |
 | `/status --probe` | `IMPLEMENTED` | Same, plus one real `probe_workers()` call | Yes |
-| `/workers` | `IMPLEMENTED` | Configured workers (static view) | No |
+| `/workers` | `IMPLEMENTED` | AIDO's own configured workers (static view, `M1.4`: sourced from AIDO's global config, never a project's) | No |
 | `/workers --probe` | `IMPLEMENTED` | Workers, plus live provider/quota state | Yes |
-| `/config` | `IMPLEMENTED` | Loaded `aido.yaml` facts | No |
-| `/validate` | `IMPLEMENTED` | Config validation | No |
-| `/run` | `IMPLEMENTED` | Start or resume project execution | Potentially |
+| `/config` | `IMPLEMENTED`, extended `M1.4` | Manifest + roadmap facts + loaded engine facts | No |
+| `/validate` | `IMPLEMENTED` | Same as the CLI-level `validate` above, from inside the REPL | No |
+| `/run` | `IMPLEMENTED` | Same as the CLI-level `run` above, from inside the REPL | Potentially |
 | `/exit` | `IMPLEMENTED` | Exit the REPL | No |
 | `resume`, `--resume`/`-r` | `M2` | Resume a frontend session by id | No |
 | `--continue`/`-c` | `M2` | Resume the most recent session | No |
@@ -34,12 +37,46 @@ syntax — the two are never mixed in the same example.
 | `doctor` | `M6` | Read-only diagnostics | No |
 | Timeline | `M7` | Real-time event feed | No |
 
-Each M1 command maps directly to one `OrchestratorEngine` call (see
+Each command maps directly to one `OrchestratorEngine` call (see
 `docs/ENGINE_CONTRACT.md`): `/status` → `.status()`, `/workers` →
-`.workers()`, `/validate` → `.validate()`, `/run` → `.run()`. `/config`
-shows the loaded `aido.yaml` facts (via `.validate()`'s
-`ProjectSnapshot`), never a raw file dump. `/run` is also how a project
-resumes; see "Session resume vs. project run" in `ARCHITECTURE.md`.
+`.workers()`, `validate`/`/validate` → `.validate()`, `run`/`/run` →
+`.run()`. `/config` shows the loaded manifest/roadmap facts plus
+`.validate()`'s `ProjectSnapshot`, never a raw file dump. `run`/`/run`
+is also how a project resumes; see "Session resume vs. project run" in
+`ARCHITECTURE.md`.
+
+## M1.4 — Autonomous AIDO project contract
+
+Full grammar/schema: `docs/PROJECT_CONTRACT.md`. Full milestone
+rationale: `ROADMAP.md`, M1.4.
+
+```
+aido-code init <parent-path> <project-name>   # scaffold a new project
+aido-code validate                            # manifest + roadmap + resources + AIDO registry, provider-free
+aido-code run                                 # requires the roadmap's Current milestone: Status: APPROVED
+```
+
+`init`/`validate`/`run` are new **CLI-level** subcommands (argv-based,
+before the REPL starts) — the first real subset of parity with
+`ai-dev-orchestrator`'s own legacy `aido init/validate/run/status` CLI
+(that project's own P13.5-documented transitional surface). This is
+real progress toward M8's own gate, not M8 itself: the binary name
+stays `aido-code`/`python -m aido_code` until M8's separate cutover
+decision (see `ROADMAP.md`, M8). `validate`/`run` also remain available
+as `/validate`/`/run` from inside the REPL, delegating to the exact
+same underlying logic — never a second, duplicated implementation.
+
+A project's own `aido.yaml` no longer resembles `ai-dev-orchestrator`'s
+own schema: no `workers:`/`providers:`/`models:`/`mvp:`/`work_items:`/
+`qa:`. It names a project, a `ROADMAP.md`, a `resources/` directory, and
+an `initial_prompt` — see `docs/PROJECT_CONTRACT.md` §2. `ROADMAP.md`
+itself, parsed deterministically (§3), replaces `MVP_SPEC.yaml`'s
+future role as the executable acceptance contract.
+
+`/workers`/`/status`/`/config` are otherwise unchanged commands whose
+underlying data now comes from AIDO's own global worker configuration
+(`docs/PROJECT_CONTRACT.md` §4) and the parsed manifest/roadmap, never
+from a project-level `workers.yaml`.
 
 ## M1.1 — `--probe` on `/status`/`/workers`
 

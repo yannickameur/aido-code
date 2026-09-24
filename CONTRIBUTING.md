@@ -10,9 +10,15 @@ implements, an independent DEV B reviews and corrects, deterministic QA
 decides PASS/FAIL, and a governed Git merge lands the result — never a
 single developer's own claim that "it works."
 
-1. `ai-dev-orchestrator` governs this repository via `aido.yaml` (start
-   from `aido.example.yaml`, copied to a local, untracked `aido.yaml`;
-   see "Local configuration" below).
+1. `ai-dev-orchestrator` governs this repository via a local, untracked
+   `aido.yaml` (start from the milestone's own tracked template, e.g.
+   `aido.example.yaml` for M1, or a fresh local copy reproducing
+   `ROADMAP.md`'s current milestone's WorkItems for M1.4 onward — see
+   "Local configuration" below). This is the engine's own legacy,
+   file-based configuration shape (worker registry path, `work_items:`,
+   `qa:`), used only to drive *this repository's own* governed
+   development — never the product contract a project AIDO governs
+   consumes (that is `docs/PROJECT_CONTRACT.md`, as of M1.4).
 2. `aido validate` checks the config before anything runs.
 3. `aido run` drives the governed WorkItem Flow: DEV A, DEV B
    corrective review, deterministic QA, then a governed merge/tag —

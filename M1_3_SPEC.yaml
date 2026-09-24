@@ -1,3 +1,8 @@
+# HISTORICAL RECORD (as of M1.4, see ROADMAP.md): kept as proof of what
+# M1.3 actually built and was accepted against, no longer the model for
+# a future milestone's contract — see docs/PROJECT_CONTRACT.md. Never
+# deleted, never edited to match a newer schema.
+#
 # M1.3 acceptance contract: AIDO Code, milestone M1.3 (audit hardening).
 # See ROADMAP.md for the full milestone list and docs/CLI_SPEC.md/
 # docs/ENGINE_CONTRACT.md for the exact command surface and engine API

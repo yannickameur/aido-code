@@ -1,3 +1,9 @@
+# MIGRATION DEBT (as of M1.4, see ROADMAP.md, M2): this template
+# describes M2's WorkItems in the pre-M1.4, ProjectConfig-shaped
+# work_items:/qa: schema. It must be migrated into ROADMAP.md's own
+# deterministic Markdown grammar (docs/PROJECT_CONTRACT.md §3) before a
+# future GO M2 — real, separate work, not started by M1.4.
+#
 # AIDO Code — governed configuration for AI Dev Orchestrator (schema v1),
 # M2 ("Sessions and resume"). See ai-dev-orchestrator/docs/PROJECT_CONFIG.md
 # for the full schema reference, and this project's own CONTRIBUTING.md
