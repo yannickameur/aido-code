@@ -32,7 +32,8 @@ merge. AIDO Code never makes any of those decisions itself; see
 | M1.2 — Rich provider quota status | `DONE` |
 | M1.3 — Audit hardening | `DONE` |
 | M1.4 — Autonomous AIDO project contract | `DONE` |
-| M2 — Sessions and resume | `SPECIFIED`, not started, unaffected by M1.4 |
+| M8 — `aido` command cutover | `DONE` — completed right after M1.4 (out of numeric order); see `ROADMAP.md`, M8 |
+| M2 — Sessions and resume | `SPECIFIED`, not started, unaffected by M1.4/M8 |
 | M3+ | `PLANNED` |
 
 Each milestone's real, governed build is recorded factually in
@@ -84,23 +85,49 @@ This installs `ai-dev-orchestrator` (the engine) as a dependency — no
 separate checkout, and no manual worker configuration: AIDO Code
 resolves its own global worker pool (see "Workers" below).
 
+### Command names
+
+`aido` is the real command (M8, `DONE`). `aido-code`/`python -m
+aido_code` remain a compatibility alias, kept indefinitely — both
+resolve to the exact same entry point, never a duplicated
+implementation.
+
 ```bash
-aido-code init . myproject   # scaffold a new project (manifest, DRAFT ROADMAP.md, resources/, Git)
+aido init . myproject   # scaffold a new project (manifest, DRAFT ROADMAP.md, resources/, Git)
 cd myproject
-aido-code validate           # DRAFT / Not executable, until ROADMAP.md's milestone is marked APPROVED
-aido-code                    # launch the AIDO Code terminal
 ```
 
-(Equivalently: `python -m aido_code init . myproject`, etc.)
+Then:
 
-Inside the terminal:
+1. fill in `README.md` (what the project is, for humans);
+2. add any real reference material under `resources/`;
+3. fill in `ROADMAP.md` — objective, acceptance criteria, WorkItems,
+   dependencies, QA (`docs/PROJECT_CONTRACT.md`);
+4. flip the current milestone's `Status:` from `DRAFT` to `APPROVED`
+   once it's ready to execute;
+5. validate:
+   ```bash
+   aido validate   # Current milestone: APPROVED / Executable
+   ```
+6. commit the project definition:
+   ```bash
+   git add README.md ROADMAP.md aido.yaml resources/
+   git commit -m "Define initial project"
+   ```
+7. start governed development:
+   ```bash
+   aido run
+   ```
+
+No worker/provider/model configuration ever belongs in the project
+itself. Inside the terminal (`aido` with no arguments):
 
 ```
 /status           project + roadmap milestone + all AIDO-configured workers, no provider call
 /workers          AIDO's own configured workers (never a project's)
 /status --probe   same, plus a live provider/quota probe
 /config           manifest + roadmap + resources + loaded engine facts
-/validate         same validation as the CLI-level `aido-code validate`
+/validate         same validation as the CLI-level `aido validate`
 /run              start or resume the project — requires the roadmap's Current milestone: Status: APPROVED
 ```
 

@@ -11,9 +11,15 @@ there. This roadmap starts at M1.
 
 ## Where we stand
 
-DONE: M1, M1.1, M1.2, M1.3, M1.4
-NEXT: M2, entirely not started (unaffected/unblocked by M1.4)
-FUTURE: M3-M8
+DONE: M1, M1.1, M1.2, M1.3, M1.4, M8
+NEXT: M2, entirely not started (unaffected/unblocked by M1.4/M8)
+FUTURE: M3-M7
+
+M8 completed **out of numeric order**, right after M1.4: M1.4 itself
+delivered the functional parity (`init`/`validate`/`run`/`status`) M8
+was gated on, so the binary-name cutover became a small, immediate
+packaging follow-up rather than a separately-scheduled future milestone
+— see M8 below.
 
 | Milestone | Status |
 |---|---|
@@ -22,13 +28,13 @@ FUTURE: M3-M8
 | M1.2 — Rich provider quota status | `DONE` (see `M1_2_SPEC.yaml`) |
 | M1.3 — Audit hardening | `DONE` (see `M1_3_SPEC.yaml`) |
 | M1.4 — Autonomous AIDO project contract | `DONE` (see `docs/PROJECT_CONTRACT.md`; real WI-M1.4-07 failure + recovery split, see M1.4 below) |
-| M2 — Sessions and resume | `SPECIFIED`, not started, entirely unaffected by M1.4 (see `M2_SPEC.yaml`, `docs/SESSION_CONTRACT.md`) |
+| M2 — Sessions and resume | `SPECIFIED`, not started, entirely unaffected by M1.4/M8 (see `M2_SPEC.yaml`, `docs/SESSION_CONTRACT.md`) |
 | M3 — Natural-language piloting | `À VOTER` |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
 | M6 — Doctor/diagnostics | `À VOTER` |
 | M7 — Real-time timeline | `À VOTER` |
-| M8 — `aido` command cutover | `À VOTER`, gated on functional parity |
+| M8 — `aido` command cutover | `DONE` (2026-09-25) — completed right after M1.4, see M8 below |
 | M9+ | `À VOTER`, only per real, demonstrated need |
 
 **`MVP_SPEC.yaml`/`M1_1_SPEC.yaml`/`M1_2_SPEC.yaml`/`M1_3_SPEC.yaml` are
@@ -965,45 +971,122 @@ granularity `OrchestratorEngine.run()` actually returns; a finer
 per-step feed is real, separate, future engine-side work (see
 `ARCHITECTURE.md`, "Events"), never simulated here.
 
-## M8 — `aido` command cutover
+## M8 — `aido` command cutover (`DONE`, 2026-09-25)
 
-**Binary name only.** M8 gates when this project's own `aido-code`/
-`python -m aido_code` invocation may claim the `aido` name — nothing
-about the *product model* (manifest/`ROADMAP.md`/resources/AIDO global
-workers, `docs/PROJECT_CONTRACT.md`) waits for it. That model is already
-current as of M1.4, regardless of binary name. Only after this project
-demonstrates functional parity with the orchestrator's own existing
-legacy `aido` CLI (`init`/`validate`/`run`/`status`, that project's own
-transitional surface per its P13.5) does the cutover itself happen. Until
-then this project never claims the `aido` binary name (`python -m
-aido_code`/`aido-code` instead). The orchestrator retiring or renaming
-its own console script is a separate decision made in that project, not
-here.
+**Binary name only — completed right after M1.4.** M1.4 itself already
+delivered functional parity with the orchestrator's own legacy `aido`
+CLI (`init`/`validate`/`run`/`status`, that project's own transitional
+surface per its P13.5): AIDO Code's own `init`/`validate`/`run` never
+needed an engine-level `.init()` to reach that parity — the still-open
+`.init()` gate `docs/ENGINE_CONTRACT.md` used to describe turned out to
+be moot, since `aido-code init` is entirely this project's own logic,
+never a call into the engine. With parity already real, the cutover
+itself became a small, immediate packaging follow-up rather than a
+separately-scheduled future milestone.
 
-**Packaging requirement, gating this milestone** — status as of M1.1:
+**Ownership, before/after**:
 
-- `RESOLVED`: the engine has a unique, unambiguous PyPI distribution
-  name (`ai-dev-orchestrator`, never the third-party-owned
-  `orchestrator`); this project declares it as a real dependency
-  (`ai-dev-orchestrator>=0.1.2`); automatic installation from local
-  wheels was proven end to end — `pip install --no-index --find-links
-  <wheelhouse> aido-code` in a fully clean venv (no sibling checkout,
-  no prior editable install of either package) installed
-  `ai-dev-orchestrator` automatically as a transitive dependency, and
-  `aido-code`'s own commands (including `/status --probe`) worked
-  correctly against it, all with zero `orchestrator` (third-party)
-  distribution ever present. See `docs/M1_1_REFERENCE_RUN.md`.
-- `NOT YET RESOLVED`: no public distribution/versioning channel exists
-  (no PyPI publish, no Trusted Publishing, no tag/release for either
-  package, a deliberate scope boundary of M1.1); the `aido` binary
-  name cutover itself has not happened; the still-open `.init()` gate
-  in `docs/ENGINE_CONTRACT.md` ("What this contract does not give
-  AIDO Code (yet)") is unaffected by this work.
-- Today's development convention of two sibling Git checkouts with
-  `pip install -e ../ai-dev-orchestrator` (see `CONTRIBUTING.md`)
-  remains the local dev-loop convenience for now; a real, publishable
-  install path is proven above but not yet the default onboarding
-  path.
+```text
+before: aido      -> ai-dev-orchestrator (orchestrator.cli)
+        aido-code -> AIDO Code
+
+after:  aido      -> AIDO Code (aido_code.__main__:main)
+        aido-code -> AIDO Code (same main, compatibility alias)
+        ai-dev-orchestrator -> engine/library only, no console script
+```
+
+**Changes**:
+
+- This project's own `pyproject.toml`: `[project.scripts]` now declares
+  both `aido = "aido_code.__main__:main"` (the real, primary command)
+  and `aido-code = "aido_code.__main__:main"` (a compatibility alias,
+  kept indefinitely — no arbitrary removal date; both point at the
+  exact same `main`, never a duplicated implementation).
+- `ai-dev-orchestrator`'s own `pyproject.toml` no longer declares
+  `[project.scripts]` at all (that project's own P13.6) — a plain `pip
+  install ai-dev-orchestrator` installs no console script; its legacy
+  `orchestrator.cli` module stays importable, internal-only.
+- **Collision, verified real**: installing both distributions, in
+  either order, in a clean venv, leaves exactly one `aido` — AIDO
+  Code's — since the engine no longer declares one at all. See
+  `docs/M1_1_REFERENCE_RUN.md`-style acceptance below.
+- WI-M8-01B (the only functional `src/aido_code/*` change this cutover
+  needed, built through the governed WorkItem Flow per
+  `CONTRIBUTING.md` — never written directly; **`WI-M8-01` itself is
+  retired, never reused**: a first governed attempt crashed pre-
+  execution on a dirty working tree, and `mark_work_item_running()`
+  persists before `prepare_work_item()` can raise — a real
+  `ai-dev-orchestrator` crash-recovery gap, noted here, out of this
+  task's own scope to fix; that WorkItem id stays stuck `running`
+  forever under the abandoned `mvp-m8-cutover`, never mutated,
+  `WI-M8-01B` is the real replacement under a fresh `mvp-m8-cutover-2`):
+  the CLI's own usage/error messages (`aido_code.__main__`) no longer
+  hardcode the `aido-code` name; they reflect whichever command name
+  actually invoked the process, so `aido init` (wrong argument count)
+  and `aido init`/`validate`/`run` (unrecognized input) print accurate
+  usage text regardless of which of the two entry points was used.
+
+**Packaging status** (superseding the M1.1-era notes below, kept as
+historical record):
+
+- `RESOLVED` (M1.1): unique, unambiguous PyPI distribution name for the
+  engine; automatic transitive install from a local wheelhouse proven
+  end to end.
+- `RESOLVED` (M8, this cutover): the `aido` binary name itself now
+  belongs to AIDO Code; verified with real, clean-venv wheel installs in
+  both install orders (engine-then-AIDO-Code and AIDO-Code-with-engine-
+  dependency) — `aido` resolves to AIDO Code's own entry point in every
+  case, never overwritten by install order.
+- `NOT YET RESOLVED`, unaffected by this cutover: no public
+  distribution/versioning channel exists yet (no PyPI publish, no
+  Trusted Publishing, no tag/release for either package). Today's
+  development convention of two sibling Git checkouts with `pip install
+  -e ../ai-dev-orchestrator` (`CONTRIBUTING.md`) remains the local
+  dev-loop convenience.
+
+### WorkItems
+
+Prepared for AI Dev Orchestrator's real, governed WorkItem Flow
+(`CONTRIBUTING.md`) — the only `src/aido_code/*` change this cutover
+needed. The local, untracked config that reproduces it for a real
+governed run is never committed.
+
+1. **WI-M8-01B** — Dynamic program name in CLI usage/error messages
+   (`WI-M8-01` retired, see the note above this list).
+
+   Dependencies: none. Capabilities: development.
+
+   Acceptance criteria:
+   - `aido_code.__main__`'s user-facing usage/error strings (the `init
+     <parent-path> <project-name>` argument-count message, the
+     `validate`/`run` argument-count message, and the unrecognized-
+     argument message) no longer hardcode the literal `aido-code` —
+     each derives the actually-invoked program name (e.g. from
+     `Path(sys.argv[0]).name`, falling back to `aido` if that is empty/
+     unavailable) so both the `aido` and `aido-code` entry points print
+     an accurate command name in their own usage text.
+   - No behavioral change beyond the displayed program name string:
+     exit codes, which branch handles which input, and every other
+     message stay exactly as before.
+   - No second, duplicated implementation of argument handling — the
+     existing `main()` control flow is unchanged, only the string
+     construction for these three messages.
+   - Offline tests cover: the `init` wrong-argument-count message
+     reflecting a simulated `aido` invocation; the same reflecting a
+     simulated `aido-code` invocation; the `validate`/`run` wrong-
+     argument-count message under both; the unrecognized-argument
+     message under both; a fallback case (empty/unusual `sys.argv[0]`)
+     still prints a sane, non-empty program name.
+
+### Historical notes (M1.1-era, kept as record — superseded above)
+
+- The engine's PyPI distribution rename (`ai-dev-orchestrator`, never
+  the third-party-owned `orchestrator`) and automatic transitive-install
+  proof (`pip install --no-index --find-links <wheelhouse> aido-code`
+  in a fully clean venv installing `ai-dev-orchestrator` automatically,
+  `aido-code`'s own commands including `/status --probe` working
+  correctly, zero third-party `orchestrator` distribution ever present)
+  — see `docs/M1_1_REFERENCE_RUN.md`.
 
 ## M9+
 
