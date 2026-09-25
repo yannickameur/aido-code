@@ -1010,14 +1010,21 @@ after:  aido      -> AIDO Code (aido_code.__main__:main)
   either order, in a clean venv, leaves exactly one `aido` — AIDO
   Code's — since the engine no longer declares one at all. See
   `docs/M1_1_REFERENCE_RUN.md`-style acceptance below.
-- WI-M8-01 (the only functional `src/aido_code/*` change this cutover
+- WI-M8-01B (the only functional `src/aido_code/*` change this cutover
   needed, built through the governed WorkItem Flow per
-  `CONTRIBUTING.md` — never written directly): the CLI's own usage/
-  error messages (`aido_code.__main__`) no longer hardcode the
-  `aido-code` name; they reflect whichever command name actually
-  invoked the process, so `aido init` (wrong argument count) and `aido
-  init`/`validate`/`run` (unrecognized input) print accurate usage
-  text regardless of which of the two entry points was used.
+  `CONTRIBUTING.md` — never written directly; **`WI-M8-01` itself is
+  retired, never reused**: a first governed attempt crashed pre-
+  execution on a dirty working tree, and `mark_work_item_running()`
+  persists before `prepare_work_item()` can raise — a real
+  `ai-dev-orchestrator` crash-recovery gap, noted here, out of this
+  task's own scope to fix; that WorkItem id stays stuck `running`
+  forever under the abandoned `mvp-m8-cutover`, never mutated,
+  `WI-M8-01B` is the real replacement under a fresh `mvp-m8-cutover-2`):
+  the CLI's own usage/error messages (`aido_code.__main__`) no longer
+  hardcode the `aido-code` name; they reflect whichever command name
+  actually invoked the process, so `aido init` (wrong argument count)
+  and `aido init`/`validate`/`run` (unrecognized input) print accurate
+  usage text regardless of which of the two entry points was used.
 
 **Packaging status** (superseding the M1.1-era notes below, kept as
 historical record):
@@ -1044,7 +1051,8 @@ Prepared for AI Dev Orchestrator's real, governed WorkItem Flow
 needed. The local, untracked config that reproduces it for a real
 governed run is never committed.
 
-1. **WI-M8-01** — Dynamic program name in CLI usage/error messages.
+1. **WI-M8-01B** — Dynamic program name in CLI usage/error messages
+   (`WI-M8-01` retired, see the note above this list).
 
    Dependencies: none. Capabilities: development.
 
