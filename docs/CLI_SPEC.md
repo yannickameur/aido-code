@@ -5,11 +5,15 @@ what each milestone delivers and its acceptance criteria.
 
 ## Binary name
 
-**Current (M1 through M7, until M8's cutover gate is met): `aido-code
-...` or `python -m aido_code ...`.** The name `aido` belongs to the
-orchestrator's own existing CLI until M8. A separate, clearly-labeled
-"M8: future syntax" section below documents the post-cutover `aido ...`
-syntax — the two are never mixed in the same example.
+**`aido ...` is the real, current command (M8, `DONE`).** `aido-code
+...`/`python -m aido_code ...` remain fully equivalent, kept
+indefinitely as a compatibility alias — both resolve to the exact same
+`aido_code.__main__:main`, never a duplicated implementation. Examples
+below use `aido` by convention; substituting `aido-code` anywhere below
+changes nothing. See `ROADMAP.md`, M8, for the cutover itself — the
+`aido` name no longer belongs to `ai-dev-orchestrator`'s own legacy CLI,
+which installs no console script at all any more (that project's own
+P13.6).
 
 ## Command reference
 
@@ -51,18 +55,18 @@ Full grammar/schema: `docs/PROJECT_CONTRACT.md`. Full milestone
 rationale: `ROADMAP.md`, M1.4.
 
 ```
-aido-code init <parent-path> <project-name>   # scaffold a new project
-aido-code validate                            # manifest + roadmap + resources + AIDO registry, provider-free
-aido-code run                                 # requires the roadmap's Current milestone: Status: APPROVED
+aido init <parent-path> <project-name>   # scaffold a new project
+aido validate                            # manifest + roadmap + resources + AIDO registry, provider-free
+aido run                                 # requires the roadmap's Current milestone: Status: APPROVED
 ```
 
 `init`/`validate`/`run` are new **CLI-level** subcommands (argv-based,
-before the REPL starts) — the first real subset of parity with
+before the REPL starts) — real functional parity with
 `ai-dev-orchestrator`'s own legacy `aido init/validate/run/status` CLI
-(that project's own P13.5-documented transitional surface). This is
-real progress toward M8's own gate, not M8 itself: the binary name
-stays `aido-code`/`python -m aido_code` until M8's separate cutover
-decision (see `ROADMAP.md`, M8). `validate`/`run` also remain available
+(that project's own P13.5-documented transitional surface, now retired
+as a console script per its own P13.6). This parity is exactly what let
+M8's own binary-name cutover happen immediately after M1.4 — see
+`ROADMAP.md`, M8. `validate`/`run` also remain available
 as `/validate`/`/run` from inside the REPL, delegating to the exact
 same underlying logic — never a second, duplicated implementation.
 
@@ -205,24 +209,30 @@ Renders `RunResult.events`/a future engine event stream: DEV A, DEV B,
 QA, Git, WAITING, BLOCKED, COMPLETED. Granularity is bounded by what
 the engine actually emits; see "Events" in `ARCHITECTURE.md`.
 
-## M8 — `aido` command cutover
+## M8 — `aido` command cutover (`DONE`, 2026-09-25)
 
-Gated on functional parity with the orchestrator's own existing `aido`
-CLI (`init`/`validate`/`run`/`status`). Before that point, this project
-never claims the `aido` command name; it runs as `python -m
-aido_code`/`aido-code`. The orchestrator's own console script is
-retired or renamed in a separate, later decision.
+Completed right after M1.4, which already delivered functional parity
+with the orchestrator's own legacy `aido` CLI (`init`/`validate`/`run`/
+`status`). `aido` is now this project's own real, primary command
+(`aido_code.__main__:main`); `aido-code`/`python -m aido_code` remain a
+compatibility alias, kept indefinitely. `ai-dev-orchestrator`'s own
+console script was retired (that project's own P13.6) — a plain `pip
+install ai-dev-orchestrator` installs no command at all any more; that
+distribution's legacy `orchestrator.cli` module stays importable,
+internal-only. See `ROADMAP.md`, M8, for the full record.
 
-**Known gate, not yet resolved**: the orchestrator's public
-`orchestrator.engine.OrchestratorEngine` façade currently exposes
+**Gate that turned out moot**: the orchestrator's public
+`orchestrator.engine.OrchestratorEngine` façade exposes
 `.validate()`/`.status()`/`.workers()`/`.probe_workers()`/`.run()`/
-`.close()` — no public `.init()` method — while parity requires
-matching all four of `init`/`validate`/`run`/`status`. This project
-must never import private helpers from `orchestrator.cli` to work
-around this gap. See `ROADMAP.md`, "M8", for the options to evaluate —
-not decided here, and not something M2 depends on or blocks on.
+`.close()` — still no public `.init()` method. This never blocked
+parity: `aido init` is entirely this project's own logic
+(`aido_code.project_init`), never a call into the engine. This project
+still never imports private helpers from `orchestrator.cli`.
 
-### M8 future syntax (post-cutover only, never mixed with the current syntax above)
+### Future command syntax (not yet built — M2/M3/M4/M6, binary name already `aido`)
+
+The binary name itself is no longer a gate for any of these — only the
+commands themselves remain unbuilt:
 
 ```
 aido resume

@@ -10,6 +10,13 @@ implements, an independent DEV B reviews and corrects, deterministic QA
 decides PASS/FAIL, and a governed Git merge lands the result — never a
 single developer's own claim that "it works."
 
+**Naming note (since M8): `aido` is now AIDO Code's own product
+command** (see `README.md`). The steps below govern *this repository's
+own* development using `ai-dev-orchestrator`'s legacy, no-longer-
+installed engine CLI instead — always invoked explicitly as `python -m
+orchestrator.cli ...` from a sibling checkout, never the bare word
+`aido`, to avoid any confusion between the two.
+
 1. `ai-dev-orchestrator` governs this repository via a local, untracked
    `aido.yaml` (start from the milestone's own tracked template, e.g.
    `aido.example.yaml` for M1, or a fresh local copy reproducing
@@ -19,11 +26,12 @@ single developer's own claim that "it works."
    `qa:`), used only to drive *this repository's own* governed
    development — never the product contract a project AIDO governs
    consumes (that is `docs/PROJECT_CONTRACT.md`, as of M1.4).
-2. `aido validate` checks the config before anything runs.
-3. `aido run` drives the governed WorkItem Flow: DEV A, DEV B
-   corrective review, deterministic QA, then a governed merge/tag —
-   exactly as documented in `ai-dev-orchestrator`'s own `ROADMAP.md`,
-   section "WorkItem Flow".
+2. `python -m orchestrator.cli validate <config>` checks the config
+   before anything runs.
+3. `python -m orchestrator.cli run <config>` drives the governed
+   WorkItem Flow: DEV A, DEV B corrective review, deterministic QA,
+   then a governed merge/tag — exactly as documented in
+   `ai-dev-orchestrator`'s own `ROADMAP.md`, section "WorkItem Flow".
 4. **No functional AIDO Code code** lands on `main` except through that
    governed flow — absolute.
 
@@ -92,9 +100,9 @@ This project's own `pytest -q` suite must always stay offline: it must
 never call a real Claude/Codex/Vibe/DeepSeek/Kimi/Ralph provider, and
 no real provider consumption may ever come from this project's own QA
 either; see `MVP_SPEC.yaml`. This does not restrict real governed
-development itself — once WorkItems are scheduled, `aido run` driving
-DEV A, DEV B, QA, and governed merge is expected and required to use
-real workers/providers.
+development itself — once WorkItems are scheduled, `python -m
+orchestrator.cli run <config>` driving DEV A, DEV B, QA, and governed
+merge is expected and required to use real workers/providers.
 
 ## Questions about the engine itself
 

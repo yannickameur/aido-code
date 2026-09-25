@@ -81,6 +81,85 @@ def test_main_init_rejects_wrong_argument_count(capsys) -> None:
     assert "usage" in err.lower()
 
 
+def test_main_init_wrong_argument_count_reflects_aido_invocation(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(entrypoint.sys, "argv", ["/usr/local/bin/aido", "init", "only-one-arg"])
+
+    exit_code = entrypoint.main(["init", "only-one-arg"])
+
+    assert exit_code != 0
+    err = capsys.readouterr().err
+    assert "usage: aido init <parent-path> <project-name>" in err
+    assert "aido-code" not in err
+
+
+def test_main_init_wrong_argument_count_reflects_aido_code_invocation(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(entrypoint.sys, "argv", ["/usr/local/bin/aido-code", "init", "only-one-arg"])
+
+    exit_code = entrypoint.main(["init", "only-one-arg"])
+
+    assert exit_code != 0
+    err = capsys.readouterr().err
+    assert "usage: aido-code init <parent-path> <project-name>" in err
+
+
+def test_main_validate_wrong_argument_count_reflects_aido_invocation(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(entrypoint.sys, "argv", ["/usr/local/bin/aido", "validate", "extra"])
+
+    exit_code = entrypoint.main(["validate", "extra"])
+
+    assert exit_code != 0
+    err = capsys.readouterr().err
+    assert "usage: aido validate" in err
+    assert "aido-code" not in err
+
+
+def test_main_run_wrong_argument_count_reflects_aido_code_invocation(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(entrypoint.sys, "argv", ["/usr/local/bin/aido-code", "run", "extra"])
+
+    exit_code = entrypoint.main(["run", "extra"])
+
+    assert exit_code != 0
+    err = capsys.readouterr().err
+    assert "usage: aido-code run" in err
+
+
+def test_main_unrecognized_argument_reflects_aido_invocation(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(entrypoint.sys, "argv", ["/usr/local/bin/aido", "frobnicate"])
+
+    exit_code = entrypoint.main(["frobnicate"])
+
+    assert exit_code != 0
+    err = capsys.readouterr().err
+    assert "aido only accepts" in err
+    assert "aido-code only accepts" not in err
+
+
+def test_main_unrecognized_argument_reflects_aido_code_invocation(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(entrypoint.sys, "argv", ["/usr/local/bin/aido-code", "frobnicate"])
+
+    exit_code = entrypoint.main(["frobnicate"])
+
+    assert exit_code != 0
+    err = capsys.readouterr().err
+    assert "aido-code only accepts" in err
+
+
+def test_main_program_name_falls_back_when_argv0_is_empty(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(entrypoint.sys, "argv", ["", "frobnicate"])
+
+    exit_code = entrypoint.main(["frobnicate"])
+
+    assert exit_code != 0
+    err = capsys.readouterr().err
+    assert "aido only accepts" in err
+
+
+def test_program_name_falls_back_when_argv0_is_empty(monkeypatch) -> None:
+    monkeypatch.setattr(entrypoint.sys, "argv", [""])
+
+    assert entrypoint._program_name() == "aido"
+
+
 def test_main_init_handles_filesystem_error_without_traceback(tmp_path, capsys) -> None:
     parent_file = tmp_path / "not-a-directory"
     parent_file.write_text("keep me")
