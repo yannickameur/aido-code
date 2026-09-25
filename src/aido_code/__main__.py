@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from aido_code.engine_client import EngineClient, EngineError
 from aido_code.engine_plan import EnginePlanError, build_engine_plan
@@ -36,14 +37,20 @@ def _project_command(command: str) -> int:
         return 1
 
 
+def _program_name() -> str:
+    return Path(sys.argv[0]).name or "aido"
+
+
 def main(argv: list[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
 
+    prog = _program_name()
+
     if argv and argv[0] == "init":
         if len(argv) != 3:
             print(
-                "Error: usage: aido-code init <parent-path> <project-name>",
+                f"Error: usage: {prog} init <parent-path> <project-name>",
                 file=sys.stderr,
             )
             return 2
@@ -55,14 +62,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if argv and argv[0] in ("validate", "run"):
         if len(argv) != 1:
-            print(f"Error: usage: aido-code {argv[0]}", file=sys.stderr)
+            print(f"Error: usage: {prog} {argv[0]}", file=sys.stderr)
             return 2
         return _project_command(argv[0])
 
     if argv:
         print(
             "Error: unrecognized argument(s): "
-            f"{' '.join(argv)}. aido-code only accepts "
+            f"{' '.join(argv)}. {prog} only accepts "
             "'init <parent-path> <project-name>', 'validate', or 'run'; "
             "run it with none to start the REPL.",
             file=sys.stderr,
