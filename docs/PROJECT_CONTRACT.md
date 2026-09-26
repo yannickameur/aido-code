@@ -1,8 +1,10 @@
 # Project contract (M1.4) — manifest, ROADMAP.md, resources, workers
 
 Full, authoritative grammar/schema for M1.4 ("Autonomous AIDO project
-contract"). `ROADMAP.md`'s own M1.4 section stays short and points here,
-the same way M2's section points to `docs/SESSION_CONTRACT.md`. This
+contract"). `ROADMAP.md`'s own M1.4 section stays short and points here.
+Since M2, `ROADMAP.md`'s own `## Current milestone` is itself a direct
+instance of this same grammar (§3) — AIDO governs its own next
+milestone the same way it governs any project it drives. This
 document does not itself execute anything; the governed WorkItems that
 implement it are `ROADMAP.md`'s WI-M1.4-01 through WI-M1.4-08, built by
 AI Dev Orchestrator's real WorkItem Flow (`CONTRIBUTING.md`), never
@@ -91,9 +93,7 @@ second, looser parser).
   handed to the engine (§6) — not by this parser itself.
 - `roadmap` is required: a path (same resolution rule) to the project's
   `ROADMAP.md`. It must resolve to a location **inside `workspace`** —
-  no `..` traversal, no symlink escaping `workspace` (mirrors the
-  path-safety rule M2's own `docs/SESSION_CONTRACT.md` already documents
-  for session file paths, DR-4 — same principle, new location).
+  no `..` traversal, no symlink escaping `workspace`.
 - `resources` is required: a path (same resolution rule) to the
   project's resources directory, also confined inside `workspace`, same
   rule. It must exist and be a directory.
@@ -456,14 +456,12 @@ this plan only supplies *what's available* and *what to do*; nothing in
 
 ## 8. What this contract does not cover (explicitly out of scope for M1.4)
 
-- M2 sessions (`/resume`, `/new`, `--resume`/`-r`, `--continue`/`-c`) —
-  entirely separate, unstarted; see `ROADMAP.md`, M2.
+- M2 sessions (`resume`, `/new`, `--continue`/`-c`) — entirely
+  separate, unstarted; see `ROADMAP.md`, M2 (now itself an instance of
+  this grammar's `## Current milestone`).
 - `qa_protected_paths` authored from `ROADMAP.md`.
 - A per-project override of `execution.permission_mode`/
   `git.base_branch`.
-- Any migration of `M2_SPEC.yaml`/`aido.m2.example.yaml`'s own content
-  into this grammar — real, separate work required before a future GO
-  M2 (`ROADMAP.md`, M2), not started by M1.4.
 - Multiple simultaneously-`APPROVED` milestones, or any notion of
   milestone sequencing beyond "exactly one `Current milestone`" — a
   project advances by editing `ROADMAP.md` to make its next milestone

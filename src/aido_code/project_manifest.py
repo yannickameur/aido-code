@@ -27,9 +27,8 @@ Path semantics: every relative path in ``aido.yaml`` (``project.workspace``,
 containing that ``aido.yaml`` file*, never the caller's current working
 directory. ``~`` is expanded. ``roadmap``/``resources`` must each resolve
 to a location **inside** the resolved ``project.workspace`` — no ``..``
-traversal, no symlink escaping ``workspace`` — mirroring the same
-path-safety principle ``docs/SESSION_CONTRACT.md`` (DR-4) already
-documents for session file paths, fail-closed here too.
+traversal, no symlink escaping ``workspace`` — using the same
+fail-closed path-safety principle for project-contained files.
 
 NO SECRETS — same guard-rail ``ai-dev-orchestrator``'s own
 ``project_config``/``worker_registry`` modules use: a handful of
@@ -159,7 +158,7 @@ def _resolve_confined_path(raw: str, *, base_dir: Path, workspace: Path, field: 
     """Same resolution as ``_resolve_path``, then verifies the resolved,
     symlink-followed path is still ``workspace`` itself or a descendant
     of it — fail closed on ``..`` traversal or a symlink escaping
-    ``workspace`` (mirrors ``docs/SESSION_CONTRACT.md`` DR-4)."""
+    ``workspace`` (same fail-closed confinement principle)."""
     resolved = _resolve_path(raw, base_dir=base_dir)
     if resolved != workspace and workspace not in resolved.parents:
         raise InvalidProjectManifestError(
