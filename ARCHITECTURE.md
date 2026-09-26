@@ -132,9 +132,15 @@ intent. Full M2 acceptance criteria: `ROADMAP.md`, M2.
 `OrchestratorEngine.run()` returns `RunResult.events` (`EngineEvent`
 tuples: `kind`/`timestamp`/`project_id`/`mvp_id`/`work_item_id`/
 `payload`). Today this is coarse: one `work_item.<status>` event per
-WorkItem processed, because that is the granularity the orchestrator
-itself currently exposes (`MVPManager` runs DEV A/DEV B/QA/merge
-synchronously within one call, with no internal event bus yet). A
-richer per-step timeline (M7) depends on that engine-side
-instrumentation landing first; this project must never fabricate
-finer-grained progress by guessing or by parsing subprocess output.
+WorkItem processed, emitted only once that WorkItem's whole DEV A/DEV
+B/QA/merge sequence has already finished, because that is the
+granularity the orchestrator itself currently exposes (`MVPManager`
+runs DEV A/DEV B/QA/merge synchronously within one call, with no
+internal event bus yet). Its `ExecutionSnapshot` also does not expose
+`backend`/`model`/execution-profile/quality-tier/`reasoning_effort` —
+facts already recorded internally by the engine, simply not surfaced
+through this façade yet. A richer, per-step live timeline (M3, folded
+in from the former M7) depends on that engine-side instrumentation
+landing first; this project must never fabricate finer-grained
+progress, or a model/profile it was not actually told, by guessing or
+by parsing subprocess/Git/SQLite output.

@@ -35,11 +35,11 @@ P13.6).
 | `--continue`/`-c` | `M2` | Resume the most recent session | No |
 | `/resume` | `M2` | Resume picker, from inside the REPL | No |
 | `/new` | `M2` | New frontend session | No |
-| Free-form natural language | `M3` | Status/steering questions | Depends |
+| Free-form natural language | `M3` (`DRAFT`) | Status/steering questions | Depends |
+| Live timeline during `run` | `M3` (`DRAFT`) | Real-time event feed | No |
 | `-p "<request>"` | `M4` | Non-interactive mode | Depends |
 | `--output json`/`stream-json` | `M5` | Structured output | No |
 | `doctor` | `M6` | Read-only diagnostics | No |
-| Timeline | `M7` | Real-time event feed | No |
 
 Each command maps directly to one `OrchestratorEngine` call (see
 `docs/ENGINE_CONTRACT.md`): `/status` → `.status()`, `/workers` →
@@ -159,7 +159,11 @@ failing — see `ROADMAP.md`, M2. A project-requiring command
 no project bound replies with a clean "no project bound" message; it
 never crashes, fabricates a project, or searches for one.
 
-## M3 — Natural-language piloting
+## M3 — Conversational piloting and live execution (`DRAFT`)
+
+Full rationale, engine prerequisite, and WorkItems: `ROADMAP.md`, M3.
+Absorbs former M7 (real-time timeline) — there is no separate future
+timeline milestone.
 
 Free-form questions/requests handled in the REPL, e.g.:
 
@@ -174,6 +178,27 @@ qu'est-ce qui bloque la QA ?
 Every fact used to answer comes from an `OrchestratorEngine` snapshot.
 A conversational layer may explain/summarize; it never becomes a
 second authority on project state.
+
+During `aido run`, a live timeline renders `RunResult.events`/a future
+engine progress feed as it happens: WorkItem started; each DEV A/DEV
+B/DEV FIX execution's worker, provider, backend, execution profile,
+model, quality tier, and reasoning effort (when the engine exposes
+one), plus started/commit/completed/failed; QA
+started/PASS/FAIL/INCONCLUSIVE; Git merge-ready/merge completed/tag.
+Granularity is bounded by what the engine actually emits; see "Events"
+in `ARCHITECTURE.md`. Never reconstructed by parsing stdout, Git, or
+SQLite.
+
+A `Ctrl+C` during a real `aido run` is recognized explicitly (no raw
+traceback); the next `aido run` resumes/recovers using the engine's own
+existing durable recovery state — never a second, AIDO-side recovery
+mechanism. `aido resume`/`/resume` (M2) stays session-resume only.
+
+**Not executable yet**: both the live timeline and clean run
+interruption depend on an engine-side capability that does not exist
+publicly yet (see `docs/ENGINE_CONTRACT.md`, "What this contract does
+not give AIDO Code (yet)", and `ROADMAP.md`, M3). This milestone stays
+`DRAFT` until that capability ships.
 
 ## M4 — Non-interactive mode
 
@@ -202,12 +227,6 @@ Read-only diagnostics, covering (as far as each can honestly be
 determined without side effects): engine version, config, project
 state, Git, Ralph, providers, workers, observable quota, QA, permission
 mode.
-
-## M7 — Timeline
-
-Renders `RunResult.events`/a future engine event stream: DEV A, DEV B,
-QA, Git, WAITING, BLOCKED, COMPLETED. Granularity is bounded by what
-the engine actually emits; see "Events" in `ARCHITECTURE.md`.
 
 ## M8 — `aido` command cutover (`DONE`, 2026-09-25)
 

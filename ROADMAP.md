@@ -11,15 +11,21 @@ there. This roadmap starts at M1.
 
 ## Where we stand
 
-DONE: M1, M1.1, M1.2, M1.3, M1.4, M8, M2
-CURRENT: M2.1 — APPROVED
-FUTURE: M3-M7
+DONE: M1, M1.1, M1.2, M1.3, M1.4, M8, M2, M2.1
+CURRENT: M3 — DRAFT
+FUTURE: M4-M6, M9+
 
 M8 completed **out of numeric order**, right after M1.4: M1.4 itself
 delivered the functional parity (`init`/`validate`/`run`/`status`) M8
 was gated on, so the binary-name cutover became a small, immediate
 packaging follow-up rather than a separately-scheduled future milestone
 — see M8 below.
+
+**M7 was retired as a separate milestone (2026-09-26)**: real-time
+timeline visibility is needed as soon as M3, not later, so its need is
+now covered by M3 below instead of a second, later milestone. There is
+no other section in this file describing timeline delivery as future
+work beyond M3.
 
 | Milestone | Status |
 |---|---|
@@ -29,12 +35,11 @@ packaging follow-up rather than a separately-scheduled future milestone
 | M1.3 — Audit hardening | `DONE` (see `M1_3_SPEC.yaml`) |
 | M1.4 — Autonomous AIDO project contract | `DONE` (see `docs/PROJECT_CONTRACT.md`; real WI-M1.4-07 failure + recovery split, see M1.4 below) |
 | M2 — Sessions and resume | `DONE` (real governed run: 5/5 WorkItems `completed`; see M2 below) |
-| M2.1 — Graceful interactive interruption | `APPROVED` — governed by this file's own `## Current milestone` below (real bug found by M2's own manual smoke test) |
-| M3 — Natural-language piloting | `À VOTER` |
+| M2.1 — Graceful interactive interruption | `DONE` (real governed run: 1/1 WorkItem `completed`; see M2.1 below) |
+| M3 — Conversational piloting and live execution | `DRAFT` — governed by this file's own `## Current milestone` below (absorbs former M7) |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
 | M6 — Doctor/diagnostics | `À VOTER` |
-| M7 — Real-time timeline | `À VOTER` |
 | M8 — `aido` command cutover | `DONE` (2026-09-25) — completed right after M1.4, see M8 below |
 | M9+ | `À VOTER`, only per real, demonstrated need |
 
@@ -909,22 +914,14 @@ the currently-loaded `aido.yaml` names, never a separately-tracked
 "current MVP" pointer. This is what makes a real governed run of the
 milestone below safe to prepare against this same project.
 
-## Current milestone
+## M2.1 — Graceful interactive interruption (`DONE`)
 
-Status: APPROVED
+Objective: fix only the handling of Ctrl+C interruptions in AIDO's
+REPL/session interactions so they never produce a raw traceback,
+without intercepting or changing the interruption semantics of a
+governed engine run.
 
-### ID
-
-m2.1
-
-### Objective
-
-Fix only the handling of Ctrl+C interruptions in AIDO's REPL/session
-interactions so they never produce a raw traceback, without
-intercepting or changing the interruption semantics of a governed
-engine run.
-
-### Acceptance criteria
+Acceptance criteria:
 
 - Ctrl+C at the main `aido>` prompt is handled cleanly and never produces a Python traceback.
 - Ctrl+C in the `aido resume` CLI picker is handled cleanly and never produces a Python traceback.
@@ -941,25 +938,13 @@ engine run.
 
 ### WorkItems
 
-#### WI-M2.1-01 — Handle interactive Ctrl+C cleanly
+#### WI-M2.1-01 — Handle interactive Ctrl+C cleanly (`completed`)
 
 Dependencies: none
 Capabilities: development
 
-Acceptance criteria:
-
-- Ctrl+C at the main `aido>` prompt is handled cleanly and never produces a Python traceback.
-- Ctrl+C in the `aido resume` CLI picker is handled cleanly and never produces a Python traceback.
-- Ctrl+C in the REPL's `/resume` picker cleanly cancels the selection and returns control to the REPL.
-- Interrupting the prompt or a picker never modifies or corrupts the persisted session.
-- No call to OrchestratorEngine.run(), probe_workers(), a worker, or a provider is triggered by this interruption handling.
-- Do NOT introduce a global `except KeyboardInterrupt` that would wrap `/run` or an engine command's own execution.
-- Future interruption/resume of a run in progress during DEV A/DEV B/QA/merge stays out of scope and belongs to M3.
-- Reuse the existing CLI/REPL code paths; do not create a second, parallel implementation.
-- No new dependency.
-- All existing tests stay green.
-- Add the targeted tests this Ctrl+C behavior needs.
-- `git diff --check` stays clean.
+Acceptance criteria: identical to the milestone-level criteria above
+(single-WorkItem milestone).
 
 ### QA
 
@@ -983,11 +968,167 @@ Argv: ["pytest", "-q"]
 - a new dependency;
 - a REPL rewrite.
 
-## M3 — Natural-language piloting
+### Real run (2026-09-26)
 
-Free-form status/steering questions answered from real engine facts;
-see `docs/CLI_SPEC.md`. A conversational layer may explain, never
-decide.
+A human GO was given, then the governed WorkItem Flow ran WI-M2.1-01 to
+completion (`cycles_run=1`, `all_terminal=True`,
+`reached_max_cycles=False`). Preparation commit `cd9cceb` ("Define
+M2.1 graceful interactive interruption"); functional final commit
+`b36c10a` ("Handle Ctrl+C at REPL prompt and session picker"), pushed
+to `origin/main`. `pytest -q` — 241 passed (was 238 after M2). `git
+diff --check` clean. A real terminal smoke test was additionally run
+outside the offline test suite: `aido --continue`, then `Ctrl+C` at the
+`aido>` prompt — clean exit, no traceback. No manual code correction
+was made by any human/assistant at any point.
+
+## Current milestone
+
+Status: DRAFT
+
+### ID
+
+m3
+
+### Objective
+
+Give AIDO users conversational access to real project/engine facts,
+real-time visibility into what a governed run is actually doing, and a
+clean way to interrupt and resume a governed run — without the REPL,
+or any natural-language layer, ever becoming a second orchestration
+authority. This milestone covers, together, three concerns that share
+one root cause observed during M2's own real run: `aido run` stays
+silent for the whole run and only prints a final summary, offers no
+clean way to stop it mid-flight, and offers no way to ask what is
+happening in plain language. Former M7 (real-time timeline) is folded
+into this milestone rather than kept as a later, separate one — see
+"Where we stand" above.
+
+Concretely, three capabilities: (1) natural-language requests
+translated into an existing AIDO action (`/status`, `/workers`, `/run`,
+...) or answered directly from an `OrchestratorEngine` snapshot, never
+a second decision-maker; (2) a live timeline of WorkItem/DEV A/DEV
+B/DEV FIX/QA/Git transitions as they happen, including the worker,
+provider, backend, execution profile, model, quality tier, and
+reasoning effort the engine actually chose for each execution; (3)
+explicit, clean `Ctrl+C` handling during a real `aido run`, reusing the
+engine's own existing durable recovery state (`RECOVERY_REQUIRED`)
+rather than a new AIDO-side recovery mechanism.
+
+Real-time visibility (2) and clean interruption (3) both depend on
+engine-side capabilities that do not exist publicly yet, verified by
+direct inspection of `ai-dev-orchestrator`'s own `src/orchestrator/
+engine.py` on 2026-09-26: `OrchestratorEngine.run()` only returns one
+coarse `work_item.<status>` event per WorkItem, emitted only after that
+WorkItem's whole DEV A/DEV B/QA/merge sequence has already finished
+(`EngineEvent`'s own docstring documents this as a known, unfilled
+gap); its public `ExecutionSnapshot` does not expose `backend`/
+`model`/execution-profile/quality-tier/`reasoning_effort` (all already
+recorded internally on `ExecutionRecord`, simply not surfaced through
+the façade); and nothing in the engine catches `KeyboardInterrupt`
+explicitly anywhere. These are real, separate, engine-side
+prerequisites — tracked as a new proposal in `ai-dev-orchestrator`'s
+own `ROADMAP.md` — not something this milestone works around by
+observing Git/SQLite/stdout instead. This milestone therefore stays
+`Status: DRAFT`: it documents the frontend-side contract this project
+will build once that engine capability ships, and is not executable
+(`run`) until then.
+
+### Acceptance criteria
+
+- Free-form natural-language requests in the REPL can retrieve project status, current activity, why a WorkItem is waiting/blocked, and available workers/providers, using only real `OrchestratorEngine` snapshot facts.
+- Free-form natural-language requests can also trigger an already-supported AIDO action (e.g. `run`/continue) by translating intent into that exact existing command — never a second orchestration decision.
+- The conversational layer never re-implements `WorkerSelector`, QA, Git governance, DEV A/DEV B selection, WAITING/BLOCKED decisions, merge, or recovery; every fact and every decision still comes from `OrchestratorEngine`.
+- During `aido run`, the terminal shows significant transitions as they happen: WorkItem started; for each DEV A/DEV B/DEV FIX execution, worker, provider, backend, execution profile, model, quality tier, and reasoning effort when the engine actually exposes one for that execution, plus started/commit produced/completed/failed; QA started/PASS/FAIL/INCONCLUSIVE; Git merge-ready/merge completed/tag/final SHA when available — never reconstructed by scraping stdout, `git log`, worktrees, branches, or the engine's private SQLite; sourced only from a public engine API.
+- Model/execution-profile/quality-tier/reasoning-effort values shown are exactly what the engine actually decided for that execution — AIDO never guesses a model from a `worker_id`.
+- A `Ctrl+C` during a real `aido run` is recognized explicitly: no raw traceback, no WorkItem left ambiguously marked, no state mutated outside what the engine's own durable recovery mechanism already governs.
+- The next `aido run` resumes/recovers the governed workflow using the engine's own existing state machine (e.g. `RECOVERY_REQUIRED`) — never a second, AIDO-side recovery mechanism.
+- `aido resume`/`/resume` continues to mean session resume only (M2), never a substitute for engine-level run recovery.
+- Any conversational session persistence reuses the M2 session model; no second session/history store.
+- This milestone stays minimal: no long-term memory, no RAG, no vector database.
+- The engine-side prerequisites above are tracked separately in `ai-dev-orchestrator`'s own `ROADMAP.md`; this milestone cannot be executed (`run`) until they exist and this document is revisited.
+- All existing tests stay green; the full suite stays offline (no real Claude/Codex/Vibe/DeepSeek/Kimi call from any M3 test).
+- `git diff --check` stays clean.
+
+### WorkItems
+
+#### WI-M3-01 — Consume public live engine events and render a live timeline
+
+Dependencies: none
+Capabilities: development
+
+Acceptance criteria:
+
+- Renders WorkItem/DEV A/DEV B/DEV FIX/QA/Git transitions as they are emitted by a public `OrchestratorEngine` progress API (callback, iterator, or event sink — the exact shape is an engine-side decision, see `docs/ENGINE_CONTRACT.md`), never by parsing stdout/Git/SQLite.
+- For every DEV A/DEV B/DEV FIX execution, renders worker, provider, backend, execution profile id, model, quality tier, and reasoning effort when the engine actually exposes one for that execution — rendered exactly as decided by the engine, never guessed from `worker_id`.
+- Renders QA phase transitions (started, PASS/FAIL/INCONCLUSIVE) and Git transitions (merge-ready, merge completed, tag/final SHA when available).
+- Falls back to today's single end-of-run summary, unregressed, when the engine capability this depends on is not yet available.
+- Not executable until the engine-side prerequisite (see Objective) lands.
+- Offline tests use fake/scripted engine progress events; zero real provider/Ralph calls.
+
+#### WI-M3-02 — Handle graceful run interruption and expose recovery/resume UX
+
+Dependencies: none
+Capabilities: development
+
+Acceptance criteria:
+
+- A `Ctrl+C` during `aido run` is caught explicitly at AIDO Code's own boundary: no raw Python traceback reaches the terminal.
+- AIDO never marks a WorkItem `completed` itself, never guesses whether the interrupted step finished, and never reconstructs recovery state from Git/logs/session data — the engine's own durable state (e.g. `RECOVERY_REQUIRED`) remains the sole source of truth.
+- The timeline (WI-M3-01) renders the interruption and the next run's recovery, when the underlying engine events exist.
+- The next `aido run` against the same project resumes the governed workflow exactly as the engine's own existing recovery mechanism already dictates — no new AIDO-side recovery logic.
+- `aido resume`/`/resume` (M2) is unchanged: session resume only, never a run-recovery substitute.
+- Not executable until the engine-side prerequisite (explicit interrupt handling/event, see Objective) lands.
+- Offline tests simulate a `KeyboardInterrupt` mid-`run()` via the existing fake provider/subprocess seams; zero real provider calls.
+
+#### WI-M3-03 — Add a minimal natural-language intent/piloting layer
+
+Dependencies: none
+Capabilities: development
+
+Acceptance criteria:
+
+- Free-form REPL input can be interpreted as one of: a status/state question, a "why is WorkItem X waiting/blocked" question, an available-workers/providers question, or a request to run/continue the project.
+- Every answer is built only from a real `OrchestratorEngine` snapshot (`.status()`/`.workers()`/`.probe_workers()`); a run/continue intent maps to the exact existing `/run` action, never a new orchestration path.
+- The layer never selects a worker, never renders a QA/merge verdict of its own, and never fabricates a fact the engine has not actually returned.
+- Unrecognized free-form input fails gracefully (a clear "not understood" reply), never a crash, never a guessed action.
+- Offline tests cover each supported intent against a fake engine snapshot, and the unrecognized-input path.
+
+#### WI-M3-04 — Persist/reuse conversational session context and complete regression acceptance
+
+Dependencies: WI-M3-03
+Capabilities: development
+
+Acceptance criteria:
+
+- Conversational context (if any is kept across turns) is stored using M2's own session model/store — no second session or history persistence mechanism.
+- No long-term memory, no RAG, no vector database, no model training of any kind.
+- `pytest -q` passes for the whole package, offline, zero real provider/Ralph calls.
+- M1/M1.1/M1.2/M1.3/M1.4/M2/M2.1's own already-covered command behaviors remain passing, unregressed.
+- `git diff --check` stays clean.
+
+### QA
+
+#### QA-M3-01 — Full test suite
+
+Kind: unit_test
+Required: true
+Timeout: 300
+Argv: ["pytest", "-q"]
+
+### Out of scope
+
+- background daemon, detached jobs, remote attach.
+- multi-project orchestration.
+- a web UI, or a complex TUI.
+- M5's structured `json`/`stream-json` streaming output.
+- M6's `doctor`/diagnostics.
+- vector database, RAG, or model training of any kind.
+- a second worker-selection engine.
+- a second recovery engine.
+- reconstructing the timeline by scraping Git, SQLite, or stdout.
+- a general REPL rewrite.
+- plugins/MCP/hooks without a demonstrated need.
+- executing this milestone (`aido run`) before the engine-side prerequisite documented in the Objective is `DONE`.
 
 ## M4 — Non-interactive mode
 
@@ -1006,14 +1147,6 @@ can depend on, never a terminal-output parser. See `docs/CLI_SPEC.md`.
 project, Git, Ralph, providers, workers, observable quota, QA,
 permissions; read-only wherever the underlying fact genuinely is. See
 `docs/CLI_SPEC.md`.
-
-## M7 — Real-time timeline
-
-Renders engine events (DEV A, DEV B, QA, Git, WAITING, BLOCKED,
-COMPLETED). Bounded today by the coarse `work_item.<status>`
-granularity `OrchestratorEngine.run()` actually returns; a finer
-per-step feed is real, separate, future engine-side work (see
-`ARCHITECTURE.md`, "Events"), never simulated here.
 
 ## M8 — `aido` command cutover (`DONE`, 2026-09-25)
 
