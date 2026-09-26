@@ -10,6 +10,7 @@ import pytest
 from aido_code.project_init import run_init
 from aido_code.repl import run
 from aido_code.session import Session, SessionStore
+from orchestrator.engine import OrchestratorEngine
 
 
 def _commands(session: Session, commands: str) -> str:
@@ -37,6 +38,38 @@ def test_resumed_project_uses_saved_path_and_reads_current_files(
     roadmap = project / "ROADMAP.md"
     roadmap.write_text(roadmap.read_text().replace("Status: DRAFT", "Status: APPROVED"))
     assert "current_milestone_status: APPROVED" in _commands(resumed, "/config\n")
+
+
+def test_status_after_resume_queries_current_engine_and_roadmap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert run_init(str(tmp_path), "bound") == 0
+    project = tmp_path / "bound"
+    store = SessionStore(tmp_path / "sessions")
+    resumed = store.resume(store.create(project).session_id)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+
+    calls = 0
+    original_status = OrchestratorEngine.status
+
+    def current_status(self: OrchestratorEngine):
+        nonlocal calls
+        calls += 1
+        return original_status(self)
+
+    monkeypatch.setattr(OrchestratorEngine, "status", current_status)
+    first = _commands(resumed, "/status\n")
+    assert "current_milestone_status: DRAFT" in first
+    assert "NOT_INITIALIZED" in first
+
+    roadmap = project / "ROADMAP.md"
+    roadmap.write_text(roadmap.read_text().replace("Status: DRAFT", "Status: APPROVED"))
+    second = _commands(resumed, "/status\n")
+    assert "current_milestone_status: APPROVED" in second
+    assert "NOT_INITIALIZED" in second
+    assert calls == 2
 
 
 def test_resumed_unbound_session_reports_no_project(tmp_path: Path) -> None:
