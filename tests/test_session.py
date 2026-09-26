@@ -54,6 +54,23 @@ def test_unbound_session_and_fallback_location(tmp_path: Path, monkeypatch: pyte
     assert load_session(session.session_id) == session
 
 
+def test_saved_project_path_survives_filesystem_change(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    project = tmp_path / "project"
+    project.mkdir()
+    session = create_session(project)
+    save_session(session)
+
+    project.rename(tmp_path / "moved")
+    replacement = tmp_path / "replacement"
+    replacement.mkdir()
+    project.symlink_to(replacement, target_is_directory=True)
+
+    assert load_session(session.session_id) == session
+
+
 def test_invalid_files_have_controlled_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
     session = create_session()
