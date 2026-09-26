@@ -496,7 +496,11 @@ def run(
     while True:
         output_stream.write(prompt)
         output_stream.flush()
-        line = input_stream.readline()
+        try:
+            line = input_stream.readline()
+        except KeyboardInterrupt:
+            output_stream.write("\n")
+            return
         if line == "":
             return
 

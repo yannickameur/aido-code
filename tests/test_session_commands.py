@@ -13,6 +13,19 @@ from aido_code.repl import run
 from aido_code.session import SessionStore
 
 
+class InterruptingInput(StringIO):
+    def __init__(self, contents: str, *, on_read: int) -> None:
+        super().__init__(contents)
+        self.on_read = on_read
+        self.read_count = 0
+
+    def readline(self, *args: object, **kwargs: object) -> str:
+        self.read_count += 1
+        if self.read_count == self.on_read:
+            raise KeyboardInterrupt
+        return super().readline(*args, **kwargs)
+
+
 @pytest.fixture
 def isolated_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SessionStore:
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
@@ -95,3 +108,52 @@ def test_repl_new_without_project_and_invalid_picker(
     assert "Invalid session selection" in output.getvalue()
     assert len(store.list()) == 1
     assert store.latest().project_path is None
+
+
+def test_ctrl_c_at_repl_prompt_exits_without_changing_session(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _offline(monkeypatch)
+    store = SessionStore(tmp_path / "sessions")
+    session = store.create()
+    session_file = store.directory / f"{session.session_id}.json"
+    saved = session_file.read_bytes()
+    output = StringIO()
+
+    run(InterruptingInput("", on_read=1), output, session=session, session_store=store)
+
+    assert output.getvalue() == "aido> \n"
+    assert session_file.read_bytes() == saved
+
+
+def test_ctrl_c_at_cli_resume_picker_cancels_without_changing_session(
+    isolated_store: SessionStore, monkeypatch: pytest.MonkeyPatch, capsys,
+) -> None:
+    _offline(monkeypatch)
+    session = isolated_store.create()
+    session_file = isolated_store.directory / f"{session.session_id}.json"
+    saved = session_file.read_bytes()
+    monkeypatch.setattr(entrypoint.sys, "stdin", InterruptingInput("", on_read=1))
+
+    assert entrypoint.main(["resume"]) == 0
+
+    assert "Session selection cancelled." in capsys.readouterr().out
+    assert session_file.read_bytes() == saved
+
+
+def test_ctrl_c_at_repl_resume_picker_returns_to_prompt_without_changing_session(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _offline(monkeypatch)
+    store = SessionStore(tmp_path / "sessions")
+    session = store.create()
+    session_file = store.directory / f"{session.session_id}.json"
+    saved = session_file.read_bytes()
+    output = StringIO()
+
+    run(InterruptingInput("/resume\n/exit\n", on_read=2), output,
+        session=session, session_store=store)
+
+    assert "Session selection cancelled.\naido> " in output.getvalue()
+    assert "Resumed session" not in output.getvalue()
+    assert session_file.read_bytes() == saved
