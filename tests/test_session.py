@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import fields, replace
+from datetime import datetime
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -13,6 +14,7 @@ from aido_code.session import (
     InvalidSessionError,
     Session,
     SessionNotFoundError,
+    SessionStore,
     UnsupportedSessionVersionError,
     create_session,
     load_session,
@@ -123,3 +125,86 @@ def test_failed_replace_preserves_old_file_and_cleans_temp(
         save_session(replace(session, updated_at="2026-09-26T00:00:00+00:00"))
     assert path.read_bytes() == original
     assert list(path.parent.iterdir()) == [path]
+
+
+def test_store_create_list_latest_and_resume(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path / "sessions")
+    assert store.list() == []
+    assert store.latest() is None
+    assert not store.directory.exists()
+
+    first = store.create()
+    second = store.create(tmp_path)
+    assert store.load(first.session_id) == first
+    assert second.project_path == str(tmp_path.resolve())
+    assert first.created_at == first.updated_at
+    assert second.created_at == second.updated_at
+
+    old = "2020-01-01T00:00:00+00:00"
+    newer = "2021-01-01T00:00:00+00:00"
+    store.save(replace(first, updated_at=old))
+    store.save(replace(second, updated_at=newer))
+    assert [session.session_id for session in store.list()] == [second.session_id, first.session_id]
+    assert store.latest().session_id == second.session_id
+
+    resumed = store.resume(first.session_id)
+    assert resumed.created_at == first.created_at
+    assert datetime.fromisoformat(resumed.updated_at) > datetime.fromisoformat(newer)
+    assert store.load(first.session_id) == resumed
+    assert store.latest() == resumed
+
+
+def test_latest_breaks_timestamp_ties_by_id(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path)
+    first = store.create()
+    second = store.create()
+    same = "2026-01-01T00:00:00+00:00"
+    store.save(replace(first, updated_at=same))
+    store.save(replace(second, updated_at=same))
+
+    assert [item.session_id for item in store.list()] == sorted(
+        [first.session_id, second.session_id], reverse=True,
+    )
+    assert store.latest().session_id == max(first.session_id, second.session_id)
+
+
+def test_listing_ignores_other_filenames_and_reports_corruption(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path)
+    valid = store.create()
+    (tmp_path / "index.json").write_text("{broken", encoding="utf-8")
+    (tmp_path / f"{valid.session_id}.json.bak").write_text("{broken", encoding="utf-8")
+    (tmp_path / f"{str(uuid4()).upper()}.json").write_text("{broken", encoding="utf-8")
+    assert store.list() == [valid]
+
+    corrupt_id = str(uuid4())
+    corrupt = tmp_path / f"{corrupt_id}.json"
+    corrupt.write_text("{broken", encoding="utf-8")
+    with pytest.raises(InvalidSessionError, match=corrupt_id):
+        store.list()
+    assert corrupt.read_text(encoding="utf-8") == "{broken"
+
+
+def test_resume_rejects_invalid_and_missing_ids_without_creating_files(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path / "sessions")
+    with pytest.raises(InvalidSessionError, match="invalid session id"):
+        store.resume("../escape")
+    missing = str(uuid4())
+    with pytest.raises(SessionNotFoundError, match=missing):
+        store.resume(missing)
+    assert not store.directory.exists()
+
+
+def test_resume_preserves_file_on_failed_save(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    store = SessionStore(tmp_path)
+    session = store.create()
+    path = tmp_path / f"{session.session_id}.json"
+    original = path.read_bytes()
+
+    def fail_replace(_source: str, _target: Path) -> None:
+        raise OSError("simulated replace failure")
+
+    monkeypatch.setattr("aido_code.session.os.replace", fail_replace)
+    with pytest.raises(OSError, match="simulated replace failure"):
+        store.resume(session.session_id)
+    assert path.read_bytes() == original
+    assert list(tmp_path.iterdir()) == [path]
