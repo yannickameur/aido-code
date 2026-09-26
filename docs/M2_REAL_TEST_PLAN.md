@@ -1,8 +1,18 @@
 # M2 real test plan
 
-Scenarios to run **after** M2 (`M2_SPEC.yaml`, `docs/SESSION_CONTRACT.md`)
-is actually built by the governed WorkItem Flow (`aido.m2.example.yaml`,
-WI-M2-01 through WI-M2-10). **Not executed by this preparation task.**
+**SUPERSEDED, kept as historical record only.** Written against the
+pre-simplification, 10-WorkItem M2 design (`M2_SPEC.yaml`,
+`docs/SESSION_CONTRACT.md`, `aido.m2.example.yaml` — all three retired;
+see `ROADMAP.md`, M2). Several scenarios below (session index, resume
+aliases `--resume`/`-r`, concurrent-lock contention) describe
+capabilities the simplified M2 (`ROADMAP.md`'s own `## Current
+milestone`, WI-M2-01 through WI-M2-05) does not build. Do not run this
+plan against the simplified M2; a new, real smoke pass should be
+written from `ROADMAP.md`'s own M2 acceptance criteria once it is
+built.
+
+Scenarios to run **after** M2 is actually built by the governed
+WorkItem Flow. **Not executed by this preparation task.**
 WI-M2-01 through WI-M2-10's own offline pytest QA is the primary,
 automated acceptance gate (`M2_SPEC.yaml`, criterion 17); this plan is
 the additional real, human-driven smoke pass to run once that QA is

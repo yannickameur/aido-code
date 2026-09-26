@@ -134,8 +134,8 @@ itself. Inside the terminal (`aido` with no arguments):
 `/run` starts or resumes *project* execution, the engine's own WorkItem
 flow — refused cleanly, before any provider call, while the current
 milestone is still `DRAFT`. That is a different thing from session
-resume (M2, not built yet), which restores AIDO Code's own conversation
-state; see [`docs/SESSION_CONTRACT.md`](docs/SESSION_CONTRACT.md). Full
+resume (M2, not built yet), which restores AIDO Code's own minimal
+frontend state; see [`ROADMAP.md`](ROADMAP.md), M2. Full
 manifest/`ROADMAP.md` contract:
 [`docs/PROJECT_CONTRACT.md`](docs/PROJECT_CONTRACT.md).
 
@@ -183,7 +183,6 @@ so far.
 | [`docs/PROJECT_CONTRACT.md`](docs/PROJECT_CONTRACT.md) | M1.4: manifest, `ROADMAP.md` grammar, resources, AIDO's own worker config |
 | [`docs/CLI_SPEC.md`](docs/CLI_SPEC.md) | command/flag reference |
 | [`docs/ENGINE_CONTRACT.md`](docs/ENGINE_CONTRACT.md) | the engine API AIDO Code consumes |
-| [`docs/SESSION_CONTRACT.md`](docs/SESSION_CONTRACT.md) | M2 session data model |
 | [`docs/M1_REFERENCE_RUN.md`](docs/M1_REFERENCE_RUN.md) | M1's real, governed build |
 | [`docs/M1_1_REFERENCE_RUN.md`](docs/M1_1_REFERENCE_RUN.md) | M1.1's real, governed build |
 | [`docs/M2_REAL_TEST_PLAN.md`](docs/M2_REAL_TEST_PLAN.md) | M2's post-build test scenarios |
