@@ -17,6 +17,7 @@ __all__ = [
     "InvalidSessionError",
     "UnsupportedSessionVersionError",
     "SessionNotFoundError",
+    "SessionProjectError",
     "SessionStore",
     "create_session",
     "session_directory",
@@ -25,6 +26,7 @@ __all__ = [
     "list_sessions",
     "latest_session",
     "resume_session",
+    "project_manifest_path",
 ]
 
 SESSION_SCHEMA_VERSION = 1
@@ -49,6 +51,10 @@ class SessionNotFoundError(SessionError):
     """No session file exists for the requested identifier."""
 
 
+class SessionProjectError(SessionError):
+    """A project command cannot use this session's project binding."""
+
+
 @dataclass(frozen=True)
 class Session:
     schema_version: int
@@ -56,6 +62,16 @@ class Session:
     created_at: str
     updated_at: str
     project_path: str | None = None
+
+
+def project_manifest_path(session: Session) -> Path:
+    """Use the saved binding as-is; never discover or substitute a project."""
+    if session.project_path is None:
+        raise SessionProjectError("no project bound to this session")
+    project = Path(session.project_path)
+    if not project.is_dir():
+        raise SessionProjectError(f"bound project is unavailable: {project}")
+    return project / "aido.yaml"
 
 
 def _valid_id(session_id: str) -> str:

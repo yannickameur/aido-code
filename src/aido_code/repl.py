@@ -53,6 +53,7 @@ from aido_code.project_command import ProjectCommandContext, load_project_comman
 from aido_code.project_manifest import ProjectManifestError
 from aido_code.project_resources import ProjectResourcesError
 from aido_code.roadmap import CurrentMilestone, RoadmapError
+from aido_code.session import Session, SessionProjectError, project_manifest_path
 from orchestrator.worker_registry import WorkerRegistryError
 
 COMMANDS: dict[str, str] = {
@@ -424,6 +425,34 @@ def _run_run(
     return format_run(result)
 
 
+def _run_session_validate(config_path: str) -> str:
+    try:
+        load_project_command_context(config_path)
+    except _PROJECT_COMMAND_ERRORS as exc:
+        return f"Validation failed: {exc}"
+    return "Configuration is valid."
+
+
+def _run_session_project(
+    config_path: str,
+    *,
+    provider_adapters: dict[str, object] | None = None,
+    subprocess_runner: object | None = None,
+) -> str:
+    try:
+        context = load_project_command_context(config_path)
+        if not context.roadmap.milestone.is_executable:
+            return "Error: Current milestone is DRAFT. Not executable."
+        plan = build_engine_plan(context.manifest, context.roadmap, context.resources)
+        with EngineClient.from_config(
+            plan, worker_registry=context.worker_registry,
+            provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
+        ) as client:
+            return format_run(client.run())
+    except _PROJECT_COMMAND_ERRORS as exc:
+        return f"Error: {exc}"
+
+
 def _run_workers(
     config_path: str,
     *,
@@ -449,19 +478,16 @@ def run(
     *,
     prompt: str = "aido> ",
     config_path: str = DEFAULT_CONFIG_PATH,
+    session: Session | None = None,
     provider_adapters: dict[str, object] | None = None,
     subprocess_runner: object | None = None,
 ) -> None:
     """Read commands from ``input_stream`` until ``/exit`` or EOF.
 
-    ``provider_adapters``/``subprocess_runner`` are forwarded to every
-    engine construction this loop makes (``EngineClient.open()`` for
-    ``/run``/``/validate``; ``_open_project_command_engine()`` for
-    ``/status``/``/workers``/``/config``, and either way only reaching a
-    real ``probe_workers()`` call when ``--probe`` is given); same
-    test-only seams both construction paths accept (see
-    ``engine_client.py``), production callers (``__main__.py``) never set
-    them.
+    A resumed ``session`` supplies its saved project directory to each
+    project command. The files are loaded again on every command through
+    the shared M1.4 project loader. ``provider_adapters`` and
+    ``subprocess_runner`` are test seams for engine construction.
     """
     while True:
         output_stream.write(prompt)
@@ -480,6 +506,16 @@ def run(
         if name == "/help" and not flags:
             output_stream.write(format_help() + "\n")
             continue
+        needs_project = (
+            (name in ("/status", "/workers") and flags in ([], ["--probe"]))
+            or command in ("/config", "/validate", "/run")
+        )
+        if needs_project and session is not None:
+            try:
+                config_path = str(project_manifest_path(session))
+            except SessionProjectError as exc:
+                output_stream.write(f"Error: {exc}\n")
+                continue
         if name == "/status" and flags in ([], ["--probe"]):
             output_stream.write(
                 _run_status(
@@ -506,11 +542,13 @@ def run(
             output_stream.write(_run_config(config_path) + "\n")
             continue
         if command == "/validate":
-            output_stream.write(_run_validate(config_path) + "\n")
+            output_stream.write(
+                (_run_session_validate(config_path) if session is not None else _run_validate(config_path)) + "\n"
+            )
             continue
         if command == "/run":
             output_stream.write(
-                _run_run(
+                (_run_session_project if session is not None else _run_run)(
                     config_path,
                     provider_adapters=provider_adapters,
                     subprocess_runner=subprocess_runner,
