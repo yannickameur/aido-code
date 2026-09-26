@@ -170,7 +170,25 @@ live Store, SQLite connection, or any dataclass from
 
 - A per-sub-step event feed (DEV A running, DEV B completed, QA
   running, merge completed, ...). Only a coarse per-WorkItem event
-  exists today.
+  exists today, emitted only after that WorkItem's whole DEV A/DEV
+  B/QA/merge sequence has already finished. This blocks M3's live
+  timeline (`ROADMAP.md`, M3).
+- `ExecutionSnapshot.backend`/`.model`/an execution-profile id/quality
+  tier/`reasoning_effort`. These facts already exist internally on the
+  engine's own `ExecutionRecord` (`backend`/`model`/`reasoning_effort`)
+  and, when adaptive execution selects a profile, on a separate
+  `AdaptiveExecutionDecision` audit record (`profile_id`/
+  `quality_tier`) — neither is surfaced through this façade today. This
+  also blocks M3's live timeline, which must render exactly what the
+  engine decided, never a value guessed from `worker_id`.
+- Explicit `KeyboardInterrupt` handling anywhere in the engine. A
+  `Ctrl+C` during `.run()` propagates as a raw exception; nothing
+  converts it into a clean, typed outcome or event. This blocks M3's
+  graceful run-interruption behavior (`ROADMAP.md`, M3) — though the
+  engine's existing durable recovery state (`RECOVERY_REQUIRED`,
+  `RecoveryCoordinator`) already reconciles an orphaned `RUNNING`
+  execution on the next call, and M3 is expected to reuse that
+  unchanged, never build a second recovery mechanism.
 - Push/streaming updates. `.run()` is a single blocking call that
   drives up to `max_cycles` WorkItems and returns; AIDO Code polls by
   calling it again, or drives its own loop around repeated `.status()`
@@ -180,13 +198,14 @@ live Store, SQLite connection, or any dataclass from
 - A public `.init()` method. This contract's methods today are exactly
   `.validate()`/`.status()`/`.workers()`/`.probe_workers()`/`.run()`/
   `.close()` — there is no engine-level equivalent of the
-  orchestrator's own `aido init`. This is the specific gate
-  `ROADMAP.md`'s M8 (`aido` command cutover) cannot pass until
-  resolved; see that section for the options under consideration. AIDO
-  Code must never import `orchestrator.cli`'s private helpers to work
-  around this gap.
+  orchestrator's own `aido init`. This turned out not to block M8
+  (`aido` command cutover, `DONE`): `aido init` is entirely AIDO Code's
+  own logic (`aido_code.project_init`), never a call into the engine —
+  see `ROADMAP.md`, M8. AIDO Code must still never import
+  `orchestrator.cli`'s private helpers to work around this gap.
 
 None of these are invented here. They are real, future orchestrator-side
-work, tracked as `À VOTER`/future increments in `ai-dev-orchestrator`'s
-own `ROADMAP.md`, not something AIDO Code should work around by
-reaching past this contract.
+work; the live-timeline/execution-detail/interrupt gaps above are
+tracked as a new proposal in `ai-dev-orchestrator`'s own `ROADMAP.md`
+(status: proposed, not yet implemented as of 2026-09-26), not something
+AIDO Code should work around by reaching past this contract.
