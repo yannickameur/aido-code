@@ -79,11 +79,7 @@ def _validate(session: Session) -> None:
     if session.project_path is not None:
         if not isinstance(session.project_path, str) or not Path(session.project_path).is_absolute():
             raise InvalidSessionError("session project_path must be an absolute path or null")
-        try:
-            normalized = str(Path(session.project_path).resolve())
-        except (OSError, ValueError) as exc:
-            raise InvalidSessionError("session project_path is invalid") from exc
-        if normalized != session.project_path:
+        if "\x00" in session.project_path or os.path.normpath(session.project_path) != session.project_path:
             raise InvalidSessionError("session project_path must be normalized")
 
 
