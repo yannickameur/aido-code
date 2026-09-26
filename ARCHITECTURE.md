@@ -68,7 +68,7 @@ AIDO-built `WorkerRegistry` injected
 | AIDO Code owns | AI Dev Orchestrator owns |
 |---|---|
 | The terminal/REPL: prompt, rendering, colors, layout | Worker selection |
-| Sessions: conversation history, project binding, resume-by-session-id | QA verdicts |
+| Sessions: minimal frontend state, optional project binding, resume-by-session-id (M2 — conversation history and its persistence belong to M3) | QA verdicts |
 | Commands (`/help`, `/status`, `/workers`, `/config`, `/validate`, `/run`, `/exit`, later `/resume`/`/new`) | Merge decisions |
 | Output rendering: text today, `json`/`stream-json` later (M5), built directly from typed snapshots, never by parsing this project's own stdout | WorkItem completion, all engine state transitions |
 | Natural-language interpretation of engine facts (M3): may explain, never a second authority on state (`LLM IS NOT ORACLE`, the same invariant the engine itself is built on) | SQLite / all persisted state |
@@ -96,32 +96,36 @@ Two different concepts share the word "resume" in this ecosystem, on
 purpose (matching Claude Code/Codex CLI conventions the user already
 knows) — they are never the same operation:
 
-- **Session resume** (`aido-code resume`, `aido-code resume <id>`,
-  `--resume`/`-r`, `--continue`/`-c`, `/resume`, `/new`; see
-  `docs/CLI_SPEC.md`, M2, and `docs/SESSION_CONTRACT.md`) is about
-  *this project's own UX state*: which conversation, which directory,
-  which history. It touches nothing in the orchestrator's persisted
-  state.
+- **Session resume** (`aido resume`, `aido resume <id>`, `aido
+  --continue`/`-c`, `/resume`, `/new`; see `docs/CLI_SPEC.md`, M2) is
+  about *this project's own UX state*: a minimal local session and its
+  optional project binding. It touches nothing in the orchestrator's
+  persisted state.
 - **Project run/resume** is `OrchestratorEngine.run()` alone. The
   engine decides, from its own real persisted state
   (`READY`/`WAITING`/`RECOVERY_REQUIRED`/...), what "continuing the
   project" actually means.
 
-**Hard invariant (M2): session resume never automatically triggers the
-engine.** Selecting, resuming, or creating a session only ever
-restores/creates AIDO Code's own UX state — it loads the session,
-restores its interaction history and project/config binding, and
-restores display context. It never, by itself:
+**Hard invariant (M2)**:
+
+```
+Session AIDO = minimal frontend state.
+Project / WorkItem / MVP / QA / provider / quota / merge
+  = state owned by ai-dev-orchestrator.
+```
+
+Creating or resuming a session never automatically triggers the engine.
+It never, by itself:
 
 - calls `OrchestratorEngine.run()`;
-- starts or resumes a WorkItem;
+- calls `probe_workers()`;
 - selects a worker;
-- causes a provider call (including `.probe_workers()`);
+- causes a provider call;
 - mutates any engine state.
 
 Advancing the project always requires a separate, explicit user action:
 `/run` today, or a future M3 request explicitly interpreted as a run
-intent.
+intent. Full M2 acceptance criteria: `ROADMAP.md`, M2.
 
 ## Events / timeline
 

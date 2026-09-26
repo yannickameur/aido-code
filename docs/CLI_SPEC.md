@@ -31,7 +31,7 @@ P13.6).
 | `/validate` | `IMPLEMENTED` | Same as the CLI-level `validate` above, from inside the REPL | No |
 | `/run` | `IMPLEMENTED` | Same as the CLI-level `run` above, from inside the REPL | Potentially |
 | `/exit` | `IMPLEMENTED` | Exit the REPL | No |
-| `resume`, `--resume`/`-r` | `M2` | Resume a frontend session by id | No |
+| `resume`, `resume <session-id>` | `M2` | Resume a frontend session by id | No |
 | `--continue`/`-c` | `M2` | Resume the most recent session | No |
 | `/resume` | `M2` | Resume picker, from inside the REPL | No |
 | `/new` | `M2` | New frontend session | No |
@@ -120,22 +120,19 @@ stays project start/resume, unchanged.
 
 ## M2 — Session commands and flags
 
-Full contract: `M2_SPEC.yaml` and `docs/SESSION_CONTRACT.md`.
-Conventions deliberately close to Codex CLI/Claude Code — using the
-current, pre-M8 binary name:
+Full contract: `ROADMAP.md`, M2. Conventions deliberately close to
+Codex CLI/Claude Code:
 
 ```
-aido-code resume                # interactive session picker
-aido-code resume <session-id>   # resume a specific session
-aido-code --resume <session-id> # Claude-style alias
-aido-code -r <session-id>       # short alias
+aido resume                # interactive session picker
+aido resume <session-id>   # resume a specific session
 
-aido-code --continue            # continue the most recent session
-aido-code -c                    # short alias
+aido --continue            # continue the most recently used session
+aido -c                    # short alias
 ```
 
 Equivalently: `python -m aido_code resume`, `python -m aido_code
---resume <session-id>`, etc.
+--continue`, etc.
 
 In the REPL:
 
@@ -144,19 +141,22 @@ In the REPL:
 /new
 ```
 
+Not added in M2: `--resume`/`-r` — `resume <session-id>` already covers
+that capability; a separate alias is not needed.
+
 All of the above are session-level and **never** automatically call
 `OrchestratorEngine.run()`, probe/select a worker, or otherwise touch
-engine state — see `docs/SESSION_CONTRACT.md` and "Session resume vs.
-project run/resume" in `ARCHITECTURE.md`. Resuming a session only
-restores AIDO Code's own UX state; advancing the project always
-requires a separate, explicit `/run`.
+engine state — see "Session resume vs. project run/resume" in
+`ARCHITECTURE.md`. Resuming a session only restores AIDO Code's own
+minimal frontend state (and its optional project binding); advancing
+the project always requires a separate, explicit `/run`.
 
-**Works without a project (`aido.yaml`) present**: `aido-code` with no
-project detected, `aido-code resume`/`-c`, and REPL `/new`/`/help` all
-start a session in the `UNBOUND` state rather than failing — see
-`docs/SESSION_CONTRACT.md`, "Unbound sessions". A project-requiring
-command (`/status`, `/workers`, `/validate`, `/run`) issued from an
-unbound session replies with a clean "no project bound" message; it
+**Works without a project (`aido.yaml`) present**: `aido` with no
+project detected, `aido resume`/`--continue`/`-c`, and REPL `/new`/
+`/help` all start a session with `project_path = null` rather than
+failing — see `ROADMAP.md`, M2. A project-requiring command
+(`/status`, `/workers`, `/validate`, `/run`) issued from a session with
+no project bound replies with a clean "no project bound" message; it
 never crashes, fabricates a project, or searches for one.
 
 ## M3 — Natural-language piloting
@@ -237,8 +237,6 @@ commands themselves remain unbuilt:
 ```
 aido resume
 aido resume <session-id>
-aido --resume <session-id>
-aido -r <session-id>
 aido --continue
 aido -c
 aido -p "status"

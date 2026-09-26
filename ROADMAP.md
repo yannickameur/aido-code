@@ -12,7 +12,7 @@ there. This roadmap starts at M1.
 ## Where we stand
 
 DONE: M1, M1.1, M1.2, M1.3, M1.4, M8
-NEXT: M2, entirely not started (unaffected/unblocked by M1.4/M8)
+CURRENT: M2 — DRAFT
 FUTURE: M3-M7
 
 M8 completed **out of numeric order**, right after M1.4: M1.4 itself
@@ -28,7 +28,7 @@ packaging follow-up rather than a separately-scheduled future milestone
 | M1.2 — Rich provider quota status | `DONE` (see `M1_2_SPEC.yaml`) |
 | M1.3 — Audit hardening | `DONE` (see `M1_3_SPEC.yaml`) |
 | M1.4 — Autonomous AIDO project contract | `DONE` (see `docs/PROJECT_CONTRACT.md`; real WI-M1.4-07 failure + recovery split, see M1.4 below) |
-| M2 — Sessions and resume | `SPECIFIED`, not started, entirely unaffected by M1.4/M8 (see `M2_SPEC.yaml`, `docs/SESSION_CONTRACT.md`) |
+| M2 — Sessions and resume | `DRAFT` — governed by this file's own `## Current milestone` below, unaffected by M1.4/M8 |
 | M3 — Natural-language piloting | `À VOTER` |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
@@ -42,10 +42,14 @@ historical acceptance records of M1/M1.1/M1.2/M1.3 as they were actually
 built — kept as proof, never deleted, but no longer the model for how a
 future milestone's contract is authored.** Starting at M1.4,
 `ROADMAP.md` is the single functional source of truth for a *project*
-this product governs (see M1.4 below and `docs/PROJECT_CONTRACT.md`);
-this file (AIDO Code's own roadmap) stays free-form prose by convention,
-not an instance of the deterministic grammar M1.4 defines for the
-projects AIDO governs.
+this product governs (see M1.4 below and `docs/PROJECT_CONTRACT.md`).
+This file's own historical milestones (M1 through M1.4, M8) and
+not-yet-specified future milestones (M3 and beyond) stay free-form
+prose by convention — but starting at M2, this file's own `## Current
+milestone` section is itself a direct instance of the exact same
+deterministic grammar `docs/PROJECT_CONTRACT.md` §3 defines for the
+projects AIDO governs: this repository governs its own next milestone
+the same way it governs any project, never a special free-form case.
 
 ## M1 — Minimal interactive shell (`DONE`)
 
@@ -154,10 +158,11 @@ which found:
 | F-03 | LOW | `docs/ENGINE_CONTRACT.md` omits `worker_display_name` (a real `ExecutionSnapshot` field, P13.3). |
 
 The audit also raised six M2 design risks (DR-1 through DR-6) —
-resolved directly in `docs/SESSION_CONTRACT.md`, `M2_SPEC.yaml`, and
-`aido.m2.example.yaml` as documentation/spec work (see M2's own section
-below); no code changes were needed for that part, since M2 has no code
-yet.
+resolved at the time directly in `docs/SESSION_CONTRACT.md`,
+`M2_SPEC.yaml`, and `aido.m2.example.yaml` as documentation/spec work
+(all three later retired when M2 itself was simplified — see M2's own
+section below); no code changes were needed for that part, since M2 has
+no code yet.
 
 **Not manually coded**: per `CONTRIBUTING.md`, F-01/F-02 require real
 functional code (`src/aido_code/*`) and must be produced by AI Dev
@@ -266,8 +271,9 @@ instruction.
 APPROVED/DRAFT gate, resources confinement, `initial_prompt`
 combination, AIDO's own global worker configuration, and exactly how
 `validate`/`run`/`status`/`workers`/`config` behave). This section stays
-short and points there, the same way M2's own section points to
-`docs/SESSION_CONTRACT.md`.
+short and points there — the same way M2's own `## Current milestone`
+section (below) is itself a direct instance of that grammar, not a
+separate contract document.
 
 **New manifest shape** (`aido.yaml`, replacing the schema every prior
 milestone used):
@@ -843,63 +849,27 @@ reports `Current milestone: DRAFT` / `Not executable`; `run` refuses
 cleanly (`Error: Current milestone is DRAFT. Not executable.`, exit 1)
 before any provider is touched.
 
-## M2 — Sessions and resume (`SPECIFIED`, not started, unaffected by M1.4)
+## M2 — Sessions and resume (`DRAFT`)
 
-Fully specified: acceptance contract in `M2_SPEC.yaml`, the session
-data model/persistence/concurrency contract in
-`docs/SESSION_CONTRACT.md`, 10 governed WorkItems drafted below
-(portable template: `aido.m2.example.yaml`). Not yet created in any
-orchestrator runtime state; no code has been written. A human GO is
-required before launching this milestone's governed WorkItem Flow,
-exactly like M1's.
+**Simplified after human, point-by-point review of the original M2
+design.** The previous 10-WorkItem design (`M2_SPEC.yaml`,
+`docs/SESSION_CONTRACT.md`, `aido.m2.example.yaml` — a session index,
+an `fcntl.flock()` concurrency contract, a rich interaction-history
+model, six external-audit design-hardening items DR-1 through DR-6) was
+judged over-engineered, and predates the M1.4/M8 changes. Applying
+REUSE FIRST/KISS/YAGNI, M2 now means only: *find a local AIDO context
+and resume a minimal session.* It does **not** yet define an LLM
+conversation — a session's history, and its persistence, belong to M3.
+The user-facing product is now `aido`; `aido-code` stays a compatibility
+alias, never the canonical name in a new spec (M8).
 
-Current, pre-M8 binary name throughout (`docs/CLI_SPEC.md`): every
-command below is `aido-code ...`/`python -m aido_code ...`, never
-`aido ...` (that syntax is post-M8 only).
-
-**SPEC migration debt (noted by M1.4, not resolved by it)**:
-`M2_SPEC.yaml`/`aido.m2.example.yaml` still describe M2 in the
-pre-M1.4 shape (a `ProjectConfig`-style YAML `work_items:`/`qa:` list).
-Their relevant content — the acceptance contract, the 10 WorkItems
-below — must be migrated into `ROADMAP.md`'s own deterministic grammar
-(`docs/PROJECT_CONTRACT.md` §3) before a future GO M2, so this project
-never carries two sources of functional truth at once. That migration
-is real, separate work, not started here, and never a precondition M1.4
-itself needed to satisfy.
-
-Must cover:
-
-- a versioned, persistent session model (`docs/SESSION_CONTRACT.md`);
-- a session index with a deterministic most-recent rule;
-- `aido-code resume`: interactive picker; `aido-code resume
-  <session-id>`: direct resume;
-- `--resume`/`-r`, `--continue`/`-c` CLI aliases; `/resume`/`/new` in
-  the REPL;
-- a session's link to its project (directory/`aido.yaml`), without
-  duplicating `ProjectConfig` or engine state in the SessionStore;
-- strict separation between session/frontend state and engine state:
-  session resume never automatically calls `OrchestratorEngine.run()`,
-  probes/selects a worker, or mutates engine state (see
-  `ARCHITECTURE.md`, "Hard invariant (M2)");
-- resume after this process restarts;
-- concurrency/corruption/error handling, fail-closed;
-- tests entirely offline (`M2_SPEC.yaml`, criterion 17).
-
-**Design hardening (DR-1 through DR-6, external audit 2026-09-23)**:
-resolved directly in `docs/SESSION_CONTRACT.md`/`M2_SPEC.yaml`/
-`aido.m2.example.yaml`, before any governed implementation starts —
-session file as sole source of truth with a rebuildable index and
-atomic (temp-file + `os.replace`) writes (DR-1); a real OS-level lock
-(`fcntl.flock()`, releases automatically on process death, no stale-lock
-cleanup logic) rather than a vague "lock file" (DR-2); `updated_at`
-bumped on successful open/resume, not only on command receipt, ties
-broken by `session_id` (DR-3); `session_id` format validated before any
-disk access, path confinement, symlinks never followed (DR-4); an
-explicit never-stored list (env, credentials, raw provider output) for
-interaction history, distinct from terminal rendering safety (M1.3)
-(DR-5); AIDO Code starts and serves `resume`/`-c`/`/new`/`/help` with no
-project bound, an explicit `UNBOUND` session state (DR-6). See
-`docs/SESSION_CONTRACT.md` for the full contract.
+`M2_SPEC.yaml`, `aido.m2.example.yaml`, and `docs/SESSION_CONTRACT.md`
+are retired. `ROADMAP.md`'s own `## Current milestone` below, in the
+same deterministic grammar `docs/PROJECT_CONTRACT.md` §3 defines, is
+now the single executable contract for M2 — no parallel functional
+source survives it. Not yet created in any orchestrator runtime state;
+no code has been written. A human GO is required before launching this
+milestone's governed WorkItem Flow, exactly like M1's.
 
 ### Runtime transition (mvp-0.1 -> mvp-0.2)
 
@@ -913,31 +883,167 @@ mutation of the prior MVP's historical WorkItem records. `bootstrap()`
 scopes WorkItem lookups by `mvp_id`, and
 `OrchestratorEngine.run()`/`.status()` operate on whatever `mvp.id`
 the currently-loaded `aido.yaml` names, never a separately-tracked
-"current MVP" pointer. This is what makes `aido.m2.example.yaml` safe
-to prepare against this same project.
+"current MVP" pointer. This is what makes a real governed run of the
+milestone below safe to prepare against this same project.
+
+## Current milestone
+
+Status: DRAFT
+
+### ID
+
+m2
+
+### Objective
+
+Add a minimal local session model to AIDO, letting it create, find, and
+resume a user context and its optional project, without duplicating
+ai-dev-orchestrator's own state and without yet introducing M3's
+natural-language conversation.
+
+### Acceptance criteria
+
+- An AIDO session is a minimal frontend state, distinct from any engine state.
+- It may be bound to a project, or to none.
+- It persists across two processes.
+- `aido resume` finds and resumes a session.
+- `aido --continue`/`aido -c` resumes the most recently used one.
+- Creating or resuming a session never starts the orchestrator or a provider.
+- No engine-state data is ever persisted as a source of truth inside a session.
+- M1, M1.1, M1.2, M1.3, M1.4, and M8 stay unregressed.
 
 ### WorkItems
 
-Drafted, portable template only (`aido.m2.example.yaml`); not created
-in any orchestrator runtime state.
+#### WI-M2-01 — Create the minimal session model and persistence
 
-1. **WI-M2-01** — Session model + versioned persistence.
-2. **WI-M2-02** — Session index + deterministic most-recent selection.
-3. **WI-M2-03** — Session-to-project/config binding.
-4. **WI-M2-04** — Direct resume by session id.
-5. **WI-M2-05** — Interactive resume picker.
-6. **WI-M2-06** — `--resume`/`-r` and `--continue`/`-c` CLI aliases.
-7. **WI-M2-07** — REPL `/resume` and `/new`.
-8. **WI-M2-08** — Session/engine isolation (proves resume never calls
-   `.run()`/`.probe_workers()`/selects a worker, and never duplicates
-   engine state as a source of truth).
-9. **WI-M2-09** — Concurrency/corruption/error handling.
-10. **WI-M2-10** — Resume-after-process-restart acceptance.
+Dependencies: none
+Capabilities: development
 
-Full criteria: `aido.m2.example.yaml`. Full contract: `M2_SPEC.yaml`
-and `docs/SESSION_CONTRACT.md`. Real test scenarios to run after this
-milestone is built (not run during preparation):
-`docs/M2_REAL_TEST_PLAN.md`.
+Acceptance criteria:
+
+- Create a minimal Session model containing only: schema_version, session_id, created_at, updated_at, and an optional project_path.
+- session_id is an opaque UUID, stable and unique, with no business meaning.
+- A session created from a project records the normalized absolute path of the project root.
+- A session created outside a project uses project_path = null.
+- A session never persists ProjectConfig, the contents of aido.yaml, ROADMAP.md, resources, or any engine/worker/provider/WorkItem/MVP/ quota/QA-verdict state.
+- Sessions are stored under `$XDG_STATE_HOME/aido/sessions/`, falling back to `~/.local/state/aido/sessions/`.
+- One versioned JSON file per session, `<session_id>.json`.
+- Writes are atomic using the standard library only: a temp file in the same directory, flush, `os.fsync`, `os.replace`.
+- No external dependency is added for this persistence.
+- A save followed by a read reproduces the session's persisted state.
+- Invalid JSON or an unsupported schema version produces a controlled error, never a raw traceback.
+- Tests use only temporary directories.
+
+#### WI-M2-02 — Manage the session lifecycle
+
+Dependencies: WI-M2-01
+Capabilities: development
+
+Acceptance criteria:
+
+- One single SessionStore layer owns creation, loading, saving, listing, and finding the most recent session.
+- Listing scans `<session_id>.json` files directly.
+- No index, cache, SQLite, or session database is created in M2.
+- The most recent session is chosen by updated_at.
+- On a tie, session_id breaks it deterministically.
+- updated_at is refreshed on creation and on a successful resume.
+- A user-supplied session id's format is validated before looking up its file.
+- An invalid id format produces an explicit error.
+- A nonexistent session produces an explicit error and is never implicitly created.
+- Files that do not match the expected session filename shape are ignored during listing.
+- A corrupted session is never silently deleted or repaired.
+- Tests cover creation, loading, listing, latest, timestamp ties, invalid id, and nonexistent session.
+
+#### WI-M2-03 — Restore the session project binding
+
+Dependencies: WI-M2-01
+Capabilities: development
+
+Acceptance criteria:
+
+- A session may hold a project_path, or project_path = null.
+- On resume, that path is restored as the project context.
+- Reuse the existing M1.4 project-context-loading mechanism.
+- No second parser for aido.yaml, ROADMAP.md, or resources is created.
+- Project files are re-read from their current state whenever needed.
+- A session is never a configuration cache.
+- If project_path has disappeared, the session itself stays resumable.
+- A command that needs the unavailable project then produces an explicit, controlled error.
+- If the directory still exists but is no longer a valid AIDO project, a project-requiring command fails cleanly.
+- AIDO never automatically searches elsewhere for a moved project and never guesses a replacement.
+- project_path = null is a valid, sufficient state; no unneeded BOUND/UNBOUND state machine is introduced.
+- Tests cover a valid project, no project, a deleted project, and a project that has become invalid.
+
+#### WI-M2-04 — Add session creation and resume commands
+
+Dependencies: WI-M2-02, WI-M2-03
+Capabilities: development
+
+Acceptance criteria:
+
+- Add `aido resume <session-id>` to resume a specific session.
+- Add `aido resume` to show a simple interactive picker over existing sessions.
+- The picker is plain text; no TUI dependency is added.
+- The picker shows at least session_id, updated_at, and project_path when present.
+- Sessions are listed by descending updated_at.
+- If no session exists, `aido resume` exits cleanly with an explicit message.
+- Add `aido --continue` and `aido -c` to resume the most recently used session.
+- If no session exists, --continue/-c fails cleanly without creating one.
+- Add `/resume` in the REPL, reusing the same picker and resume path.
+- Add `/new` in the REPL to create a new session, bound to the active project if any, else with project_path = null.
+- `/resume` and `/new` switch the active session without modifying or deleting the prior one.
+- Every variant uses the same SessionStore and the same central resume implementation.
+- A successful resume refreshes updated_at.
+- No creation/resume path ever calls OrchestratorEngine.run(), probe_workers(), WorkerSelector, or a provider.
+- Do NOT add `--resume` or `-r` in M2: `resume <session-id>` already provides that capability.
+- Existing M1/M1.4/M8 commands keep working against the active session.
+
+#### WI-M2-05 — Validate session behavior and AIDO regression
+
+Dependencies: WI-M2-04
+Capabilities: development
+
+Acceptance criteria:
+
+- A session created in one process can be resumed in a new process, solely from its persisted file.
+- After resume, session_id, created_at, and project_path stay correct, and updated_at reflects the resume.
+- A session with no project can be created, exited, and resumed.
+- A session whose project has disappeared or become invalid stays resumable; only commands that need that project fail explicitly.
+- Prove that `resume <id>`, `resume`, `--continue`, `-c`, `/resume`, and `/new` never trigger OrchestratorEngine.run(), probe_workers(), a worker selection, or a provider call.
+- A session never persists a WorkItem, MVP, ExecutionRecord, QA verdict, quota, worker, provider, or merge state as a source of truth.
+- Any query of project state after resume uses the current project context and engine, never a copy stored in the session.
+- Cover the essential errors: nonexistent session, invalid session id, invalid JSON, unsupported schema_version, missing project_path.
+- Do not add automatic repair of a corrupted session.
+- Do not add a session index, cache, database, or multi-process locking.
+- All tests are offline and use temporary directories.
+- The full `pytest -q` suite passes with no regression.
+- M1, M1.1, M1.2, M1.3, M1.4, and M8's own delivered functionality stays working.
+
+### QA
+
+#### QA-M2-01 — Full test suite
+
+Kind: unit_test
+Required: true
+Timeout: 300
+Argv: ["pytest", "-q"]
+
+### Out of scope
+
+- conversation history;
+- persistence of an LLM conversation;
+- natural-language interpretation, reserved for M3;
+- a session index/cache;
+- SQLite or another session database;
+- multi-process locking / fcntl.flock;
+- SIGKILL/stale-lock handling;
+- background sessions;
+- a session broker/server;
+- cross-machine coordination;
+- display-metadata persistence;
+- `--resume`/`-r`;
+- any engine-state mutation during a resume;
+- M3 and beyond.
 
 ## M3 — Natural-language piloting
 
