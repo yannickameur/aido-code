@@ -187,26 +187,11 @@ class TestUnrecognizedCommand:
         assert "Unknown command" not in transcript
 
 
-class TestNoProjectLevelResumeCommand:
-    """M1.1 adds no project-level `/resume` command, and M2's own
-    session-level `/resume`/`/new` remain entirely unimplemented and
-    unaffected by this milestone: `/run` alone is still how a project
-    starts/resumes (see M1_1_SPEC.yaml)."""
-
-    def test_slash_resume_is_not_a_recognized_command(self) -> None:
-        transcript = _run("/resume\n/exit\n")
-        assert "Unknown command: '/resume'" in transcript
-        assert "Traceback" not in transcript
-
-    def test_slash_new_is_not_a_recognized_command(self) -> None:
-        transcript = _run("/new\n/exit\n")
-        assert "Unknown command: '/new'" in transcript
-        assert "Traceback" not in transcript
-
-    def test_help_never_advertises_resume_or_new(self) -> None:
+class TestSessionHelp:
+    def test_help_advertises_resume_and_new(self) -> None:
         transcript = _run("/help\n/exit\n")
-        assert "/resume" not in transcript
-        assert "/new" not in transcript
+        assert "/resume" in transcript
+        assert "/new" in transcript
 
 
 class TestEntryPoints:
@@ -238,16 +223,18 @@ class TestEntryPoints:
         assert "Unknown command: '/bogus'" in result.stdout
         assert "Traceback" not in result.stderr
 
-    def test_python_dash_m_aido_code_reports_missing_config_cleanly(self, tmp_path: Path) -> None:
+    def test_python_dash_m_aido_code_starts_unbound_without_config(self, tmp_path: Path) -> None:
         result = subprocess.run(
             [sys.executable, "-m", "aido_code"],
+            input="/validate\n/exit\n",
             cwd=tmp_path,
             capture_output=True,
             text=True,
             timeout=10,
+            env={**os.environ, "XDG_STATE_HOME": str(tmp_path / "state")},
         )
-        assert result.returncode == 1
-        assert "Error:" in result.stderr
+        assert result.returncode == 0
+        assert "no project bound" in result.stdout
         assert "Traceback" not in result.stderr
 
 

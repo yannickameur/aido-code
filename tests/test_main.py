@@ -6,8 +6,8 @@ to it correctly).
 An unrecognized CLI launch argument (flag or positional) is rejected
 with a clear message and a standard non-zero exit code, never silently
 ignored and never a traceback. A normal, no-argument launch is
-unchanged. No M2 flag (--resume/-r/--continue/-c) is implemented or
-recognized here (see docs/CLI_SPEC.md, ROADMAP.md "M1.3").
+now creates a frontend session. M2 adds resume and continue; --resume/-r
+remain unsupported (see docs/CLI_SPEC.md, ROADMAP.md "M2").
 
 Offline only: project-command loading/repl.run()/run_init() are stubbed so
 no real project/provider/Ralph/filesystem call happens anywhere in this

@@ -1,10 +1,8 @@
 """Minimal REPL loop for AIDO Code.
 
 WI-06 scope: `/help`, `/exit`, `/status`, `/config`, `/validate`,
-`/workers`, `/run`, and a clear message (never a traceback) for anything
-unrecognized or for any engine/config error. `/run` is also how a
-project resumes: there is no separate resume command in this MVP; see
-docs/CLI_SPEC.md and docs/ENGINE_CONTRACT.md ("`.run()` is also resume").
+`/workers`, `/run`, and a clear message for unknown commands. `/run`
+advances project work; `/resume` switches frontend sessions.
 
 WI-M1.1-03 extends `/status`/`/workers` with an explicit `--probe`
 opt-in (see docs/CLI_SPEC.md, "M1.1"): `/status` (no flags) now also
@@ -37,6 +35,7 @@ and nothing about work items is fabricated to fill the gap."""
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import TextIO
 
 from aido_code.engine_client import (
@@ -53,7 +52,8 @@ from aido_code.project_command import ProjectCommandContext, load_project_comman
 from aido_code.project_manifest import ProjectManifestError
 from aido_code.project_resources import ProjectResourcesError
 from aido_code.roadmap import CurrentMilestone, RoadmapError
-from aido_code.session import Session, SessionProjectError, project_manifest_path
+from aido_code.session import Session, SessionError, SessionProjectError, SessionStore, project_manifest_path
+from aido_code.session_commands import pick_session, resume_selected
 from orchestrator.worker_registry import WorkerRegistryError
 
 COMMANDS: dict[str, str] = {
@@ -65,6 +65,8 @@ COMMANDS: dict[str, str] = {
     "/config": "Show the loaded aido.yaml's validated configuration.",
     "/validate": "Validate aido.yaml and its worker registry.",
     "/run": "Start or resume the project (drives the engine to completion or WAITING).",
+    "/resume": "Choose an existing session.",
+    "/new": "Create and switch to a new session.",
     "/exit": "Exit the REPL.",
 }
 
@@ -479,6 +481,7 @@ def run(
     prompt: str = "aido> ",
     config_path: str = DEFAULT_CONFIG_PATH,
     session: Session | None = None,
+    session_store: SessionStore | None = None,
     provider_adapters: dict[str, object] | None = None,
     subprocess_runner: object | None = None,
 ) -> None:
@@ -489,6 +492,7 @@ def run(
     the shared M1.4 project loader. ``provider_adapters`` and
     ``subprocess_runner`` are test seams for engine construction.
     """
+    store = session_store if session_store is not None else SessionStore()
     while True:
         output_stream.write(prompt)
         output_stream.flush()
@@ -505,6 +509,25 @@ def run(
             return
         if name == "/help" and not flags:
             output_stream.write(format_help() + "\n")
+            continue
+        if command == "/resume":
+            try:
+                session_id = pick_session(store, input_stream, output_stream)
+                if session_id is not None:
+                    session = resume_selected(store, session_id)
+                    output_stream.write(f"Resumed session {session.session_id}\n")
+            except (SessionError, OSError, ValueError) as exc:
+                output_stream.write(f"Error: {exc}\n")
+            continue
+        if command == "/new":
+            project_path = session.project_path if session is not None else (
+                str(Path(config_path).resolve().parent) if Path(config_path).is_file() else None
+            )
+            try:
+                session = store.create(project_path)
+                output_stream.write(f"Created session {session.session_id}\n")
+            except (SessionError, OSError, ValueError) as exc:
+                output_stream.write(f"Error: {exc}\n")
             continue
         needs_project = (
             (name in ("/status", "/workers") and flags in ([], ["--probe"]))
