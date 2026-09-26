@@ -18,7 +18,11 @@ def pick_session(store: SessionStore, input_stream: TextIO, output_stream: TextI
         output_stream.write(f"  {number}. {session.session_id}  {session.updated_at}  {project}\n")
     output_stream.write("Select a session number (blank to cancel): ")
     output_stream.flush()
-    choice = input_stream.readline().strip()
+    try:
+        choice = input_stream.readline().strip()
+    except KeyboardInterrupt:
+        output_stream.write("\nSession selection cancelled.\n")
+        return None
     if not choice:
         output_stream.write("Session selection cancelled.\n")
         return None
