@@ -888,7 +888,7 @@ milestone below safe to prepare against this same project.
 
 ## Current milestone
 
-Status: DRAFT
+Status: APPROVED
 
 ### ID
 
