@@ -131,16 +131,29 @@ intent. Full M2 acceptance criteria: `ROADMAP.md`, M2.
 
 `OrchestratorEngine.run()` returns `RunResult.events` (`EngineEvent`
 tuples: `kind`/`timestamp`/`project_id`/`mvp_id`/`work_item_id`/
-`payload`). Today this is coarse: one `work_item.<status>` event per
-WorkItem processed, emitted only once that WorkItem's whole DEV A/DEV
-B/QA/merge sequence has already finished, because that is the
-granularity the orchestrator itself currently exposes (`MVPManager`
-runs DEV A/DEV B/QA/merge synchronously within one call, with no
-internal event bus yet). Its `ExecutionSnapshot` also does not expose
-`backend`/`model`/execution-profile/quality-tier/`reasoning_effort` —
-facts already recorded internally by the engine, simply not surfaced
-through this façade yet. A richer, per-step live timeline (M3, folded
-in from the former M7) depends on that engine-side instrumentation
-landing first; this project must never fabricate finer-grained
-progress, or a model/profile it was not actually told, by guessing or
-by parsing subprocess/Git/SQLite output.
+`payload`, plus optional metadata fields, see below) — coarse: one
+`work_item.<status>` event per WorkItem processed, emitted only once
+that WorkItem's whole DEV A/DEV B/QA/merge sequence has already
+finished. This is unchanged by P18 on purpose: `RunResult` itself stays
+exactly as before, so `on_event=None` (the default) preserves today's
+exact behavior.
+
+Since `ai-dev-orchestrator` P18 (`DONE`, commit `23e68b7`, confirmed
+present in the sibling engine this project's `.venv` actually imports —
+see `docs/ENGINE_CONTRACT.md`), `OrchestratorEngine.run()` also accepts
+an optional `on_event: Callable[[EngineEvent], None]` callback,
+delivered synchronously in the same thread, live, once per real
+progress fact, never batched/reordered: finer `dev_a.*`/`dev_b.*`/
+`dev_fix.*`/`qa.*`/`git.*`/`run.*` kinds, each optionally carrying
+`execution_id`/`phase`/`status`/`worker_id`/`worker_display_name`/
+`provider`/`backend`/`profile_id`/`model`/`quality_tier`/
+`reasoning_effort`/`commit_sha` — exactly what the engine actually
+decided, `None` when genuinely unknown, never guessed from `worker_id`.
+This project does not yet consume `on_event` anywhere
+(`aido_code.engine_client.EngineClient.run()` still calls
+`self._engine.run(max_cycles=max_cycles)` with no callback) — wiring a
+richer, per-step live timeline is M3's own unbuilt work
+(`ROADMAP.md`, M3, `WI-M3-01`/`WI-M3-02`), no longer blocked by a
+missing engine capability. This project must never fabricate
+finer-grained progress, or a model/profile it was not actually told, by
+guessing or by parsing subprocess/Git/SQLite output.

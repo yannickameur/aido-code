@@ -1014,24 +1014,28 @@ explicit, clean `Ctrl+C` handling during a real `aido run`, reusing the
 engine's own existing durable recovery state (`RECOVERY_REQUIRED`)
 rather than a new AIDO-side recovery mechanism.
 
-Real-time visibility (2) and clean interruption (3) both depend on
-engine-side capabilities that do not exist publicly yet, verified by
-direct inspection of `ai-dev-orchestrator`'s own `src/orchestrator/
-engine.py` on 2026-09-26: `OrchestratorEngine.run()` only returns one
-coarse `work_item.<status>` event per WorkItem, emitted only after that
-WorkItem's whole DEV A/DEV B/QA/merge sequence has already finished
-(`EngineEvent`'s own docstring documents this as a known, unfilled
-gap); its public `ExecutionSnapshot` does not expose `backend`/
-`model`/execution-profile/quality-tier/`reasoning_effort` (all already
-recorded internally on `ExecutionRecord`, simply not surfaced through
-the façade); and nothing in the engine catches `KeyboardInterrupt`
-explicitly anywhere. These are real, separate, engine-side
-prerequisites — tracked as a new proposal in `ai-dev-orchestrator`'s
-own `ROADMAP.md` — not something this milestone works around by
-observing Git/SQLite/stdout instead. This milestone therefore stays
-`Status: DRAFT`: it documents the frontend-side contract this project
-will build once that engine capability ships, and is not executable
-(`run`) until then.
+Real-time visibility (2) and clean interruption (3) depended on
+engine-side capabilities that did not exist publicly as of 2026-09-26
+(verified then by direct inspection of `ai-dev-orchestrator`'s own
+`src/orchestrator/engine.py`). **That engine-side prerequisite is now
+`DONE`**: `ai-dev-orchestrator` P18 (live execution events and graceful
+interruption) landed on `main` at commit `23e68b7`, confirmed present
+in the sibling engine this project's `.venv` actually imports (editable
+install, verified 2026-09-28 — see `docs/ENGINE_CONTRACT.md`).
+`OrchestratorEngine.run()` now accepts an optional `on_event` callback
+delivering fine-grained `EngineEvent`s (`dev_a.*`/`dev_b.*`/
+`dev_fix.*`/`qa.*`/`git.*`/`run.*` kinds, live, as they happen) carrying
+`worker_id`/`worker_display_name`/`provider`/`backend`/`profile_id`/
+`model`/`quality_tier`/`reasoning_effort`/`commit_sha`; `RunResult.events`
+itself stays the original coarse `work_item.<status>` tuple, unchanged,
+so `on_event=None` preserves today's exact behavior. The engine's own
+durable recovery (`RecoveryCoordinator`) was extended (never a second
+mechanism) to also reconcile an interrupted/orphaned QA run via the
+existing `QARunStore`. This milestone therefore stays `Status: DRAFT`
+regardless — the frontend-side contract below (WorkItems) is not yet
+built in this project — but it is no longer blocked by a missing engine
+capability; see `docs/ENGINE_CONTRACT.md` for the exact surface this
+project consumes.
 
 ### Acceptance criteria
 
@@ -1045,7 +1049,7 @@ will build once that engine capability ships, and is not executable
 - `aido resume`/`/resume` continues to mean session resume only (M2), never a substitute for engine-level run recovery.
 - Any conversational session persistence reuses the M2 session model; no second session/history store.
 - This milestone stays minimal: no long-term memory, no RAG, no vector database.
-- The engine-side prerequisites above are tracked separately in `ai-dev-orchestrator`'s own `ROADMAP.md`; this milestone cannot be executed (`run`) until they exist and this document is revisited.
+- The engine-side prerequisites above are `DONE` (`ai-dev-orchestrator` P18, commit `23e68b7`) — this milestone's own WorkItems below are what remains to be built in this project; `Status` stays `DRAFT` until they are.
 - All existing tests stay green; the full suite stays offline (no real Claude/Codex/Vibe/DeepSeek/Kimi call from any M3 test).
 - `git diff --check` stays clean.
 
@@ -1061,8 +1065,8 @@ Acceptance criteria:
 - Renders WorkItem/DEV A/DEV B/DEV FIX/QA/Git transitions as they are emitted by a public `OrchestratorEngine` progress API (callback, iterator, or event sink — the exact shape is an engine-side decision, see `docs/ENGINE_CONTRACT.md`), never by parsing stdout/Git/SQLite.
 - For every DEV A/DEV B/DEV FIX execution, renders worker, provider, backend, execution profile id, model, quality tier, and reasoning effort when the engine actually exposes one for that execution — rendered exactly as decided by the engine, never guessed from `worker_id`.
 - Renders QA phase transitions (started, PASS/FAIL/INCONCLUSIVE) and Git transitions (merge-ready, merge completed, tag/final SHA when available).
-- Falls back to today's single end-of-run summary, unregressed, when the engine capability this depends on is not yet available.
-- Not executable until the engine-side prerequisite (see Objective) lands.
+- Falls back to today's single end-of-run summary, unregressed, if `on_event` is ever omitted/unavailable.
+- The engine-side prerequisite (see Objective) is `DONE` (P18); this WorkItem's own implementation in this project is what remains.
 - Offline tests use fake/scripted engine progress events; zero real provider/Ralph calls.
 
 #### WI-M3-02 — Handle graceful run interruption and expose recovery/resume UX
@@ -1077,7 +1081,7 @@ Acceptance criteria:
 - The timeline (WI-M3-01) renders the interruption and the next run's recovery, when the underlying engine events exist.
 - The next `aido run` against the same project resumes the governed workflow exactly as the engine's own existing recovery mechanism already dictates — no new AIDO-side recovery logic.
 - `aido resume`/`/resume` (M2) is unchanged: session resume only, never a run-recovery substitute.
-- Not executable until the engine-side prerequisite (explicit interrupt handling/event, see Objective) lands.
+- The engine-side prerequisite (explicit interrupt handling/event, see Objective) is `DONE` (P18); this WorkItem's own implementation in this project is what remains.
 - Offline tests simulate a `KeyboardInterrupt` mid-`run()` via the existing fake provider/subprocess seams; zero real provider calls.
 
 #### WI-M3-03 — Add a minimal natural-language intent/piloting layer
@@ -1128,7 +1132,7 @@ Argv: ["pytest", "-q"]
 - reconstructing the timeline by scraping Git, SQLite, or stdout.
 - a general REPL rewrite.
 - plugins/MCP/hooks without a demonstrated need.
-- executing this milestone (`aido run`) before the engine-side prerequisite documented in the Objective is `DONE`.
+- executing this milestone (`aido run`) before this milestone's own WorkItems above are actually built and `Status` moves past `DRAFT` — the engine-side prerequisite itself is `DONE` (P18), but that alone does not make this milestone's own unbuilt frontend code executable.
 
 ## M4 — Non-interactive mode
 

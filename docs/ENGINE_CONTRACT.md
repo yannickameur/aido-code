@@ -158,43 +158,58 @@ live Store, SQLite connection, or any dataclass from
 - **`ProjectStatusSnapshot`**: `initialized`, `project_id`,
   `project_name`, `mvp` (`MVPStatusSnapshot | None`), `work_items`
   (`tuple[WorkItemSnapshot, ...]`).
-- **`EngineEvent`**: `kind` (currently `"work_item.<status>"` only),
+- **`EngineEvent`** (P18, `DONE`): `kind` — either the original coarse
+  `"work_item.<status>"` (still the only thing `RunResult.events` ever
+  contains) or, delivered live via `on_event` only (see below), a finer
+  `"dev_a.<status>"`/`"dev_b.<status>"`/`"dev_fix.<status>"`/
+  `"qa.<status>"`/`"git.<status>"`/`"run.<status>"` value — plus
   `timestamp`, `project_id`, `mvp_id`, `work_item_id`, `payload` (a
-  plain `dict`). See "Events" in `ARCHITECTURE.md` for the current
-  granularity limit.
+  plain `dict`), and optional metadata (`None` when genuinely unknown,
+  never fabricated/guessed from `worker_id`): `execution_id`, `phase`,
+  `status`, `worker_id`, `worker_display_name`, `provider`, `backend`,
+  `profile_id`, `model`, `quality_tier`, `reasoning_effort`,
+  `commit_sha`. See "Events" in `ARCHITECTURE.md`.
 - **`RunResult`**: `cycles_run`, `all_terminal`, `reached_max_cycles`,
   `work_items` (`tuple[WorkItemSnapshot, ...]`), `events`
-  (`tuple[EngineEvent, ...]`).
+  (`tuple[EngineEvent, ...]`) — unchanged by P18: always the coarse
+  per-WorkItem tuple, regardless of whether `on_event` is used.
+
+## Live events and graceful interruption (P18, `DONE`)
+
+Confirmed by direct introspection of the sibling engine this project's
+own `.venv` actually imports (editable install of
+`~/projects/ai-dev-orchestrator`, `main` at commit `23e68b7`,
+2026-09-28):
+
+- `OrchestratorEngine.run(*, max_cycles=..., on_event=None)` — an
+  optional `on_event: Callable[[EngineEvent], None]` callback, called
+  synchronously in the same thread, once per real live progress fact,
+  in the exact order those facts occur, never batched/reordered/from a
+  separate thread. Omitting it (the default) leaves every behavior,
+  including `RunResult`, exactly as before P18 — this is a pure
+  addition, never a breaking change to this contract's existing
+  surface. An exception raised by `on_event` itself propagates
+  immediately to `.run()`'s own caller, never swallowed.
+- Graceful interruption: a `Ctrl+C`/`asyncio.CancelledError` during
+  `.run()` is now handled explicitly inside the engine (POSIX
+  process-group cleanup for Ralph and QA subprocess trees; no orphaned
+  OS processes). `RecoveryCoordinator` was **extended** (never a second
+  recovery mechanism) to also reconcile an interrupted/orphaned QA run
+  (via the engine's own existing `QARunStore`), not just an interrupted
+  DEV execution as before — the next `.run()` call resumes exactly
+  where it left off (QA-only resume when DEV already succeeded; DEV is
+  never replayed).
+
+**Not yet true of this project's own code**: `EngineClient.run()`
+(`src/aido_code/engine_client.py`) still calls
+`self._engine.run(max_cycles=max_cycles)` with no `on_event` — wiring a
+live timeline and interruption UX on top of this now-available engine
+capability is M3's own unbuilt work (`ROADMAP.md`, M3, `WI-M3-01`/
+`WI-M3-02`), never something to build by parsing subprocess/Git/SQLite
+output instead of this contract.
 
 ## What this contract does not give AIDO Code (yet)
 
-- A per-sub-step event feed (DEV A running, DEV B completed, QA
-  running, merge completed, ...). Only a coarse per-WorkItem event
-  exists today, emitted only after that WorkItem's whole DEV A/DEV
-  B/QA/merge sequence has already finished. This blocks M3's live
-  timeline (`ROADMAP.md`, M3).
-- `ExecutionSnapshot.backend`/`.model`/an execution-profile id/quality
-  tier/`reasoning_effort`. These facts already exist internally on the
-  engine's own `ExecutionRecord` (`backend`/`model`/`reasoning_effort`)
-  and, when adaptive execution selects a profile, on a separate
-  `AdaptiveExecutionDecision` audit record (`profile_id`/
-  `quality_tier`) — neither is surfaced through this façade today. This
-  also blocks M3's live timeline, which must render exactly what the
-  engine decided, never a value guessed from `worker_id`.
-- Explicit `KeyboardInterrupt` handling anywhere in the engine. A
-  `Ctrl+C` during `.run()` propagates as a raw exception; nothing
-  converts it into a clean, typed outcome or event. This blocks M3's
-  graceful run-interruption behavior (`ROADMAP.md`, M3) — though the
-  engine's existing durable recovery state (`RECOVERY_REQUIRED`,
-  `RecoveryCoordinator`) already reconciles an orphaned `RUNNING`
-  execution on the next call, and M3 is expected to reuse that
-  unchanged, never build a second recovery mechanism.
-- Push/streaming updates. `.run()` is a single blocking call that
-  drives up to `max_cycles` WorkItems and returns; AIDO Code polls by
-  calling it again, or drives its own loop around repeated `.status()`
-  calls for a read-only view while a separate `.run()` is in flight
-  elsewhere.
-- Cancellation of an in-flight `.run()`.
 - A public `.init()` method. This contract's methods today are exactly
   `.validate()`/`.status()`/`.workers()`/`.probe_workers()`/`.run()`/
   `.close()` — there is no engine-level equivalent of the
@@ -203,9 +218,17 @@ live Store, SQLite connection, or any dataclass from
   own logic (`aido_code.project_init`), never a call into the engine —
   see `ROADMAP.md`, M8. AIDO Code must still never import
   `orchestrator.cli`'s private helpers to work around this gap.
+- Push/streaming updates over a socket/RPC boundary. `.run()` remains a
+  single blocking Python call (with the new optional in-process
+  `on_event` callback above); AIDO Code polls by calling it again, or
+  drives its own loop around repeated `.status()` calls for a read-only
+  view while a separate `.run()` is in flight elsewhere.
 
-None of these are invented here. They are real, future orchestrator-side
-work; the live-timeline/execution-detail/interrupt gaps above are
-tracked as a new proposal in `ai-dev-orchestrator`'s own `ROADMAP.md`
-(status: proposed, not yet implemented as of 2026-09-26), not something
-AIDO Code should work around by reaching past this contract.
+None of these are invented here. They are real, still-open
+orchestrator-side gaps; AIDO Code must never work around them by
+reaching past this contract (parsing stdout/Git/SQLite, guessing a
+value). The live-timeline/execution-detail/interrupt gaps that used to
+be listed here were the engine-side prerequisite for M3 — they are
+resolved (`ai-dev-orchestrator` P18, `DONE`, commit `23e68b7`); only
+this project's own consumption of that capability (M3's WorkItems)
+remains unbuilt.
