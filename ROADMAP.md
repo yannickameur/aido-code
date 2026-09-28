@@ -12,7 +12,7 @@ there. This roadmap starts at M1.
 ## Where we stand
 
 DONE: M1, M1.1, M1.2, M1.3, M1.4, M8, M2, M2.1
-CURRENT: M2.2 — DRAFT
+CURRENT: M2.2 — APPROVED
 QUEUED: M3 — APPROVED (paused behind M2.2, resumes as `## Current milestone` once M2.2 reaches `DONE`)
 FUTURE: M4-M6, M9+
 
@@ -47,7 +47,7 @@ still `Status: APPROVED`) until M2.2 reaches `DONE`. See M2.2 below.
 | M1.4 — Autonomous AIDO project contract | `DONE` (see `docs/PROJECT_CONTRACT.md`; real WI-M1.4-07 failure + recovery split, see M1.4 below) |
 | M2 — Sessions and resume | `DONE` (real governed run: 5/5 WorkItems `completed`; see M2 below) |
 | M2.1 — Graceful interactive interruption | `DONE` (real governed run: 1/1 WorkItem `completed`; see M2.1 below) |
-| M2.2 — CLI-level `aido status` parity fix | `DRAFT` — governed by this file's own `## Current milestone` below; inserted ahead of M3 (2026-09-28) |
+| M2.2 — CLI-level `aido status` parity fix | `APPROVED` (human GO 2026-09-28) — governed by this file's own `## Current milestone` below; inserted ahead of M3 (2026-09-28) |
 | M3 — Conversational piloting and live execution | `APPROVED` (human GO 2026-09-28; engine prerequisite `ai-dev-orchestrator` P18 `DONE`) — **queued behind M2.2**, see `## M3 — ...` below (absorbs former M7) |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
@@ -995,7 +995,7 @@ was made by any human/assistant at any point.
 
 ## Current milestone
 
-Status: DRAFT
+Status: APPROVED
 
 ### ID
 
@@ -1009,15 +1009,17 @@ delivered (`docs/CLI_SPEC.md`, "M1.4 — Autonomous AIDO project
 contract"; `ROADMAP.md`, M8) but never actually wired:
 `aido_code.__main__` never exposed a `status` subcommand — only the
 REPL's `/status` existed. A hand-authored fix for this exact gap
-already exists, is fully tested, and was pushed for review as a
-not-yet-merged PR (`add-cli-status` branch, PR #4,
-`github.com/yannickameur/aido-code`) — but never merged directly:
-`CONTRIBUTING.md`'s own absolute rule ("no functional AIDO Code code
-lands on `main` except through that governed flow") applies here
-without exception, however small or however clearly-specified the fix
-already is. This milestone exists so the governed `aido run` flow
-builds that exact same, already-specified fix properly, rather than
-merging the unreviewed direct commit.
+already exists, is fully tested, and was pushed as a not-yet-merged PR
+(`add-cli-status` branch, PR #4, `github.com/yannickameur/aido-code`)
+— but never merged: it is a hand-authored direct commit outside the
+governed flow, already reviewed and already tested, yet still not
+compliant with `CONTRIBUTING.md`'s own absolute rule ("no functional
+AIDO Code code lands on `main` except through that governed flow"),
+which applies here without exception regardless of review/test status
+or however small or however clearly-specified the fix already is. This
+milestone exists so the governed `aido run` flow builds that exact
+same, already-specified fix properly, rather than merging that
+hand-authored direct commit.
 
 Deliberately **not** folded into M3's own scope: this is a leftover
 M1.4/M8 parity gap, unrelated to M3's conversational-piloting/live-
@@ -1034,7 +1036,7 @@ back into `## Current milestone` once M2.2 reaches `DONE`.
 - `aido status` works from a valid AIDO project.
 - It triggers zero provider calls.
 - Its output carries exactly the same information as `/status` — the same underlying rendering path, never a second implementation — proven by an explicit output-*identity* test (not merely an overlapping-content one).
-- `aido status --probe` is supported, with the exact same semantics as `/status --probe` (one real `probe_workers()` call), if and only if `/status --probe` itself still is.
+- `aido status --probe` is supported with the exact same semantics as `/status --probe`: exactly one `probe_workers()` call.
 - No existing command's behavior changes: `init`/`validate`/`run`/`resume`/`--continue` (CLI-level) and `/help`/`/status`/`/workers`/`/config`/`/validate`/`/run`/`/resume`/`/new`/`/exit` (REPL) all stay unregressed.
 - An explicit non-regression test exercises `aido status` end to end, offline, against a real M1.4-shaped project.
 - `README.md`, `docs/CLI_SPEC.md`, and `ROADMAP.md` stay consistent with the delivered behavior — no stale claim that `status` parity is still missing, and no stale claim that it was already delivered before this milestone actually lands.
@@ -1071,6 +1073,9 @@ Argv: ["pytest", "-q"]
 - any change to `/status`'s/`/workers`'s/`/config`'s own already-`IMPLEMENTED` behavior beyond exposing the same information at the CLI level.
 - `-p "<request>"` non-interactive mode (M4), structured output (M5), `doctor` (M6) — unrelated, unaffected.
 - merging PR #4 as-is: this milestone's own governed run is what lands on `main`, never that direct commit.
+- cherry-picking or otherwise copying PR #4's own commit into `main` by any means other than the governed flow producing its own, independent commit.
+- PR #4 stays open only as a historical/behavioral reference (what the fix looks like, what tests it needs) while this milestone is in flight — it is never merged, under any circumstance.
+- once WI-M2.2-01 is delivered on `main` by the governed flow, PR #4 is closed without merging it.
 
 ## M3 — Conversational piloting and live execution (`APPROVED`, queued behind M2.2)
 
