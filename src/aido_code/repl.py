@@ -366,6 +366,36 @@ def _open_project_command_engine(
     return context, client
 
 
+def build_status_output(
+    config_path: str,
+    *,
+    probe: bool = False,
+    provider_adapters: dict[str, object] | None = None,
+    subprocess_runner: object | None = None,
+) -> str:
+    """The one `/status` rendering path — also called directly by the
+    CLI-level `aido status` (`aido_code.__main__`), never a second
+    implementation. Raises `_PROJECT_COMMAND_ERRORS` on a missing/invalid
+    project rather than swallowing them: `_run_status()` below is the
+    REPL's own thin wrapper that turns those into an inline error
+    string; the CLI subcommand turns them into an `Error: ...` on
+    stderr plus a non-zero exit instead."""
+    context, client = _open_project_command_engine(
+        config_path, provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
+    )
+    with client:
+        snapshot = client.status()
+        workers = client.workers()
+        providers = client.probe_workers() if probe else None
+    return "\n\n".join(
+        [
+            format_status(context.roadmap.milestone, snapshot),
+            "workers:",
+            _format_workers_section(workers, providers),
+        ]
+    )
+
+
 def _run_status(
     config_path: str,
     *,
@@ -374,22 +404,14 @@ def _run_status(
     subprocess_runner: object | None = None,
 ) -> str:
     try:
-        context, client = _open_project_command_engine(
-            config_path, provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
+        return build_status_output(
+            config_path,
+            probe=probe,
+            provider_adapters=provider_adapters,
+            subprocess_runner=subprocess_runner,
         )
-        with client:
-            snapshot = client.status()
-            workers = client.workers()
-            providers = client.probe_workers() if probe else None
     except _PROJECT_COMMAND_ERRORS as exc:
         return f"Error: {exc}"
-    return "\n\n".join(
-        [
-            format_status(context.roadmap.milestone, snapshot),
-            "workers:",
-            _format_workers_section(workers, providers),
-        ]
-    )
 
 
 def _run_config(config_path: str) -> str:

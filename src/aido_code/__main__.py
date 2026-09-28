@@ -12,7 +12,7 @@ from aido_code.project_init import run_init
 from aido_code.project_manifest import ProjectManifestError
 from aido_code.project_resources import ProjectResourcesError
 from aido_code.roadmap import RoadmapError
-from aido_code.repl import format_run, run
+from aido_code.repl import build_status_output, format_run, run
 from aido_code.session import SessionError, SessionStore
 from aido_code.session_commands import pick_session, resume_selected
 from orchestrator.worker_registry import WorkerRegistryError
@@ -32,6 +32,16 @@ def _project_command(command: str) -> int:
         plan = build_engine_plan(context.manifest, context.roadmap, context.resources)
         with EngineClient.from_config(plan, worker_registry=context.worker_registry) as client:
             print(format_run(client.run()))
+        return 0
+    except (ProjectManifestError, RoadmapError, ProjectResourcesError,
+            WorkerRegistryError, EnginePlanError, EngineError, OSError, ValueError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+
+def _status_command(*, probe: bool) -> int:
+    try:
+        print(build_status_output("aido.yaml", probe=probe))
         return 0
     except (ProjectManifestError, RoadmapError, ProjectResourcesError,
             WorkerRegistryError, EnginePlanError, EngineError, OSError, ValueError) as exc:
@@ -68,6 +78,14 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         return _project_command(argv[0])
 
+    if argv and argv[0] == "status":
+        if len(argv) == 1:
+            return _status_command(probe=False)
+        if len(argv) == 2 and argv[1] == "--probe":
+            return _status_command(probe=True)
+        print(f"Error: usage: {prog} status [--probe]", file=sys.stderr)
+        return 2
+
     if argv and (argv[0] == "resume" or argv[0] in ("--continue", "-c")):
         if (argv[0] == "resume" and len(argv) > 2) or (argv[0] != "resume" and len(argv) != 1):
             print(f"Error: usage: {prog} resume [session-id] | {prog} --continue", file=sys.stderr)
@@ -96,7 +114,8 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "Error: unrecognized argument(s): "
             f"{' '.join(argv)}. {prog} only accepts "
-            "'init <parent-path> <project-name>', 'validate', 'run', 'resume', or '--continue'; "
+            "'init <parent-path> <project-name>', 'validate', 'run', 'status [--probe]', "
+            "'resume', or '--continue'; "
             "run it with none to start the REPL.",
             file=sys.stderr,
         )
