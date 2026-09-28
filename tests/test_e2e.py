@@ -194,6 +194,88 @@ class TestFullProjectLifecycle:
         assert "wi-1: completed" in after_transcript
 
 
+class TestStatusCommand:
+    """WI-M2.2-01: CLI-level ``aido status``/``aido status --probe``,
+    the exact functional parity gap M1.4/M8 claimed but never actually
+    wired (only the REPL's ``/status`` existed). ``build_status_output()``
+    (``aido_code.repl``) is the one rendering path both the REPL and
+    this CLI subcommand call — proven below by an output-*identity*
+    assertion against a real REPL transcript, not merely an
+    overlapping-content check."""
+
+    def test_status_matches_repl_status_with_zero_provider_calls(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        target = _make_project(tmp_path)
+        _set_worker_registry_override(tmp_path, monkeypatch)
+        _pin_fake_home(tmp_path, monkeypatch)
+        monkeypatch.chdir(target)
+
+        repl_output = io.StringIO()
+        run(io.StringIO("/status\n/exit\n"), repl_output, config_path=str(target / "aido.yaml"))
+        repl_transcript = repl_output.getvalue()
+
+        capsys.readouterr()
+        assert entrypoint.main(["status"]) == 0
+        cli_out = capsys.readouterr().out
+
+        assert "Traceback" not in cli_out
+        prompt = "aido> "
+        # `run()`'s loop writes `prompt`, then `_run_status(...) + "\n"`
+        # (== cli_out, since both `/status` and `aido status` delegate to
+        # the same `build_status_output()`), then `prompt` again before
+        # reading "/exit" — an exact equation, not a substring check, is
+        # what actually proves the two render identically.
+        assert repl_transcript == f"{prompt}{cli_out}{prompt}"
+        assert "current_milestone_status: APPROVED" in cli_out
+        assert "NOT_INITIALIZED" in cli_out
+
+    def test_status_probe_calls_engine_probe_workers_exactly_once(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        target = _make_project(tmp_path)
+        _set_worker_registry_override(tmp_path, monkeypatch)
+        _pin_fake_home(tmp_path, monkeypatch)
+        monkeypatch.chdir(target)
+        adapter = FakeAdapter(available=True)
+        original_from_config = entrypoint.EngineClient.from_config
+
+        def _fake_from_config(config, *, worker_registry, **kwargs):
+            return original_from_config(
+                config, worker_registry=worker_registry, provider_adapters={"anthropic": adapter},
+            )
+
+        monkeypatch.setattr(entrypoint.EngineClient, "from_config", _fake_from_config)
+
+        capsys.readouterr()
+        assert entrypoint.main(["status", "--probe"]) == 0
+        cli_out = capsys.readouterr().out
+
+        assert adapter.calls == 1
+        assert "probe=available" in cli_out
+
+    def test_status_rejects_unrecognized_flag(self, capsys: pytest.CaptureFixture[str]) -> None:
+        exit_code = entrypoint.main(["status", "--bogus"])
+
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "Traceback" not in err
+        assert "usage" in err
+        assert "status" in err
+
+    def test_status_missing_aido_yaml_fails_cleanly(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+
+        exit_code = entrypoint.main(["status"])
+        err = capsys.readouterr().err
+
+        assert exit_code != 0
+        assert "Traceback" not in err
+        assert "Error:" in err
+
+
 class TestInitDraftToApprovedLifecycle:
     """Final regression/clean-install/portability acceptance: the whole
     product-boundary story chained through the *real* CLI entry points a

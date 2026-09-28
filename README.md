@@ -131,6 +131,10 @@ itself. Inside the terminal (`aido` with no arguments):
 /run              start or resume the project — requires the roadmap's Current milestone: Status: APPROVED
 ```
 
+`aido status`/`aido status --probe` are also available directly at the
+CLI level (outside the REPL), rendering exactly the same output as
+`/status`/`/status --probe` above — one shared implementation.
+
 `/run` starts or resumes *project* execution, the engine's own WorkItem
 flow — refused cleanly, before any provider call, while the current
 milestone is still `DRAFT`. That is a different thing from session

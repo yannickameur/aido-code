@@ -22,6 +22,8 @@ P13.6).
 | `init <parent-path> <name>` | `M1.4` | Bootstrap a new project (manifest + `ROADMAP.md` DRAFT + `resources/` + Git) | No |
 | `validate` | `M1.4` (CLI-level; also `/validate` in the REPL) | Manifest + roadmap + resources + AIDO registry validation | No |
 | `run` | `M1.4` (CLI-level; also `/run` in the REPL) | Start or resume project execution, requires `Status: APPROVED` | Potentially |
+| `status` | `M2.2` (CLI-level; also `/status` in the REPL) | Same rendering as `/status` below, one shared implementation | No |
+| `status --probe` | `M2.2` (CLI-level; also `/status --probe` in the REPL) | Same rendering as `/status --probe` below, one shared implementation | Yes |
 | `/help` | `IMPLEMENTED` | List available commands | No |
 | `/status` | `IMPLEMENTED`, extended `M1.4` | Roadmap milestone facts + project + MVP + work items + all AIDO-configured workers | No |
 | `/status --probe` | `IMPLEMENTED` | Same, plus one real `probe_workers()` call | Yes |
@@ -42,8 +44,8 @@ P13.6).
 | `doctor` | `M6` | Read-only diagnostics | No |
 
 Each command maps directly to one `OrchestratorEngine` call (see
-`docs/ENGINE_CONTRACT.md`): `/status` → `.status()`, `/workers` →
-`.workers()`, `validate`/`/validate` → `.validate()`, `run`/`/run` →
+`docs/ENGINE_CONTRACT.md`): `status`/`/status` → `.status()`, `/workers`
+→ `.workers()`, `validate`/`/validate` → `.validate()`, `run`/`/run` →
 `.run()`. `/config` shows the loaded manifest/roadmap facts plus
 `.validate()`'s `ProjectSnapshot`, never a raw file dump. `run`/`/run`
 is also how a project resumes; see "Session resume vs. project run" in
@@ -58,6 +60,8 @@ rationale: `ROADMAP.md`, M1.4.
 aido init <parent-path> <project-name>   # scaffold a new project
 aido validate                            # manifest + roadmap + resources + AIDO registry, provider-free
 aido run                                 # requires the roadmap's Current milestone: Status: APPROVED
+aido status                              # M2.2: CLI-level parity with /status, zero provider calls
+aido status --probe                      # M2.2: CLI-level parity with /status --probe
 ```
 
 `init`/`validate`/`run` are new **CLI-level** subcommands (argv-based,
@@ -158,6 +162,26 @@ failing — see `ROADMAP.md`, M2. A project-requiring command
 (`/status`, `/workers`, `/validate`, `/run`) issued from a session with
 no project bound replies with a clean "no project bound" message; it
 never crashes, fabricates a project, or searches for one.
+
+## M2.2 — CLI-level `aido status` parity fix
+
+Full rationale and WorkItems: `ROADMAP.md`, M2.2. M1.4/M8 documented
+`init`/`validate`/`run`/`status` CLI-level parity, but `status` was
+never actually wired as a subcommand — only the REPL's `/status`
+existed. This milestone closes that gap:
+
+```
+aido status          # same rendering as /status, zero provider calls
+aido status --probe  # same rendering as /status --probe
+```
+
+`aido status`/`aido status --probe` share the exact same project-
+loading path (`load_project_command_context`/`build_engine_plan`/
+`EngineClient.from_config`) and the exact same rendering
+(`build_status_output()` in `repl.py`) as `/status`/`/status --probe`
+— never a second implementation. A missing/invalid `aido.yaml` or an
+unrecognized flag fails cleanly (`Error: ...`/usage message on stderr,
+non-zero exit), never a traceback.
 
 ## M3 — Conversational piloting and live execution (`APPROVED`)
 
