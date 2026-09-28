@@ -221,7 +221,17 @@ class TestStatusCommand:
         cli_out = capsys.readouterr().out
 
         assert "Traceback" not in cli_out
-        assert cli_out.strip() in repl_transcript
+        # Real identity, not containment: `run()`'s own loop (repl.py)
+        # writes exactly `prompt` before reading "/status", then
+        # `_run_status(...) + "\n"` (== `cli_out` here, since `_run_status`
+        # and `aido status` both delegate to the one shared
+        # `build_status_output()`), then `prompt` again before reading
+        # "/exit" — so the REPL transcript is fully determined by `cli_out`
+        # plus that framing; asserting the equation itself (rather than a
+        # substring/containment check) is what actually proves the two
+        # commands render identically, byte for byte.
+        prompt = "aido> "
+        assert repl_transcript == f"{prompt}{cli_out}{prompt}"
         assert "current_milestone_status: APPROVED" in cli_out
         assert "NOT_INITIALIZED" in cli_out
 
