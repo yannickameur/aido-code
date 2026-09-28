@@ -22,6 +22,8 @@ P13.6).
 | `init <parent-path> <name>` | `M1.4` | Bootstrap a new project (manifest + `ROADMAP.md` DRAFT + `resources/` + Git) | No |
 | `validate` | `M1.4` (CLI-level; also `/validate` in the REPL) | Manifest + roadmap + resources + AIDO registry validation | No |
 | `run` | `M1.4` (CLI-level; also `/run` in the REPL) | Start or resume project execution, requires `Status: APPROVED` | Potentially |
+| `status` | `M1.4` (CLI-level; also `/status` in the REPL) | Roadmap milestone facts + project + MVP + work items + all AIDO-configured workers | No |
+| `status --probe` | `M1.4` (CLI-level; also `/status --probe` in the REPL) | Same, plus one real `probe_workers()` call | Yes |
 | `/help` | `IMPLEMENTED` | List available commands | No |
 | `/status` | `IMPLEMENTED`, extended `M1.4` | Roadmap milestone facts + project + MVP + work items + all AIDO-configured workers | No |
 | `/status --probe` | `IMPLEMENTED` | Same, plus one real `probe_workers()` call | Yes |
@@ -42,12 +44,12 @@ P13.6).
 | `doctor` | `M6` | Read-only diagnostics | No |
 
 Each command maps directly to one `OrchestratorEngine` call (see
-`docs/ENGINE_CONTRACT.md`): `/status` → `.status()`, `/workers` →
-`.workers()`, `validate`/`/validate` → `.validate()`, `run`/`/run` →
-`.run()`. `/config` shows the loaded manifest/roadmap facts plus
-`.validate()`'s `ProjectSnapshot`, never a raw file dump. `run`/`/run`
-is also how a project resumes; see "Session resume vs. project run" in
-`ARCHITECTURE.md`.
+`docs/ENGINE_CONTRACT.md`): `status`/`/status` → `.status()`,
+`/workers` → `.workers()`, `validate`/`/validate` → `.validate()`,
+`run`/`/run` → `.run()`. `/config` shows the loaded manifest/roadmap
+facts plus `.validate()`'s `ProjectSnapshot`, never a raw file dump.
+`run`/`/run` is also how a project resumes; see "Session resume vs.
+project run" in `ARCHITECTURE.md`.
 
 ## M1.4 — Autonomous AIDO project contract
 
@@ -58,17 +60,21 @@ rationale: `ROADMAP.md`, M1.4.
 aido init <parent-path> <project-name>   # scaffold a new project
 aido validate                            # manifest + roadmap + resources + AIDO registry, provider-free
 aido run                                 # requires the roadmap's Current milestone: Status: APPROVED
+aido status                              # project + roadmap milestone + all AIDO-configured workers, provider-free
+aido status --probe                      # same, plus one real probe_workers() call
 ```
 
-`init`/`validate`/`run` are new **CLI-level** subcommands (argv-based,
-before the REPL starts) — real functional parity with
+`init`/`validate`/`run`/`status` are **CLI-level** subcommands
+(argv-based, before the REPL starts) — real functional parity with
 `ai-dev-orchestrator`'s own legacy `aido init/validate/run/status` CLI
 (that project's own P13.5-documented transitional surface, now retired
 as a console script per its own P13.6). This parity is exactly what let
 M8's own binary-name cutover happen immediately after M1.4 — see
-`ROADMAP.md`, M8. `validate`/`run` also remain available
-as `/validate`/`/run` from inside the REPL, delegating to the exact
-same underlying logic — never a second, duplicated implementation.
+`ROADMAP.md`, M8. `validate`/`run`/`status` also remain available
+as `/validate`/`/run`/`/status` from inside the REPL,
+`aido_code.repl.build_status_output()` being the one rendering path
+`status` and `/status` both call — never a second, duplicated
+implementation.
 
 A project's own `aido.yaml` no longer resembles `ai-dev-orchestrator`'s
 own schema: no `workers:`/`providers:`/`models:`/`mvp:`/`work_items:`/

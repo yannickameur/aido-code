@@ -366,6 +366,35 @@ def _open_project_command_engine(
     return context, client
 
 
+def build_status_output(
+    config_path: str,
+    *,
+    probe: bool = False,
+    provider_adapters: dict[str, object] | None = None,
+    subprocess_runner: object | None = None,
+) -> str:
+    """The exact `/status` rendering — shared with the CLI-level `aido
+    status` (`aido_code.__main__._project_command`) so both render
+    identically, never a second implementation. Raises the same
+    `_PROJECT_COMMAND_ERRORS` the caller is expected to handle; never
+    swallowed here (the REPL's own `_run_status` below is the one place
+    that converts them to an inline error string)."""
+    context, client = _open_project_command_engine(
+        config_path, provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
+    )
+    with client:
+        snapshot = client.status()
+        workers = client.workers()
+        providers = client.probe_workers() if probe else None
+    return "\n\n".join(
+        [
+            format_status(context.roadmap.milestone, snapshot),
+            "workers:",
+            _format_workers_section(workers, providers),
+        ]
+    )
+
+
 def _run_status(
     config_path: str,
     *,
@@ -374,22 +403,12 @@ def _run_status(
     subprocess_runner: object | None = None,
 ) -> str:
     try:
-        context, client = _open_project_command_engine(
-            config_path, provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
+        return build_status_output(
+            config_path, probe=probe,
+            provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
         )
-        with client:
-            snapshot = client.status()
-            workers = client.workers()
-            providers = client.probe_workers() if probe else None
     except _PROJECT_COMMAND_ERRORS as exc:
         return f"Error: {exc}"
-    return "\n\n".join(
-        [
-            format_status(context.roadmap.milestone, snapshot),
-            "workers:",
-            _format_workers_section(workers, providers),
-        ]
-    )
 
 
 def _run_config(config_path: str) -> str:

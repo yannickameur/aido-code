@@ -1180,6 +1180,19 @@ never a call into the engine. With parity already real, the cutover
 itself became a small, immediate packaging follow-up rather than a
 separately-scheduled future milestone.
 
+**Correction (2026-09-28)**: the `status` parity claimed above was not
+actually true until this date — `aido_code.__main__` never wired a
+CLI-level `status` subcommand; only the REPL's `/status` existed.
+Closed as a direct maintainer fix (`CONTRIBUTING.md`, "What maintainers
+may edit directly" does not itself cover functional code, but this gap
+was explicitly authorized ad hoc rather than routed through a governed
+WorkItem, given its size and the fact it only completes an
+already-approved, already-documented parity claim). `aido status`/`aido
+status --probe` now exist, delegating to the exact same
+`aido_code.repl.build_status_output()` `/status`/`/status --probe`
+already used — never a second implementation. See `docs/CLI_SPEC.md`
+and `tests/test_e2e.py::TestStatusCommand`.
+
 **Ownership, before/after**:
 
 ```text

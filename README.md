@@ -118,12 +118,17 @@ Then:
    ```bash
    aido run
    ```
+8. check on progress any time, without starting the REPL:
+   ```bash
+   aido status           # project + roadmap milestone + all AIDO-configured workers, no provider call
+   aido status --probe   # same, plus a live provider/quota probe
+   ```
 
 No worker/provider/model configuration ever belongs in the project
 itself. Inside the terminal (`aido` with no arguments):
 
 ```
-/status           project + roadmap milestone + all AIDO-configured workers, no provider call
+/status           same as the CLI-level `aido status` above, from inside the REPL
 /workers          AIDO's own configured workers (never a project's)
 /status --probe   same, plus a live provider/quota probe
 /config           manifest + roadmap + resources + loaded engine facts
