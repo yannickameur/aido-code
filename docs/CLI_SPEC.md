@@ -35,8 +35,8 @@ P13.6).
 | `--continue`/`-c` | `M2` | Resume the most recent session | No |
 | `/resume` | `M2` | Resume picker, from inside the REPL | No |
 | `/new` | `M2` | New frontend session | No |
-| Free-form natural language | `M3` (`DRAFT`) | Status/steering questions | Depends |
-| Live timeline during `run` | `M3` (`DRAFT`) | Real-time event feed | No |
+| Free-form natural language | `M3` (`APPROVED`) | Status/steering questions | Depends |
+| Live timeline during `run` | `M3` (`APPROVED`) | Real-time event feed | No |
 | `-p "<request>"` | `M4` | Non-interactive mode | Depends |
 | `--output json`/`stream-json` | `M5` | Structured output | No |
 | `doctor` | `M6` | Read-only diagnostics | No |
@@ -159,7 +159,7 @@ failing — see `ROADMAP.md`, M2. A project-requiring command
 no project bound replies with a clean "no project bound" message; it
 never crashes, fabricates a project, or searches for one.
 
-## M3 — Conversational piloting and live execution (`DRAFT`)
+## M3 — Conversational piloting and live execution (`APPROVED`)
 
 Full rationale, engine prerequisite, and WorkItems: `ROADMAP.md`, M3.
 Absorbs former M7 (real-time timeline) — there is no separate future
@@ -194,11 +194,12 @@ traceback); the next `aido run` resumes/recovers using the engine's own
 existing durable recovery state — never a second, AIDO-side recovery
 mechanism. `aido resume`/`/resume` (M2) stays session-resume only.
 
-**Not executable yet**: both the live timeline and clean run
-interruption depend on an engine-side capability that does not exist
-publicly yet (see `docs/ENGINE_CONTRACT.md`, "What this contract does
-not give AIDO Code (yet)", and `ROADMAP.md`, M3). This milestone stays
-`DRAFT` until that capability ships.
+**Engine-side prerequisite `DONE`**: both the live timeline and clean
+run interruption depend on `on_event`/`EngineEvent`/extended
+`RecoveryCoordinator` recovery, now available from `ai-dev-orchestrator`
+P18 (`DONE`, commit `23e68b7` — see `docs/ENGINE_CONTRACT.md` and
+`ROADMAP.md`, M3). This milestone is `APPROVED`; its WorkItems are what
+the governed WorkItem Flow builds next.
 
 ## M4 — Non-interactive mode
 

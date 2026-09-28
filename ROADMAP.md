@@ -12,7 +12,7 @@ there. This roadmap starts at M1.
 ## Where we stand
 
 DONE: M1, M1.1, M1.2, M1.3, M1.4, M8, M2, M2.1
-CURRENT: M3 — DRAFT
+CURRENT: M3 — APPROVED
 FUTURE: M4-M6, M9+
 
 M8 completed **out of numeric order**, right after M1.4: M1.4 itself
@@ -36,7 +36,7 @@ work beyond M3.
 | M1.4 — Autonomous AIDO project contract | `DONE` (see `docs/PROJECT_CONTRACT.md`; real WI-M1.4-07 failure + recovery split, see M1.4 below) |
 | M2 — Sessions and resume | `DONE` (real governed run: 5/5 WorkItems `completed`; see M2 below) |
 | M2.1 — Graceful interactive interruption | `DONE` (real governed run: 1/1 WorkItem `completed`; see M2.1 below) |
-| M3 — Conversational piloting and live execution | `DRAFT` — governed by this file's own `## Current milestone` below (absorbs former M7) |
+| M3 — Conversational piloting and live execution | `APPROVED` (human GO 2026-09-28; engine prerequisite `ai-dev-orchestrator` P18 `DONE`) — governed by this file's own `## Current milestone` below (absorbs former M7) |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
 | M6 — Doctor/diagnostics | `À VOTER` |
@@ -983,7 +983,7 @@ was made by any human/assistant at any point.
 
 ## Current milestone
 
-Status: DRAFT
+Status: APPROVED
 
 ### ID
 
@@ -1031,11 +1031,27 @@ itself stays the original coarse `work_item.<status>` tuple, unchanged,
 so `on_event=None` preserves today's exact behavior. The engine's own
 durable recovery (`RecoveryCoordinator`) was extended (never a second
 mechanism) to also reconcile an interrupted/orphaned QA run via the
-existing `QARunStore`. This milestone therefore stays `Status: DRAFT`
-regardless — the frontend-side contract below (WorkItems) is not yet
-built in this project — but it is no longer blocked by a missing engine
-capability; see `docs/ENGINE_CONTRACT.md` for the exact surface this
-project consumes.
+existing `QARunStore`. AIDO Code consumes this API from the verified
+sibling editable install (`~/projects/ai-dev-orchestrator`, `main` =
+`23e68b7`); every WorkItem below is built exclusively against that
+public API — never by scraping Git/SQLite/stdout. With the engine-side
+prerequisite resolved, this milestone is **`Status: APPROVED`** (human
+GO, 2026-09-28): its WorkItems are now buildable by the governed
+WorkItem Flow (`aido run`, per `docs/PROJECT_CONTRACT.md` §3.2) — see
+`docs/ENGINE_CONTRACT.md` for the exact surface this project consumes.
+
+**Release gate, separate from this approval**: developing/testing this
+milestone against the verified sibling editable install is sufficient
+and requires nothing further. Distributing AIDO Code as a normal
+(non-editable) install is a separate, later concern — the engine's own
+`pyproject.toml` still declares `version = "0.1.3"`, unchanged by the
+P18 commits, so this project's current `ai-dev-orchestrator>=0.1.3`
+constraint cannot by itself distinguish a published `0.1.3` build with
+P18 from one without it. Before a normal install can depend on P18, a
+distinct engine version containing it must be published and this
+project's minimum dependency raised accordingly (exact number decided
+at release time, not here). This is a packaging release gate, not a
+blocker for building this milestone now.
 
 ### Acceptance criteria
 
@@ -1049,7 +1065,7 @@ project consumes.
 - `aido resume`/`/resume` continues to mean session resume only (M2), never a substitute for engine-level run recovery.
 - Any conversational session persistence reuses the M2 session model; no second session/history store.
 - This milestone stays minimal: no long-term memory, no RAG, no vector database.
-- The engine-side prerequisites above are `DONE` (`ai-dev-orchestrator` P18, commit `23e68b7`) — this milestone's own WorkItems below are what remains to be built in this project; `Status` stays `DRAFT` until they are.
+- The engine-side prerequisites above are `DONE` (`ai-dev-orchestrator` P18, commit `23e68b7`); this milestone's own WorkItems below are what the governed WorkItem Flow now builds in this project.
 - All existing tests stay green; the full suite stays offline (no real Claude/Codex/Vibe/DeepSeek/Kimi call from any M3 test).
 - `git diff --check` stays clean.
 
@@ -1132,7 +1148,6 @@ Argv: ["pytest", "-q"]
 - reconstructing the timeline by scraping Git, SQLite, or stdout.
 - a general REPL rewrite.
 - plugins/MCP/hooks without a demonstrated need.
-- executing this milestone (`aido run`) before this milestone's own WorkItems above are actually built and `Status` moves past `DRAFT` — the engine-side prerequisite itself is `DONE` (P18), but that alone does not make this milestone's own unbuilt frontend code executable.
 
 ## M4 — Non-interactive mode
 
