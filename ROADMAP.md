@@ -1135,6 +1135,24 @@ explicit, clean `Ctrl+C` handling during a real `aido run`, reusing the
 engine's own existing durable recovery state (`RECOVERY_REQUIRED`)
 rather than a new AIDO-side recovery mechanism.
 
+**One shared timeline/interruption path, both entry points**: the
+CLI-level `aido run` and the REPL's `/run` are the exact same
+underlying call (`EngineClient.run()` → `OrchestratorEngine.run()`);
+WI-M3-01's live-timeline rendering and WI-M3-02's interruption handling
+are each built once and reused by both — never a CLI-specific
+implementation and a separate REPL-specific one.
+
+**"Current activity" — two distinct sources, never a third**: when the
+REPL is idle at its prompt (no `.run()` in flight in that process),
+status/activity questions (WI-M3-03) are answered from a fresh
+`OrchestratorEngine` snapshot (`.status()`), exactly like `/status`
+today. While a blocking `.run()` call is actually in flight in that
+same process, activity is exposed *only* through the live timeline's
+own `on_event` callback (WI-M3-01) — there is no other live-activity
+source. M3 introduces no monitoring thread, no background daemon, and
+no artificial concurrent polling loop to watch a run from the outside;
+`.run()` remains the single blocking call it already is.
+
 Real-time visibility (2) and clean interruption (3) depended on
 engine-side capabilities that did not exist publicly as of 2026-09-26
 (verified then by direct inspection of `ai-dev-orchestrator`'s own
@@ -1161,6 +1179,21 @@ GO, 2026-09-28): its WorkItems are now buildable by the governed
 WorkItem Flow (`aido run`, per `docs/PROJECT_CONTRACT.md` §3.2) — see
 `docs/ENGINE_CONTRACT.md` for the exact surface this project consumes.
 
+**P18 is now a real, hard prerequisite — no silent degraded mode**: an
+earlier draft of this milestone allowed WI-M3-01 to fall back to
+today's single end-of-run summary whenever `on_event` was "unavailable"
+(correction, 2026-09-28). That conflated two different things: a
+*caller* choosing not to request the live timeline (passing
+`on_event=None` explicitly — this stays fully supported, unchanged, and
+is not a degraded mode at all) versus a *loaded engine* that does not
+actually expose the P18 API AIDO Code is built against. If the engine
+loaded at runtime lacks the required `on_event` parameter/`EngineEvent`
+fields this milestone depends on, AIDO Code fails closed with a clear
+engine-compatibility error — it never silently falls back to pretending
+to deliver M3 while actually rendering nothing live. Detecting and
+reporting that incompatibility clearly is itself part of WI-M3-01's own
+acceptance criteria below.
+
 **Release gate, separate from this approval**: developing/testing this
 milestone against the verified sibling editable install is sufficient
 and requires nothing further. Distributing AIDO Code as a normal
@@ -1179,14 +1212,15 @@ blocker for building this milestone now.
 - Free-form natural-language requests in the REPL can retrieve project status, current activity, why a WorkItem is waiting/blocked, and available workers/providers, using only real `OrchestratorEngine` snapshot facts.
 - Free-form natural-language requests can also trigger an already-supported AIDO action (e.g. `run`/continue) by translating intent into that exact existing command — never a second orchestration decision.
 - The conversational layer never re-implements `WorkerSelector`, QA, Git governance, DEV A/DEV B selection, WAITING/BLOCKED decisions, merge, or recovery; every fact and every decision still comes from `OrchestratorEngine`.
-- During `aido run`, the terminal shows significant transitions as they happen: WorkItem started; for each DEV A/DEV B/DEV FIX execution, worker, provider, backend, execution profile, model, quality tier, and reasoning effort when the engine actually exposes one for that execution, plus started/commit produced/completed/failed; QA started/PASS/FAIL/INCONCLUSIVE; Git merge-ready/merge completed/tag/final SHA when available — never reconstructed by scraping stdout, `git log`, worktrees, branches, or the engine's private SQLite; sourced only from a public engine API.
+- During `aido run` **and** `/run` (the exact same underlying `OrchestratorEngine.run()` call, one shared rendering path — never a CLI-specific implementation and a separate REPL-specific one), the terminal shows significant transitions as they happen: WorkItem started; for each DEV A/DEV B/DEV FIX execution, worker, provider, backend, execution profile, model, quality tier, and reasoning effort when the engine actually exposes one for that execution, plus started/commit produced/completed/failed; QA started/PASS/FAIL/INCONCLUSIVE; Git merge-ready/merge completed/tag/final SHA when available — never reconstructed by scraping stdout, `git log`, worktrees, branches, or the engine's private SQLite; sourced only from a public engine API.
 - Model/execution-profile/quality-tier/reasoning-effort values shown are exactly what the engine actually decided for that execution — AIDO never guesses a model from a `worker_id`.
+- While idle at the REPL prompt, "current activity"/status questions are answered from a fresh `OrchestratorEngine.status()` snapshot; while a `.run()` is actually in flight in that process, activity is exposed only through the live timeline's own `on_event` callback — never a third source, never a background monitoring thread/daemon/artificial polling loop.
 - A `Ctrl+C` during a real `aido run` is recognized explicitly: no raw traceback, no WorkItem left ambiguously marked, no state mutated outside what the engine's own durable recovery mechanism already governs.
 - The next `aido run` resumes/recovers the governed workflow using the engine's own existing state machine (e.g. `RECOVERY_REQUIRED`) — never a second, AIDO-side recovery mechanism.
 - `aido resume`/`/resume` continues to mean session resume only (M2), never a substitute for engine-level run recovery.
-- Any conversational session persistence reuses the M2 session model; no second session/history store.
+- M3 keeps no persistent conversational history: no new data is added to `SessionStore`, no second session/history store is created (see WI-M3-04's own product decision below).
 - This milestone stays minimal: no long-term memory, no RAG, no vector database.
-- The engine-side prerequisites above are `DONE` (`ai-dev-orchestrator` P18, commit `23e68b7`); this milestone's own WorkItems below are what the governed WorkItem Flow now builds in this project.
+- The engine-side prerequisites above are `DONE` (`ai-dev-orchestrator` P18, commit `23e68b7`) and are now a **hard** requirement, not a soft one: if the loaded engine lacks the required `on_event`/`EngineEvent` API, AIDO Code fails closed with a clear compatibility error rather than silently degrading to the old coarse-only behavior. This milestone's own WorkItems below are what the governed WorkItem Flow now builds in this project.
 - All existing tests stay green; the full suite stays offline (no real Claude/Codex/Vibe/DeepSeek/Kimi call from any M3 test).
 - `git diff --check` stays clean.
 
@@ -1199,23 +1233,23 @@ Capabilities: development
 
 Acceptance criteria:
 
-- Renders WorkItem/DEV A/DEV B/DEV FIX/QA/Git transitions as they are emitted by a public `OrchestratorEngine` progress API (callback, iterator, or event sink — the exact shape is an engine-side decision, see `docs/ENGINE_CONTRACT.md`), never by parsing stdout/Git/SQLite.
+- Renders WorkItem/DEV A/DEV B/DEV FIX/QA/Git transitions as they are emitted by `OrchestratorEngine.run(on_event=...)` (P18), through one rendering path shared by both `aido run` and `/run` — never by parsing stdout/Git/SQLite, never a second implementation for the other entry point.
 - For every DEV A/DEV B/DEV FIX execution, renders worker, provider, backend, execution profile id, model, quality tier, and reasoning effort when the engine actually exposes one for that execution — rendered exactly as decided by the engine, never guessed from `worker_id`.
 - Renders QA phase transitions (started, PASS/FAIL/INCONCLUSIVE) and Git transitions (merge-ready, merge completed, tag/final SHA when available).
-- Falls back to today's single end-of-run summary, unregressed, if `on_event` is ever omitted/unavailable.
-- The engine-side prerequisite (see Objective) is `DONE` (P18); this WorkItem's own implementation in this project is what remains.
-- Offline tests use fake/scripted engine progress events; zero real provider/Ralph calls.
+- **Hard engine compatibility, no silent degraded mode**: if the loaded engine does not actually expose the `on_event` parameter/required `EngineEvent` fields this WorkItem depends on, `aido run`/`/run` fail closed with a clear, explicit compatibility error (never a raw `TypeError`/`AttributeError`, never a silent fall-back to the old coarse-only summary while claiming to deliver a live timeline). This is distinct from a caller explicitly passing `on_event=None` to opt out of the live timeline, which stays fully supported and renders today's coarse end-of-run summary exactly as before — that is a deliberate choice, never a compatibility failure.
+- **EngineEvent robustness**: every dynamic value read off an `EngineEvent` (kind, phase, status, worker/provider/backend/model/etc.) is passed through M1.3's existing terminal sanitizer (`sanitize_for_terminal()`, `aido_code.repl`) before being rendered — never a second sanitizer. `None`/absent optional fields, an unrecognized `payload` shape, and an event `kind` this rendering code does not yet know about are all rendered as a generic/best-effort line or safely skipped — never raise a presentation exception. A purely-AIDO rendering bug must never become a way to abort or otherwise disrupt the governed engine run in progress (the engine's own execution continues regardless of a rendering-layer failure). No fact is ever reconstructed from Git/SQLite/stdout to compensate for a field the event did not actually carry.
+- Offline tests use fake/scripted engine progress events — including malformed/partial/unknown-kind events to exercise the robustness rules above — plus a fake engine that does not expose `on_event` at all, to exercise the fail-closed compatibility path; zero real provider/Ralph calls.
 
 #### WI-M3-02 — Handle graceful run interruption and expose recovery/resume UX
 
-Dependencies: none
+Dependencies: WI-M3-01
 Capabilities: development
 
 Acceptance criteria:
 
-- A `Ctrl+C` during `aido run` is caught explicitly at AIDO Code's own boundary: no raw Python traceback reaches the terminal.
+- A `Ctrl+C` during `aido run` **or** `/run` is caught explicitly at the one shared boundary both entry points go through (never two separate handlers): no raw Python traceback reaches the terminal.
 - AIDO never marks a WorkItem `completed` itself, never guesses whether the interrupted step finished, and never reconstructs recovery state from Git/logs/session data — the engine's own durable state (e.g. `RECOVERY_REQUIRED`) remains the sole source of truth.
-- The timeline (WI-M3-01) renders the interruption and the next run's recovery, when the underlying engine events exist.
+- The timeline (WI-M3-01) renders the interruption and the next run's recovery, using the exact `run.interrupted`/`*.interrupted`/`qa.interrupted` events P18 already emits for this.
 - The next `aido run` against the same project resumes the governed workflow exactly as the engine's own existing recovery mechanism already dictates — no new AIDO-side recovery logic.
 - `aido resume`/`/resume` (M2) is unchanged: session resume only, never a run-recovery substitute.
 - The engine-side prerequisite (explicit interrupt handling/event, see Objective) is `DONE` (P18); this WorkItem's own implementation in this project is what remains.
@@ -1228,23 +1262,26 @@ Capabilities: development
 
 Acceptance criteria:
 
-- Free-form REPL input can be interpreted as one of: a status/state question, a "why is WorkItem X waiting/blocked" question, an available-workers/providers question, or a request to run/continue the project.
+- **Product decision**: the M3 MVP intent layer is a deterministic, minimal router — never an LLM — recognizing a closed set of intents (status/state; why is a WorkItem waiting/blocked; available workers/providers; run/continue) via simple pattern/keyword matching over common natural-language phrasings, with zero provider call and zero LLM dependency to *interpret* a user command (a resulting run/continue intent may of course reach a provider once translated into the existing `/run` action — that is unrelated to interpretation itself). Free, open-ended LLM-based interpretation is explicitly out of scope for this WorkItem and may be proposed separately later, against a real, demonstrated need (À VOTER), never built speculatively here; this is not a general NLP framework either — no intent-classification library, no new dependency, no configurable grammar, a small closed hand-written matcher only (KISS/YAGNI).
+- Recognizes exactly this closed set of intents: a status/state question, a "why is WorkItem X waiting/blocked" question, an available-workers/providers question, and a request to run/continue the project — recognizing simple natural-language phrasings of each, never a fixed single sentence per intent.
+- Zero provider/LLM call to interpret which intent a free-form request maps to; matching is deterministic (pattern/keyword-based), not model-based.
 - Every answer is built only from a real `OrchestratorEngine` snapshot (`.status()`/`.workers()`/`.probe_workers()`); a run/continue intent maps to the exact existing `/run` action, never a new orchestration path.
 - The layer never selects a worker, never renders a QA/merge verdict of its own, and never fabricates a fact the engine has not actually returned.
-- Unrecognized free-form input fails gracefully (a clear "not understood" reply), never a crash, never a guessed action.
-- Offline tests cover each supported intent against a fake engine snapshot, and the unrecognized-input path.
+- Ambiguous or unrecognized free-form input never guesses an action: it fails gracefully with a clear "not understood" reply, never a crash.
+- No general-purpose NLP framework, intent-classification library, or configurable grammar is introduced — a small, closed, hand-written matcher only.
+- Offline tests cover each supported intent (including more than one phrasing per intent), the ambiguous/unrecognized-input path, and assert zero provider calls from intent interpretation itself.
 
-#### WI-M3-04 — Persist/reuse conversational session context and complete regression acceptance
+#### WI-M3-04 — Integrate conversational UX with M2 sessions and complete regression acceptance
 
-Dependencies: WI-M3-03
+Dependencies: WI-M3-01, WI-M3-02, WI-M3-03
 Capabilities: development
 
 Acceptance criteria:
 
-- Conversational context (if any is kept across turns) is stored using M2's own session model/store — no second session or history persistence mechanism.
+- **Product decision**: M3 keeps no persistent conversational history at all — no new data is added to `SessionStore`, no second session/history store is created, and no new persistence mechanism of any kind is introduced. The conversational layer (WI-M3-03) simply reuses M2's existing session binding/lifecycle (which project is bound to the current session) exactly as `/status`/`/run`/etc. already do — it does not need cross-turn memory to answer a status question or translate a run/continue intent, since each request is answered fresh from a real `OrchestratorEngine` snapshot. A future milestone may add real persistent conversational state, but only against a real, demonstrated need — never spec'd here in advance (YAGNI).
 - No long-term memory, no RAG, no vector database, no model training of any kind.
 - `pytest -q` passes for the whole package, offline, zero real provider/Ralph calls.
-- M1/M1.1/M1.2/M1.3/M1.4/M2/M2.1's own already-covered command behaviors remain passing, unregressed.
+- M1/M1.1/M1.2/M1.3/M1.4/M2/M2.1/M2.2's own already-covered command behaviors remain passing, unregressed.
 - `git diff --check` stays clean.
 
 ### QA
@@ -1269,6 +1306,9 @@ Argv: ["pytest", "-q"]
 - reconstructing the timeline by scraping Git, SQLite, or stdout.
 - a general REPL rewrite.
 - plugins/MCP/hooks without a demonstrated need.
+- a free-form/LLM-based intent interpretation layer (WI-M3-03 is a deterministic, closed-set router only) — may be proposed separately later, against a real, demonstrated need (À VOTER).
+- any new persistent conversational history/session data — `SessionStore` gains nothing new in this milestone (see WI-M3-04's own product decision).
+- silently degrading to the old coarse-only summary when the loaded engine lacks the required P18 API — that is a hard compatibility failure, not a supported fallback (see Objective).
 
 ## M4 — Non-interactive mode
 
