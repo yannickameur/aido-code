@@ -11,9 +11,8 @@ there. This roadmap starts at M1.
 
 ## Where we stand
 
-DONE: M1, M1.1, M1.2, M1.3, M1.4, M8, M2, M2.1
-CURRENT: M2.2 — APPROVED
-QUEUED: M3 — APPROVED (paused behind M2.2, resumes as `## Current milestone` once M2.2 reaches `DONE`)
+DONE: M1, M1.1, M1.2, M1.3, M1.4, M8, M2, M2.1, M2.2
+CURRENT: M3 — APPROVED
 FUTURE: M4-M6, M9+
 
 M8 completed **out of numeric order**, right after M1.4: M1.4 itself
@@ -28,15 +27,18 @@ now covered by M3 below instead of a second, later milestone. There is
 no other section in this file describing timeline delivery as future
 work beyond M3.
 
-**M2.2 was inserted ahead of M3 (2026-09-28)**: M1.4/M8's own claimed
-`init`/`validate`/`run`/`status` CLI-level parity turned out to be
-incomplete — `status` was never actually wired — and a fix was
-hand-authored directly (not through `aido run`) before that violated
+**M2.2 was inserted ahead of M3, then completed (2026-09-28)**: M1.4/M8's
+own claimed `init`/`validate`/`run`/`status` CLI-level parity turned out
+to be incomplete — `status` was never actually wired — and a fix was
+hand-authored directly (not through `aido run`), which violated
 `CONTRIBUTING.md`'s absolute governed-flow rule. Rather than merge that
-direct commit or fold the fix into M3's unrelated scope, M2.2 exists to
-let the governed flow build the exact same, already-specified fix
-properly; M3 itself is untouched, simply paused (`## M3 — ...` below,
-still `Status: APPROVED`) until M2.2 reaches `DONE`. See M2.2 below.
+direct commit or fold the fix into M3's unrelated scope, M2.2 was
+inserted so the governed flow could build the exact same,
+already-specified fix properly. A human GO was given, the governed
+WorkItem Flow ran WI-M2.2-01 to completion, and M2.2 reached `DONE` —
+see M2.2 below for the real run record. M3 itself was never modified
+by any of this; it is now resumed as `## Current milestone`, exactly as
+it was before being paused.
 
 | Milestone | Status |
 |---|---|
@@ -47,8 +49,8 @@ still `Status: APPROVED`) until M2.2 reaches `DONE`. See M2.2 below.
 | M1.4 — Autonomous AIDO project contract | `DONE` (see `docs/PROJECT_CONTRACT.md`; real WI-M1.4-07 failure + recovery split, see M1.4 below) |
 | M2 — Sessions and resume | `DONE` (real governed run: 5/5 WorkItems `completed`; see M2 below) |
 | M2.1 — Graceful interactive interruption | `DONE` (real governed run: 1/1 WorkItem `completed`; see M2.1 below) |
-| M2.2 — CLI-level `aido status` parity fix | `APPROVED` (human GO 2026-09-28) — governed by this file's own `## Current milestone` below; inserted ahead of M3 (2026-09-28) |
-| M3 — Conversational piloting and live execution | `APPROVED` (human GO 2026-09-28; engine prerequisite `ai-dev-orchestrator` P18 `DONE`) — **queued behind M2.2**, see `## M3 — ...` below (absorbs former M7) |
+| M2.2 — CLI-level `aido status` parity fix | `DONE` (real governed run: 1/1 WorkItem `completed`; see M2.2 below) |
+| M3 — Conversational piloting and live execution | `APPROVED` (human GO 2026-09-28; engine prerequisite `ai-dev-orchestrator` P18 `DONE`) — governed by this file's own `## Current milestone` below (absorbs former M7) |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
 | M6 — Doctor/diagnostics | `À VOTER` |
@@ -993,9 +995,7 @@ outside the offline test suite: `aido --continue`, then `Ctrl+C` at the
 `aido>` prompt — clean exit, no traceback. No manual code correction
 was made by any human/assistant at any point.
 
-## Current milestone
-
-Status: APPROVED
+## M2.2 — CLI-level `aido status` parity fix (`DONE`)
 
 ### ID
 
@@ -1045,7 +1045,7 @@ back into `## Current milestone` once M2.2 reaches `DONE`.
 
 ### WorkItems
 
-#### WI-M2.2-01 — Add CLI-level `aido status`/`aido status --probe`
+#### WI-M2.2-01 — Add CLI-level `aido status`/`aido status --probe` (`completed`)
 
 Dependencies: none
 Capabilities: development
@@ -1077,7 +1077,34 @@ Argv: ["pytest", "-q"]
 - PR #4 stays open only as a historical/behavioral reference (what the fix looks like, what tests it needs) while this milestone is in flight — it is never merged, under any circumstance.
 - once WI-M2.2-01 is delivered on `main` by the governed flow, PR #4 is closed without merging it.
 
-## M3 — Conversational piloting and live execution (`APPROVED`, queued behind M2.2)
+### Real run (2026-09-28)
+
+A human GO was given, then the governed WorkItem Flow ran WI-M2.2-01 to
+completion (`cycles_run=1`, `all_terminal=True`, `reached_max_cycles=False`).
+DEV A: worker `alice`, provider `anthropic`, backend `claude_code`,
+model `sonnet`, `succeeded` (14:24:58–14:28:19 UTC), producing commit
+`b15a1e33563ac50d31ae4e7516b34e43a7794ec8`. DEV B: worker `bob`,
+provider `anthropic`, backend `claude_code`, model `sonnet`,
+`succeeded` (14:28:22–14:29:18 UTC), approved as-is — no DEV FIX cycle,
+`git_sha_before`/`git_sha_after` identical. QA (`internal` engine,
+`final_verification` phase): `completed`, verdict `pass` ("all
+mandatory QA evidence present and passing for the current head SHA"),
+`pytest -q` — 1/1 passed at the QA level. Final governed commit on
+`main`: `b15a1e3` ("Add CLI-level aido status/aido status --probe
+(WI-M2.2-01)"), tag `feature/WI-M2.2-01/done`. Offline `pytest -q`
+after the run — 245 passed (was 241 before M2.2, +4 from
+`TestStatusCommand`). `git diff --check` clean. The worker's own tests
+independently converged on an output-*identity* assertion (not a
+containment one) for `aido status` vs. `/status`, exactly as this
+milestone's acceptance criteria required — its own commit message
+records that it was delivered through the governed flow rather than by
+merging the hand-authored PR #4. No manual code correction was made by
+any human/assistant at any point; PR #4 (`add-cli-status` branch) was
+closed without merging, per this milestone's own "Out of scope" above.
+
+## Current milestone
+
+Status: APPROVED
 
 ### ID
 
@@ -1273,6 +1300,14 @@ be moot, since `aido-code init` is entirely this project's own logic,
 never a call into the engine. With parity already real, the cutover
 itself became a small, immediate packaging follow-up rather than a
 separately-scheduled future milestone.
+
+**Correction**: the `status` parity claimed above was not actually
+true at the time — `aido_code.__main__` never wired a CLI-level
+`status` subcommand until M2.2's own governed run closed that gap on
+2026-09-28 (see M2.2 below). This binary-name cutover itself was never
+blocked by that gap (`init`/`validate`/`run` alone were enough for the
+cutover), but the historical claim here was imprecise and is corrected
+for the record rather than silently left standing.
 
 **Ownership, before/after**:
 
