@@ -47,10 +47,9 @@ engine defect, not maintainer authorship; see
 ## Not contributors yet
 
 `bob`/`oscar` (the `anthropic`/`openai` fallback pool), `milo`/`juno`
-(`mistral`/`vibe`, enabled), and `dana`/`kai` (`deepseek`/`kimi`,
-configured but **disabled** — no API key, no real execution evidence
-yet) are configured workers (see `ai-dev-orchestrator`'s
-`config/workers.yaml`) but have not produced a real, governed commit in
+(`mistral`/`vibe`), and `gravity_primary`/`gravity_secondary`
+(Arthur/Nora, `gravity`) are configured workers (see AIDO Code's packaged
+`default_workers.yaml`) but have not produced a real, governed commit in
 this project — `WorkerSelector` has not selected them. A display-name
 or configuration change alone never makes a worker a contributor here;
 this list is updated only when a worker actually produces one.

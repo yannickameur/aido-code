@@ -170,11 +170,10 @@ provider, model, or `workers.yaml` path again.
 | oscar | Yannick | OpenAI | gpt-6-sol |
 | milo | Nathaniel | Mistral | vibe-default |
 | juno | Juno | Mistral | vibe-default |
-| dana | Dana | DeepSeek | disabled |
-| kai | Kai | Kimi | disabled |
+| gravity_primary | Arthur | Gravity | claude-sonnet-4-6 |
+| gravity_secondary | Nora | Gravity | claude-sonnet-4-6 |
 
-Dana and Kai are configured but disabled: reaching them requires an API
-key this environment does not have. See
+All eight workers are enabled, from four providers. See
 [`CONTRIBUTORS.md`](CONTRIBUTORS.md) for who actually built AIDO Code
 so far.
 

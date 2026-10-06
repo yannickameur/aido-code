@@ -102,8 +102,8 @@ concept; see `ARCHITECTURE.md`.
 
 - `EngineConfigError` (subclass of `EngineError`): invalid `aido.yaml`,
   invalid/unreadable worker registry, or a configured provider that
-  could not be resolved (e.g. an enabled DeepSeek/Kimi worker with no
-  API key).
+  could not be resolved (e.g. an enabled worker whose provider has no
+  usable adapter or credentials).
 - `EngineError`: a runtime composition failure surfaced by `.run()`
   (e.g. a persisted-state/config conflict).
 
