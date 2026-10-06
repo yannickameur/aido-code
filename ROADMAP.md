@@ -11,9 +11,8 @@ there. This roadmap starts at M1.
 
 ## Where we stand
 
-DONE: M1, M1.1, M1.2, M1.3, M1.4, M8, M2, M2.1, M2.2
-CURRENT: M2.3 — APPROVED
-QUEUED: M3 — APPROVED (paused behind M2.3, resumes as `## Current milestone` once M2.3 reaches `DONE`)
+DONE: M1, M1.1, M1.2, M1.3, M1.4, M8, M2, M2.1, M2.2, M2.3
+CURRENT: M3 — APPROVED
 FUTURE: M4-M6, M9+
 
 M8 completed **out of numeric order**, right after M1.4: M1.4 itself
@@ -41,14 +40,16 @@ see M2.2 below for the real run record. M3 itself was never modified
 by any of this; it is now resumed as `## Current milestone`, exactly as
 it was before being paused.
 
-**M2.3 was inserted ahead of M3 (2026-10-06)**: `ai-dev-orchestrator`'s
+**M2.3 was inserted ahead of M3, then completed (2026-10-06)**: `ai-dev-orchestrator`'s
 P20 (`DONE`, `main` = `c9484b1`) removed the never-validated
 DeepSeek/Kimi providers and normalized Gravity into two worker identities
 (Arthur/Nora): the engine's validated pool is now 8 workers, 4 providers.
 AIDO Code's own packaged default pool still carries `dana`/`kai`. M2.3
 aligns it, through the governed flow (`CONTRIBUTING.md`), before M3
-starts; M3 itself is untouched, simply paused (`## M3 — ...` below, still
-`Status: APPROVED`) until M2.3 reaches `DONE`. See M2.3 below.
+starts. A human GO was given, the governed WorkItem Flow ran WI-M2.3-01 to
+completion, and M2.3 reached `DONE` — see M2.3 below for the real run
+record. M3 itself was never modified by any of this; it is now resumed as
+`## Current milestone`, exactly as it was before being paused.
 
 | Milestone | Status |
 |---|---|
@@ -60,8 +61,8 @@ starts; M3 itself is untouched, simply paused (`## M3 — ...` below, still
 | M2 — Sessions and resume | `DONE` (real governed run: 5/5 WorkItems `completed`; see M2 below) |
 | M2.1 — Graceful interactive interruption | `DONE` (real governed run: 1/1 WorkItem `completed`; see M2.1 below) |
 | M2.2 — CLI-level `aido status` parity fix | `DONE` (real governed run: 1/1 WorkItem `completed`; see M2.2 below) |
-| M2.3 — Align AIDO worker pool with validated providers | `APPROVED` (human GO 2026-10-06; engine `ai-dev-orchestrator` P20 `DONE`) — governed by this file's own `## Current milestone` below; inserted ahead of M3 |
-| M3 — Conversational piloting and live execution | `APPROVED` (human GO 2026-09-28; engine prerequisite `ai-dev-orchestrator` P18 `DONE`) — **queued behind M2.3**, see `## M3 — ...` below (absorbs former M7) |
+| M2.3 — Align AIDO worker pool with validated providers | `DONE` (real governed run: 1/1 WorkItem `completed`; see M2.3 below) |
+| M3 — Conversational piloting and live execution | `APPROVED` (human GO 2026-09-28; engine prerequisite `ai-dev-orchestrator` P18 `DONE`) — governed by this file's own `## Current milestone` below (absorbs former M7) |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
 | M6 — Doctor/diagnostics | `À VOTER` |
@@ -1113,9 +1114,7 @@ merging the hand-authored PR #4. No manual code correction was made by
 any human/assistant at any point; PR #4 (`add-cli-status` branch) was
 closed without merging, per this milestone's own "Out of scope" above.
 
-## Current milestone
-
-Status: APPROVED
+## M2.3 — Align AIDO worker pool with validated providers (`DONE`)
 
 ### ID
 
@@ -1164,7 +1163,7 @@ M2.3 reaches `DONE`.
 
 ### WorkItems
 
-#### WI-M2.3-01 — Align AIDO worker pool with validated providers
+#### WI-M2.3-01 — Align AIDO worker pool with validated providers (`completed`)
 
 Dependencies: none
 Capabilities: development
@@ -1194,7 +1193,36 @@ Argv: ["pytest", "-q"]
 - Gravity-specific status rendering, or any direct `agy` subprocess from AIDO Code.
 - the user's local worker override file: aligned by hand after the governed run, never committed.
 
-## M3 — Conversational piloting and live execution (`APPROVED`, queued behind M2.3)
+### Real run (2026-10-06)
+
+A human GO was given, then the governed WorkItem Flow ran WI-M2.3-01 to
+completion (`cycles_run=1`, `all_terminal=True`, `reached_max_cycles=False`).
+DEV A: worker `alice`, provider `anthropic`, backend `claude_code`, model
+`sonnet`, `succeeded` (11:12:04–11:14:02 UTC), producing commit
+`416189bd25c2dec11dd76eab0925dd9321363e91`. DEV B: worker `victor`,
+provider `openai`, backend `codex`, model `gpt-6-sol`, `succeeded`
+(11:14:04–11:18:10 UTC), producing the final governed commit `a4b9203`
+("Strengthen validated worker pool coverage"), tag
+`feature/WI-M2.3-01/done`; no DEV FIX cycle. QA (`internal` engine,
+`final_verification` phase): `completed`, verdict `pass` ("all mandatory
+QA evidence present and passing for the current head SHA"), `pytest -q`.
+The selected workers were chosen by `WorkerSelector` alone (the pool
+available to that run was still the pre-M2.3 one, without Gravity).
+Offline `pytest -q` after the run — 248 passed (was 245 before M2.3).
+`git diff --check` clean. Real validation afterwards: `aido validate`
+VALID; `aido status` lists exactly the 8 workers (Alice, Lydie, Victor,
+Yannick, Nathaniel, Juno, Arthur, Nora) from 4 providers (`anthropic`,
+`openai`, `mistral`, `gravity`); `aido status --probe` probes Gravity once,
+Arthur and Nora both `probe=available`, and renders the engine's Gravity
+`ProviderState` quota (`gemini-weekly`/`3p-weekly`) through the generic
+renderer. No local worker override file existed on this machine
+(`resolve_workers_override_path()` returned `None`), so none needed
+alignment. No manual code correction was made by any human/assistant at
+any point.
+
+## Current milestone
+
+Status: APPROVED
 
 ### ID
 
