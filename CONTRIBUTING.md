@@ -10,30 +10,43 @@ implements, an independent DEV B reviews and corrects, deterministic QA
 decides PASS/FAIL, and a governed Git merge lands the result — never a
 single developer's own claim that "it works."
 
-**Naming note (since M8): `aido` is now AIDO Code's own product
-command** (see `README.md`). The steps below govern *this repository's
-own* development using `ai-dev-orchestrator`'s legacy, no-longer-
-installed engine CLI instead — always invoked explicitly as `python -m
-orchestrator.cli ...` from a sibling checkout, never the bare word
-`aido`, to avoid any confusion between the two.
+## Self-hosted governed development
 
-1. `ai-dev-orchestrator` governs this repository via a local, untracked
-   `aido.yaml` (start from the milestone's own tracked template, e.g.
-   `aido.example.yaml` for M1, or a fresh local copy reproducing
-   `ROADMAP.md`'s current milestone's WorkItems for M1.4 onward — see
-   "Local configuration" below). This is the engine's own legacy,
-   file-based configuration shape (worker registry path, `work_items:`,
-   `qa:`), used only to drive *this repository's own* governed
-   development — never the product contract a project AIDO governs
-   consumes (that is `docs/PROJECT_CONTRACT.md`, as of M1.4).
-2. `python -m orchestrator.cli validate <config>` checks the config
-   before anything runs.
-3. `python -m orchestrator.cli run <config>` drives the governed
-   WorkItem Flow: DEV A, DEV B corrective review, deterministic QA,
-   then a governed merge/tag — exactly as documented in
-   `ai-dev-orchestrator`'s own `ROADMAP.md`, section "WorkItem Flow".
+AIDO Code must never govern the same checkout from which the running
+`aido` executable is editable-imported. This protects the controller from
+changes made by its own workers, including imports performed later in a run.
+Use a separate stable checkout and environment, for example:
+
+- controller: `~/projects/aido-runner/.venv/bin/aido`;
+- governed target: `~/projects/aido-code`;
+- during dual-repo development, the runner may import the sibling editable
+  engine at `~/projects/ai-dev-orchestrator`.
+
+Verify the actual `aido_code.__file__` and `orchestrator.__file__` with the
+runner's Python before starting. Updating target source files must never
+change the controller's imported checkout. Refresh the stable runner only
+between runs, after the governed target commits have landed; start a fresh
+Python process to load the new frontend. No hot reload.
+
+1. From the target directory, use its local, untracked modern `aido.yaml`
+   manifest and the current approved milestone in `ROADMAP.md`, following
+   `docs/PROJECT_CONTRACT.md`. The global worker registry remains authoritative.
+2. Run the separate stable runner's `aido validate`, then `aido status`.
+3. Run that runner's `aido run` from the target directory. The existing
+   engine drives DEV A, independent DEV B corrective review, deterministic
+   QA, and governed Git merge/tag.
 4. **No functional AIDO Code code** lands on `main` except through that
-   governed flow — absolute.
+   governed flow.
+
+For a staged bootstrap such as M3.1, an ephemeral invocation of the existing
+modern loader (`load_project_command_context`), `build_engine_plan`, and
+`EngineClient.from_config` may call `EngineClient.run(max_cycles=1)` from the
+stable runner environment. This limits the caller to one governed engine
+cycle; it changes neither worker selection nor WorkItem state semantics.
+Inspect the result before refreshing the runner and continuing in a fresh
+process. Never manually reopen terminal WorkItems or edit persisted state.
+Never add a project-specific provider/worker selection override to force a
+particular developer.
 
 ## What maintainers may edit directly
 
@@ -66,17 +79,11 @@ is published):
    the distribution name (`ai-dev-orchestrator`) and the importable
    package name (`orchestrator`) differ on purpose, see that project's
    own `pyproject.toml`).
-3. Install this project too: `python -m pip install -e .`.
-4. To run AIDO Code's own governed WorkItem Flow (the "Core rule"
-   above) locally, copy `aido.example.yaml` to `aido.yaml` (already in
-   `.gitignore`; never commit a real `aido.yaml`, since it may
-   reference machine-specific paths):
-   ```bash
-   cp aido.example.yaml aido.yaml
-   ```
-   It references the sibling checkout's own `config/workers.yaml`
-   (`../ai-dev-orchestrator/config/workers.yaml`), never a copy of the
-   worker pool. Edit that one path if your checkout layout differs.
+3. For self-hosted governed development, install AIDO Code editably from
+   the separate stable runner checkout into its environment, not from the
+   governed target. Keep the target's local modern `aido.yaml` manifest
+   untracked and follow `docs/PROJECT_CONTRACT.md`; do not substitute the
+   historical legacy engine CLI/configuration path.
 
 **Never add a machine-specific path dependency to a tracked
 `pyproject.toml`** — no `file:///home/...`, no `../ai-dev-orchestrator`,
@@ -100,9 +107,9 @@ This project's own `pytest -q` suite must always stay offline: it must
 never call a real Claude/Codex/Vibe/Gravity/Ralph provider, and
 no real provider consumption may ever come from this project's own QA
 either; see `MVP_SPEC.yaml`. This does not restrict real governed
-development itself — once WorkItems are scheduled, `python -m
-orchestrator.cli run <config>` driving DEV A, DEV B, QA, and governed
-merge is expected and required to use real workers/providers.
+development itself — once WorkItems are scheduled, the separate stable runner's
+`aido run` driving DEV A, DEV B, QA, and governed merge is expected and
+required to use real workers/providers.
 
 ## Questions about the engine itself
 
