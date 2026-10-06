@@ -64,6 +64,8 @@ def test_why_extracts_work_item_id() -> None:
         "what is the status and run the project?",
         "run the project and show status",
         "why are WI-03 and WI-04 blocked?",
+        "why are work item alpha and work item beta blocked?",
+        "why are WI-03 and work item beta blocked?",
     ],
 )
 def test_ambiguous_or_unrecognised_input_is_unknown(text: str) -> None:
@@ -84,8 +86,11 @@ def test_repl_unrecognised_input_replies_not_understood_without_engine(
 
     monkeypatch.setattr(EngineClient, "from_config", boom)
     monkeypatch.setattr(EngineClient, "open", boom)
-    transcript = _run("tell me a joke\ndelete everything\nplease continue and delete everything\n/exit\n")
-    assert transcript.count(NOT_UNDERSTOOD) == 3
+    transcript = _run(
+        "tell me a joke\ndelete everything\nplease continue and delete everything\n"
+        "why are work item alpha and work item beta blocked?\n/exit\n"
+    )
+    assert transcript.count(NOT_UNDERSTOOD) == 4
 
 
 def test_repl_workers_question_uses_workers_command_with_zero_probes(
