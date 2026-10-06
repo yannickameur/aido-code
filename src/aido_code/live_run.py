@@ -109,6 +109,25 @@ class LiveRunRenderer:
             self.render_errors += 1
 
 
+INTERRUPTED_NOTICE = (
+    "Interrupted. Output already shown is preserved. The governed engine state "
+    "determines recovery: the next `aido run` (or `/run`) calls the engine's "
+    "existing recovery path unchanged. `aido resume` and `/resume` only reopen "
+    "a session; they do not recover project execution."
+)
+
+
+def run_interruptibly(client: Any, sink: object | None) -> Any | None:
+    """The one Ctrl+C handler shared by ``aido run`` and ``/run``: runs
+    ``client.run`` and returns its ``RunResult``, or ``None`` after a
+    ``KeyboardInterrupt``. AIDO keeps no recovery state of its own; any
+    ``*.interrupted`` events the engine emitted were already rendered."""
+    try:
+        return client.run(on_event=sink)
+    except KeyboardInterrupt:
+        return None
+
+
 def format_diagnostics(diagnostics: object) -> str:
     """Render every ``FailureDiagnostic``; ``""`` when there are none."""
     entries = list(diagnostics or ())

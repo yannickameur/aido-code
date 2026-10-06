@@ -434,6 +434,12 @@ def _run_config(config_path: str) -> str:
     return format_config(context, snapshot)
 
 
+def _interrupt_helpers() -> tuple[object, str]:
+    from aido_code.live_run import INTERRUPTED_NOTICE, run_interruptibly
+
+    return run_interruptibly, INTERRUPTED_NOTICE
+
+
 def _live_sink(output_stream: TextIO | None) -> object | None:
     if output_stream is None:
         return None
@@ -462,9 +468,12 @@ def _run_run(
         with EngineClient.open(
             config_path, provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
         ) as client:
-            result = client.run(on_event=_live_sink(output_stream))
+            run_interruptibly, notice = _interrupt_helpers()
+            result = run_interruptibly(client, _live_sink(output_stream))
     except EngineError as exc:
         return f"Error: {exc}"
+    if result is None:
+        return notice
     return format_run(result, include_events=output_stream is None)
 
 
@@ -492,7 +501,10 @@ def _run_session_project(
             plan, worker_registry=context.worker_registry,
             provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
         ) as client:
-            result = client.run(on_event=_live_sink(output_stream))
+            run_interruptibly, notice = _interrupt_helpers()
+            result = run_interruptibly(client, _live_sink(output_stream))
+            if result is None:
+                return notice
             return format_run(result, include_events=output_stream is None)
     except _PROJECT_COMMAND_ERRORS as exc:
         return f"Error: {exc}"
