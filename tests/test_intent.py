@@ -44,6 +44,7 @@ def test_why_extracts_work_item_id() -> None:
     assert interpret("why is WI-03 waiting?").work_item_id == "WI-03"
     assert interpret("Why is work item alpha blocked").work_item_id == "alpha"
     assert interpret("why are we stuck").work_item_id is None
+    assert interpret("why is the work item blocked?").work_item_id is None
 
 
 @pytest.mark.parametrize(
@@ -56,6 +57,13 @@ def test_why_extracts_work_item_id() -> None:
         "delete everything",
         "what is the weather",
         "please run the workers",
+        "what is the status and which workers are available?",
+        "why is WI-03 blocked and what is the project status?",
+        "please continue and delete everything",
+        "run the project then delete everything",
+        "what is the status and run the project?",
+        "run the project and show status",
+        "why are WI-03 and WI-04 blocked?",
     ],
 )
 def test_ambiguous_or_unrecognised_input_is_unknown(text: str) -> None:
@@ -76,8 +84,8 @@ def test_repl_unrecognised_input_replies_not_understood_without_engine(
 
     monkeypatch.setattr(EngineClient, "from_config", boom)
     monkeypatch.setattr(EngineClient, "open", boom)
-    transcript = _run("tell me a joke\ndelete everything\n/exit\n")
-    assert transcript.count(NOT_UNDERSTOOD) == 2
+    transcript = _run("tell me a joke\ndelete everything\nplease continue and delete everything\n/exit\n")
+    assert transcript.count(NOT_UNDERSTOOD) == 3
 
 
 def test_repl_workers_question_uses_workers_command_with_zero_probes(

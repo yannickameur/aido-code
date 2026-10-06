@@ -38,11 +38,15 @@ _WORKER_WORDS = {"worker", "workers", "provider", "providers", "agents", "agent"
 _STATUS_WORDS = {"status", "state", "progress", "standing"}
 _RUN_VERBS = {"run", "continue", "resume", "start", "proceed", "go", "launch", "execute", "carry", "keep", "going"}
 _QUESTION_WORDS = {"what", "which", "who", "how", "where", "list", "show", "see", "any"}
+_RUN_WORDS = _RUN_VERBS | {
+    "please", "let's", "lets", "can", "could", "you", "now", "ahead", "and",
+    "on", "the", "this", "my", "our", "project", "work", "working", "it", "with",
+}
 
 
 def _work_item_id(text: str) -> str | None:
     match = _WORK_ITEM_RE.search(text)
-    if match:
+    if match and match.group(1).lower() not in _WAIT_WORDS | {"is", "are", "was", "were"}:
         return match.group(1).rstrip(".,?!")
     for candidate in _WORK_ITEM_ID_RE.findall(text):
         if any(ch.isdigit() for ch in candidate):
@@ -60,21 +64,28 @@ def interpret(text: str) -> IntentMatch:
     matched: list[Intent] = []
     if "why" in word_set and word_set & _WAIT_WORDS:
         matched.append(Intent.WHY_WAITING)
-    elif word_set & _WORKER_WORDS and (word_set & _QUESTION_WORDS or "available" in word_set
-                                       or "configured" in word_set or "enabled" in word_set):
+    if word_set & _WORKER_WORDS and (word_set & _QUESTION_WORDS or "available" in word_set
+                                     or "configured" in word_set or "enabled" in word_set):
         matched.append(Intent.WORKERS)
-    elif word_set & _STATUS_WORDS and (word_set & _QUESTION_WORDS or "is" in word_set
-                                       or "the" in word_set or len(words) <= 2):
+    if word_set & _STATUS_WORDS and (word_set & _QUESTION_WORDS or "is" in word_set
+                                     or "the" in word_set or len(words) <= 2):
         matched.append(Intent.STATUS)
-    elif word_set & _WAIT_WORDS and word_set & _QUESTION_WORDS:
+    if "why" not in word_set and word_set & _WAIT_WORDS and word_set & _QUESTION_WORDS:
         # e.g. "what is blocked?" / "is anything waiting?" -> status view
         matched.append(Intent.STATUS)
+    if matched and word_set & _RUN_VERBS:
+        return IntentMatch(Intent.UNKNOWN)
     if (words[0] in _RUN_VERBS or words[0] in {"please", "let's", "lets", "can", "could", "now"}) and (
         word_set & _RUN_VERBS
-    ) and not word_set & (_WORKER_WORDS | _STATUS_WORDS | {"why", "what", "which", "how"}):
+    ) and word_set <= _RUN_WORDS:
         matched.append(Intent.RUN)
 
     if len(matched) != 1:
         return IntentMatch(Intent.UNKNOWN)
     intent = matched[0]
+    if intent is Intent.WHY_WAITING:
+        ids = {candidate.lower() for candidate in _WORK_ITEM_ID_RE.findall(text)
+               if any(ch.isdigit() for ch in candidate)}
+        if len(ids) > 1:
+            return IntentMatch(Intent.UNKNOWN)
     return IntentMatch(intent, _work_item_id(text) if intent is Intent.WHY_WAITING else None)
