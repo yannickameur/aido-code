@@ -86,6 +86,11 @@ def interpret(text: str) -> IntentMatch:
     if intent is Intent.WHY_WAITING:
         ids = {candidate.lower() for candidate in _WORK_ITEM_ID_RE.findall(text)
                if any(ch.isdigit() for ch in candidate)}
+        ids.update(
+            match.group(1).rstrip(".,?!").lower()
+            for match in _WORK_ITEM_RE.finditer(text)
+            if match.group(1).lower() not in _WAIT_WORDS | {"is", "are", "was", "were"}
+        )
         if len(ids) > 1:
             return IntentMatch(Intent.UNKNOWN)
     return IntentMatch(intent, _work_item_id(text) if intent is Intent.WHY_WAITING else None)
