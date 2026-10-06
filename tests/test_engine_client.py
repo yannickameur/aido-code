@@ -4,7 +4,7 @@ docs/ENGINE_CONTRACT.md).
 
 Offline only, via OrchestratorEngine.open()'s own provider_adapters/
 subprocess_runner injection seams: never a real Claude/Codex/Vibe/
-DeepSeek/Kimi provider, never a real Ralph subprocess (see
+Gravity provider, never a real Ralph subprocess (see
 CONTRIBUTING.md).
 """
 

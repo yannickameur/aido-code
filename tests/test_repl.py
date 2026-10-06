@@ -19,6 +19,7 @@ import io
 import os
 import subprocess
 import sys
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -442,6 +443,44 @@ class TestStatus:
 
         assert transcript.count("  anthropic:") == 1
         assert transcript.count("five_hour") == 1
+
+    def test_probe_with_packaged_pool_probes_each_provider_once_and_renders_quota_once(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        config_path = _init_m14_project(tmp_path)
+        _use_packaged_default_registry(tmp_path, monkeypatch)
+
+        class ProviderFakeAdapter(FakeAdapter):
+            def __init__(self, provider: str, **kwargs: Any) -> None:
+                super().__init__(**kwargs)
+                self._provider = provider
+
+            async def probe(self) -> Any:
+                return replace(await super().probe(), provider=self._provider)
+
+        gravity = ProviderFakeAdapter(
+            "gravity",
+            available=True,
+            quota_windows=(
+                QuotaWindow(
+                    window_type="gravity_weekly", source="gravity", observed_at=UTC_T0,
+                    utilization=0.25, reset_at=None,
+                ),
+            ),
+        )
+        others = {name: ProviderFakeAdapter(name, available=True) for name in ("anthropic", "openai", "mistral")}
+
+        transcript = _run(
+            "/status --probe\n/exit\n", config_path=str(config_path),
+            provider_adapters={"gravity": gravity, **others},
+        )
+
+        assert gravity.calls == 1
+        assert [adapter.calls for adapter in others.values()] == [1, 1, 1]
+        assert transcript.count("  gravity:") == 1
+        assert transcript.count("gravity_weekly") == 1
+        assert "Arthur" in transcript and "Nora" in transcript
+        assert "Traceback" not in transcript
 
     def test_plain_status_never_renders_a_quota_section(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

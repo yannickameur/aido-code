@@ -130,6 +130,53 @@ def test_packaged_default_loads_and_declares_an_enabled_worker(
     assert any(w.provider for w in enabled)
 
 
+def test_packaged_default_is_exactly_the_validated_eight_worker_pool(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg-empty"))
+    monkeypatch.setenv("HOME", str(tmp_path / "home-empty"))
+
+    workers = load_worker_registry().all_workers()
+    by_id = {w.worker_id: w for w in workers}
+
+    assert len(workers) == 8
+    assert all(w.enabled for w in workers)
+    assert {w.provider for w in workers} == {"anthropic", "openai", "mistral", "gravity"}
+    assert {w.display_name for w in workers} == {
+        "Alice", "Lydie", "Victor", "Yannick", "Nathaniel", "Juno", "Arthur", "Nora",
+    }
+    assert "dana" not in by_id and "kai" not in by_id
+    assert not any(w.provider in {"deepseek", "kimi"} for w in workers)
+    assert not any(w.display_name.lower() == "gravity" for w in workers)
+
+    arthur, nora = by_id["gravity_primary"], by_id["gravity_secondary"]
+    assert (arthur.display_name, nora.display_name) == ("Arthur", "Nora")
+    assert arthur.provider == nora.provider == "gravity"
+    assert arthur.backend == nora.backend == "gravity"
+    assert (arthur.priority, nora.priority) == (101, 91)
+    for worker in (arthur, nora):
+        profile = next(p for p in worker.profiles if p.profile_id == "standard")
+        assert profile.model == "claude-sonnet-4-6"
+        assert profile.reasoning_effort is None
+
+
+def test_readme_worker_table_matches_packaged_default(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg-empty"))
+    monkeypatch.setenv("HOME", str(tmp_path / "home-empty"))
+
+    readme = (Path(__file__).resolve().parent.parent / "README.md").read_text(encoding="utf-8")
+    rows = {
+        cells[0]: [cells[1], cells[2].lower()]
+        for line in readme.splitlines()
+        if line.startswith("| ") and len(cells := [c.strip() for c in line.strip("|").split("|")]) == 4
+    }
+    for worker in load_worker_registry().all_workers():
+        assert rows[worker.worker_id] == [worker.display_name, worker.provider.lower()]
+    assert "dana" not in rows and "kai" not in rows
+
+
 def test_never_resolves_into_ai_dev_orchestrator_owned_paths(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

@@ -97,7 +97,7 @@ real, publishable path.
 ## Tests
 
 This project's own `pytest -q` suite must always stay offline: it must
-never call a real Claude/Codex/Vibe/DeepSeek/Kimi/Ralph provider, and
+never call a real Claude/Codex/Vibe/Gravity/Ralph provider, and
 no real provider consumption may ever come from this project's own QA
 either; see `MVP_SPEC.yaml`. This does not restrict real governed
 development itself — once WorkItems are scheduled, `python -m
