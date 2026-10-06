@@ -152,8 +152,9 @@ P21 (`DONE`, verified at engine SHA `6456c93`) adds progressive
 `execution.output`, bounded-output `execution.output_truncated`, neutral
 `execution.heartbeat`, and typed `FailureDiagnostic` entries through
 `RunResult.diagnostics` (see `docs/ENGINE_CONTRACT.md`). This project
-does not yet consume `on_event`: `EngineClient.run()` still calls the
-engine without a callback. M3.1's WorkItems will render these public
-facts through one CLI/REPL path. They must never infer commands,
-tests, commits, or provider reasoning from unstructured text or scrape
-Git/SQLite/`.ralph` to fill gaps.
+now passes `on_event` through `EngineClient.run()` and renders these
+public facts with `LiveRunRenderer`; CLI/REPL interruption handling shares
+`run_interruptibly`. No Git/SQLite/`.ralph` scraping is added. The real
+M3.1 acceptance exposed a remaining defect: raw backend JSON can contain
+private reasoning, which terminal sanitization alone does not suppress.
+See `ROADMAP.md`; the no-chain-of-thought acceptance is not yet met.
