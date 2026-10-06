@@ -147,3 +147,97 @@ def test_format_why_waiting_reports_only_snapshot_facts() -> None:
     assert "blocked_reason=qa failed" in _format_why_waiting(snap, "wi-01")
     assert "no WorkItem WI-9" in _format_why_waiting(snap, "WI-9")
     assert "WI-01" in _format_why_waiting(snap, None)
+
+
+def _session_commands(session: object, commands: str, **kwargs: object) -> str:
+    import io
+
+    from aido_code.repl import run
+
+    output = io.StringIO()
+    run(io.StringIO(commands + "/exit\n"), output, session=session, **kwargs)
+    return output.getvalue()
+
+
+def test_session_bound_status_phrase_reads_fresh_engine_snapshot_each_time(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from aido_code.project_init import run_init
+    from aido_code.session import SessionStore
+    from orchestrator.engine import OrchestratorEngine
+
+    assert run_init(str(tmp_path), "bound") == 0
+    project = tmp_path / "bound"
+    store = SessionStore(tmp_path / "sessions")
+    session = store.resume(store.create(project).session_id)
+    before = sorted(p.name for p in (tmp_path / "sessions").rglob("*"))
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    _pin_fake_home(tmp_path, monkeypatch)
+
+    calls = 0
+    original = OrchestratorEngine.status
+
+    def counting(self: OrchestratorEngine):
+        nonlocal calls
+        calls += 1
+        return original(self)
+
+    monkeypatch.setattr(OrchestratorEngine, "status", counting)
+    first = _session_commands(session, "what's the status?\n")
+    roadmap = project / "ROADMAP.md"
+    roadmap.write_text(roadmap.read_text().replace("Status: DRAFT", "Status: APPROVED"))
+    second = _session_commands(session, "what's the status?\n")
+    assert "current_milestone_status: DRAFT" in first
+    assert "current_milestone_status: APPROVED" in second
+    assert calls == 2
+    assert _session_commands(session, "/status\n") == second
+    # Natural-language turns add no persistence beyond the M2 session store.
+    assert sorted(p.name for p in (tmp_path / "sessions").rglob("*")) == before
+
+
+def test_session_bound_run_phrase_uses_same_shared_path_as_slash_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from aido_code.project_init import run_init
+    from aido_code.session import SessionStore
+
+    assert run_init(str(tmp_path), "bound") == 0
+    session = SessionStore(tmp_path / "sessions").create(tmp_path / "bound")
+    calls: list[tuple[str, object]] = []
+
+    def fake(config_path: str, **kwargs: object) -> str:
+        calls.append((config_path, kwargs.get("output_stream")))
+        return "SHARED-RUN"
+
+    monkeypatch.setattr("aido_code.repl._run_session_project", fake)
+    nl = _session_commands(session, "please continue\nrun the project\n")
+    slash = _session_commands(session, "/run\n")
+    assert nl.count("SHARED-RUN") == 2 and slash.count("SHARED-RUN") == 1
+    assert len(calls) == 3
+    assert {path for path, _ in calls} == {str(tmp_path / "bound" / "aido.yaml")}
+    assert all(stream is not None for _, stream in calls)
+
+
+def test_run_phrase_on_draft_milestone_matches_slash_run_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_path = _init_m14_project(tmp_path)
+    _pin_fake_home(tmp_path, monkeypatch)
+    adapter = FakeAdapter(available=True)
+    nl = _run("continue the project\n/exit\n", config_path=str(config_path),
+              provider_adapters={"anthropic": adapter})
+    cmd = _run("/run\n/exit\n", config_path=str(config_path), provider_adapters={"anthropic": adapter})
+    assert nl == cmd and NOT_UNDERSTOOD not in nl
+    assert adapter.calls == 0
+
+
+def test_repl_and_router_add_no_background_monitor_or_new_store() -> None:
+    import aido_code.intent as intent_src
+    import aido_code.repl as repl_src
+
+    for module in (intent_src, repl_src):
+        text = Path(module.__file__).read_text()
+        for forbidden in ("threading", "asyncio", "sched", "time.sleep", "vector", "embedding", "sqlite"):
+            assert forbidden not in text, (module.__name__, forbidden)
