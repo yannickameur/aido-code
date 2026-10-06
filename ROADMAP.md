@@ -62,7 +62,7 @@ record. M3 subsequently ran; its partial outcome is recorded below.
 | M2.2 — CLI-level `aido status` parity fix | `DONE` (real governed run: 1/1 WorkItem `completed`; see M2.2 below) |
 | M2.3 — Align AIDO worker pool with validated providers | `DONE` (real governed run: 1/1 WorkItem `completed`; see M2.3 below) |
 | M3 — Conversational piloting and live execution | `PARTIAL` (governed run 2026-10-06: WI-M3-03 completed; WI-M3-01 failed; WI-M3-02/04 blocked; original contract retained below) |
-| M3.1 — Live operational UX and conversational completion | `APPROVED` — unique current milestone; uses engine P21 and reuses WI-M3-03 |
+| M3.1 — Live operational UX and conversational completion | `APPROVED` — 3/3 WorkItems completed; live acceptance remains open (private-reasoning display defect) |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
 | M6 — Doctor/diagnostics | `À VOTER` |
@@ -1440,6 +1440,47 @@ P21 subsequently delivered progressive worker output, heartbeat, and
 typed failure diagnostics at `6456c93828a89ffc72b1966e04bdd0fc693469a2`.
 Unfinished frontend scope moves to M3.1 with new WorkItem IDs; WI-M3-03
 is reused, never implemented again.
+
+## M3.1 — Governed run and live acceptance (2026-10-06)
+
+The isolated stable runner bootstrapped exactly one engine cycle via the
+modern loader and `EngineClient.run(max_cycles=1)`. WI-M3.1-01 completed;
+02/03 remained planned. After pushing 01, the clean runner checkout was
+fast-forwarded to `ef32a2d`, and a fresh `aido run` completed 02/03 in two
+cycles. No hot reload, worker override, or manual persisted-state change.
+
+| WorkItem | DEV A | DEV B | Governed merge | QA |
+|---|---|---|---|---|
+| WI-M3.1-01 | Alice, `d28eb33` | Victor, `ef32a2d` | `ef32a2d` | PASS; 302 tests after merge |
+| WI-M3.1-02 | Alice, `f847166` | Victor, no additional commit | `f847166` | PASS |
+| WI-M3.1-03 | Alice, `5e83ac5` | Victor, no additional commit | `5e83ac5` | PASS |
+
+Final offline suite: **311 passed**; `git diff --check` clean. All three
+WorkItem snapshots are `completed`; the engine's MVP snapshot still says
+`running` and has not been manually changed. Historical M3 states remain
+untouched. No DEV FIX was observed. No M4 execution was started.
+
+The fresh-process live run showed worker metadata, progressive stdout
+before worker completion, neutral heartbeats, output resuming after silence,
+QA PASS and Git merge transitions, and the final summary. Two live-output
+truncation notices reported `reason=max_chars`, 64,000 delivered characters
+(39 and 43 events). No stderr stream was observed in this acceptance. No
+controller traceback or lingering target Ralph/provider process was observed.
+Ctrl+C handling is covered by offline simulated-interruption tests; this run
+was not intentionally interrupted. The existing NL router was reused.
+
+**Product acceptance remains open; M3.1 is not DONE.** Claude's raw JSON
+stdout included an assistant content block explicitly typed `thinking`
+(observed at `2026-10-06T17:21:01.901Z`), and the renderer displayed it.
+No private content is reproduced here. An offline synthetic `thinking`
+block with a harmless marker also passes through `render_event` unchanged.
+Terminal control-character sanitization does not enforce the contract's
+no-private-reasoning requirement. The 311 passing tests miss this case.
+A governed correction and regression acceptance are required before closure;
+no functional workaround or provider-specific parser was added by the
+controller. Raw backend output must not be equated with safely classified
+operational activity. Gravity was not selected in this run; its previously
+recorded P21 observability limitation remains unchanged.
 
 ## Current milestone
 

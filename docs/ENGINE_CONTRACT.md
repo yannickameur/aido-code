@@ -230,14 +230,17 @@ P21's disposable Arthur/Gravity acceptance observed 62 progressive
 stdout events, two heartbeats and subsequent output. Ralph then ended
 with `max_iterations` after five iterations, no business verdict, exit
 code 2, and no commit. These events do not prove which commands or
-tools Gravity used. M3.1 renders actual safe output and does not invent
-a provider-specific activity model or expose chain-of-thought.
+tools Gravity used. No provider-specific activity model is inferred.
 
-**AIDO Code consumption remains unbuilt**: `EngineClient.run()` still
-calls `self._engine.run(max_cycles=max_cycles)` without `on_event`;
-`ROADMAP.md` M3.1, WI-M3.1-01/02, governs the frontend wiring and
-interruption UX. A loaded engine missing the P21 API is an explicit
-compatibility failure, never a silent coarse-only fallback.
+**AIDO Code consumption delivered through the governed M3.1 flow**:
+`EngineClient.run()` forwards `on_event`, `LiveRunRenderer` renders the
+public events, and `run_interruptibly` shares CLI/REPL Ctrl+C handling.
+A loaded engine missing the checked P21 API fails closed. The fresh-process
+live acceptance verified output, heartbeat, truncation and transitions,
+but exposed private `thinking` content in raw Claude JSON reaching the
+terminal. The no-chain-of-thought requirement remains unmet; see
+`ROADMAP.md`. Neither control-character sanitization nor event transport
+alone proves output is safe operational text.
 
 **Packaging gate**: both the engine's current `pyproject.toml` and the
 minimum in AIDO Code's `pyproject.toml` still say `0.1.3`. That number
@@ -267,5 +270,6 @@ orchestrator-side gaps; AIDO Code must never work around them by
 reaching past this contract (parsing stdout/Git/SQLite, guessing a
 value). The live-timeline/execution-detail/interrupt gaps that used to
 be listed here were engine-side prerequisites for M3/M3.1 — they are
-resolved (`ai-dev-orchestrator` P18 and P21, both `DONE`); only this
-project's own frontend consumption (M3.1's WorkItems) remains unbuilt.
+resolved (`ai-dev-orchestrator` P18 and P21, both `DONE`). Frontend
+consumption is implemented; M3.1's live acceptance remains open for the
+private-reasoning display defect recorded above.

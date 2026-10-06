@@ -37,8 +37,8 @@ P13.6).
 | `--continue`/`-c` | `M2` | Resume the most recent session | No |
 | `/resume` | `M2` | Resume picker, from inside the REPL | No |
 | `/new` | `M2` | New frontend session | No |
-| Free-form natural language | `M3` (`PARTIAL`, router delivered) / M3.1 (`APPROVED`) | Closed status/steering intents, shared live run path planned | Depends |
-| Live orchestration/output during `run` | `M3.1` (`APPROVED`, not implemented) | Public P18/P21 event feed and failure diagnostics | No |
+| Free-form natural language | `M3` (`PARTIAL`, router delivered) / M3.1 (`APPROVED`) | Closed status/steering intents, shared live run path delivered | Depends |
+| Live orchestration/output during `run` | `M3.1` (implemented, live acceptance open) | Public P18/P21 event feed and failure diagnostics | No |
 | `-p "<request>"` | `M4` | Non-interactive mode | Depends |
 | `--output json`/`stream-json` | `M5` | Structured output | No |
 | `doctor` | `M6` | Read-only diagnostics | No |
@@ -197,14 +197,16 @@ reuses that router and routes a run request through the same path as
 `/run` and CLI `aido run`. Idle status questions use fresh engine
 snapshots; the router never decides worker, QA, Git, or recovery state.
 
-During a run, the terminal will render public engine events while they
+During a run, the terminal renders public engine events as they
 arrive: WorkItem/DEV A/DEV B/DEV FIX/QA/Git/interruption transitions,
 actual `execution.output`, neutral `execution.heartbeat`, and
-`execution.output_truncated`. A failed run will use
+`execution.output_truncated`. A failed run uses
 `RunResult.diagnostics` for the available phase, worker, Ralph,
 business-verdict, last-output, and next-action facts. Text and metadata
-are sanitized for the terminal; output is not reinterpreted as a
-command/tool/test or private reasoning without evidence. `Ctrl+C`
+are sanitized for terminal control characters. Live acceptance nevertheless
+found raw backend `thinking` content reaching the display; M3.1 remains
+open until this contract violation is corrected through governance.
+No provider-specific semantic activity model is inferred. `Ctrl+C`
 remains subject to engine recovery on the next run. `aido resume` and
 `/resume` remain session-only. The engine P21 API is a hard prerequisite
 (see `docs/ENGINE_CONTRACT.md`).
