@@ -12,6 +12,7 @@ from aido_code.project_init import run_init
 from aido_code.project_manifest import ProjectManifestError
 from aido_code.project_resources import ProjectResourcesError
 from aido_code.roadmap import RoadmapError
+from aido_code.live_run import LiveRunRenderer
 from aido_code.repl import build_status_output, format_run, run
 from aido_code.session import SessionError, SessionStore
 from aido_code.session_commands import pick_session, resume_selected
@@ -31,7 +32,8 @@ def _project_command(command: str) -> int:
             return 1
         plan = build_engine_plan(context.manifest, context.roadmap, context.resources)
         with EngineClient.from_config(plan, worker_registry=context.worker_registry) as client:
-            print(format_run(client.run()))
+            result = client.run(on_event=LiveRunRenderer(sys.stdout))
+            print(format_run(result, include_events=False))
         return 0
     except (ProjectManifestError, RoadmapError, ProjectResourcesError,
             WorkerRegistryError, EnginePlanError, EngineError, OSError, ValueError) as exc:

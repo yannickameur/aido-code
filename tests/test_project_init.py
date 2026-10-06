@@ -112,7 +112,7 @@ class TestSuccessfulBootstrap:
             def __exit__(self, *args):
                 return False
 
-            def run(self):
+            def run(self, on_event=None):
                 calls.append("run")
                 return object()
 
@@ -122,7 +122,7 @@ class TestSuccessfulBootstrap:
             return FakeClient()
 
         monkeypatch.setattr(entrypoint.EngineClient, "from_config", fake_from_config)
-        monkeypatch.setattr(entrypoint, "format_run", lambda result: "RUN COMPLETE")
+        monkeypatch.setattr(entrypoint, "format_run", lambda result, **kw: "RUN COMPLETE")
 
         assert entrypoint.main(["run"]) == 0
         assert calls[0].mvp.id == "m1"
