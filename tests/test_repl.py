@@ -458,27 +458,29 @@ class TestStatus:
             async def probe(self) -> Any:
                 return replace(await super().probe(), provider=self._provider)
 
-        gravity = ProviderFakeAdapter(
-            "gravity",
-            available=True,
-            quota_windows=(
-                QuotaWindow(
-                    window_type="gravity_weekly", source="gravity", observed_at=UTC_T0,
-                    utilization=0.25, reset_at=None,
+        adapters = {
+            name: ProviderFakeAdapter(
+                name,
+                available=True,
+                quota_windows=(
+                    QuotaWindow(
+                        window_type=f"{name}_weekly", source=name, observed_at=UTC_T0,
+                        utilization=0.25, reset_at=None,
+                    ),
                 ),
-            ),
-        )
-        others = {name: ProviderFakeAdapter(name, available=True) for name in ("anthropic", "openai", "mistral")}
+            )
+            for name in ("anthropic", "openai", "mistral", "gravity")
+        }
 
         transcript = _run(
             "/status --probe\n/exit\n", config_path=str(config_path),
-            provider_adapters={"gravity": gravity, **others},
+            provider_adapters=adapters,
         )
 
-        assert gravity.calls == 1
-        assert [adapter.calls for adapter in others.values()] == [1, 1, 1]
-        assert transcript.count("  gravity:") == 1
-        assert transcript.count("gravity_weekly") == 1
+        for name, adapter in adapters.items():
+            assert adapter.calls == 1
+            assert transcript.count(f"  {name}:") == 1
+            assert transcript.count(f"{name}_weekly") == 1
         assert "Arthur" in transcript and "Nora" in transcript
         assert "Traceback" not in transcript
 
