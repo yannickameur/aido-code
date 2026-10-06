@@ -68,10 +68,10 @@ AIDO-built `WorkerRegistry` injected
 | AIDO Code owns | AI Dev Orchestrator owns |
 |---|---|
 | The terminal/REPL: prompt, rendering, colors, layout | Worker selection |
-| Sessions: minimal frontend state, optional project binding, resume-by-session-id (M2 — conversation history and its persistence belong to M3) | QA verdicts |
+| Sessions: minimal frontend state, optional project binding, resume-by-session-id (M2; no persistent conversation history in M3.1) | QA verdicts |
 | Commands (`/help`, `/status`, `/workers`, `/config`, `/validate`, `/run`, `/exit`, later `/resume`/`/new`) | Merge decisions |
 | Output rendering: text today, `json`/`stream-json` later (M5), built directly from typed snapshots, never by parsing this project's own stdout | WorkItem completion, all engine state transitions |
-| Natural-language interpretation of engine facts (M3): may explain, never a second authority on state (`LLM IS NOT ORACLE`, the same invariant the engine itself is built on) | SQLite / all persisted state |
+| The delivered M3 deterministic router for a closed set of natural-language intents; never a second authority on state | SQLite / all persisted state |
 | AIDO's own global worker configuration/defaults, the `aido.yaml` manifest parser, the `ROADMAP.md` deterministic parser, `resources/` resolution (M1.4, `docs/PROJECT_CONTRACT.md`) | The `WorkerRegistry`/`WorkerSelector` *types/runtime* themselves, and every decision made from a `WorkerRegistry` once AIDO Code hands one in |
 
 AIDO Code never crosses these lines:
@@ -134,9 +134,8 @@ tuples: `kind`/`timestamp`/`project_id`/`mvp_id`/`work_item_id`/
 `payload`, plus optional metadata fields, see below) — coarse: one
 `work_item.<status>` event per WorkItem processed, emitted only once
 that WorkItem's whole DEV A/DEV B/QA/merge sequence has already
-finished. This is unchanged by P18 on purpose: `RunResult` itself stays
-exactly as before, so `on_event=None` (the default) preserves today's
-exact behavior.
+finished. This coarse `events` tuple is unchanged by P18/P21;
+P21 separately adds `RunResult.diagnostics` for failures.
 
 Since `ai-dev-orchestrator` P18 (`DONE`, commit `23e68b7`, confirmed
 present in the sibling engine this project's `.venv` actually imports —
@@ -149,11 +148,12 @@ progress fact, never batched/reordered: finer `dev_a.*`/`dev_b.*`/
 `provider`/`backend`/`profile_id`/`model`/`quality_tier`/
 `reasoning_effort`/`commit_sha` — exactly what the engine actually
 decided, `None` when genuinely unknown, never guessed from `worker_id`.
-This project does not yet consume `on_event` anywhere
-(`aido_code.engine_client.EngineClient.run()` still calls
-`self._engine.run(max_cycles=max_cycles)` with no callback) — wiring a
-richer, per-step live timeline is M3's own unbuilt work
-(`ROADMAP.md`, M3, `WI-M3-01`/`WI-M3-02`), no longer blocked by a
-missing engine capability. This project must never fabricate
-finer-grained progress, or a model/profile it was not actually told, by
-guessing or by parsing subprocess/Git/SQLite output.
+P21 (`DONE`, verified at engine SHA `6456c93`) adds progressive
+`execution.output`, bounded-output `execution.output_truncated`, neutral
+`execution.heartbeat`, and typed `FailureDiagnostic` entries through
+`RunResult.diagnostics` (see `docs/ENGINE_CONTRACT.md`). This project
+does not yet consume `on_event`: `EngineClient.run()` still calls the
+engine without a callback. M3.1's WorkItems will render these public
+facts through one CLI/REPL path. They must never infer commands,
+tests, commits, or provider reasoning from unstructured text or scrape
+Git/SQLite/`.ralph` to fill gaps.

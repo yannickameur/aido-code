@@ -66,7 +66,7 @@ file-based construction path too, but M1.4 never uses `.open()` at all.
 | `.workers()` | `tuple[WorkerSnapshot, ...]` | none, never a provider probe |
 | `.probe_workers()` | `tuple[ProviderSnapshot, ...]` | a real, explicit provider probe (network/CLI), no SQLite |
 | `.status()` | `ProjectStatusSnapshot` | none, strictly read-only, matches `aido status` |
-| `.run(max_cycles=50)` | `RunResult` | the only call that writes: SQLite, Git, a real provider execution |
+| `.run(max_cycles=50, on_event=None)` | `RunResult` | the only call that writes: SQLite, Git, a real provider execution; optional synchronous live events |
 | `.close()` | `None` | none, a documented no-op (no persistent connection is ever held) |
 
 `OrchestratorEngine` also supports `with OrchestratorEngine.open(...)
@@ -162,7 +162,9 @@ live Store, SQLite connection, or any dataclass from
   `"work_item.<status>"` (still the only thing `RunResult.events` ever
   contains) or, delivered live via `on_event` only (see below), a finer
   `"dev_a.<status>"`/`"dev_b.<status>"`/`"dev_fix.<status>"`/
-  `"qa.<status>"`/`"git.<status>"`/`"run.<status>"` value — plus
+  `"qa.<status>"`/`"git.<status>"`/`"run.<status>"` value, or P21
+  `"execution.output"`/`"execution.output_truncated"`/
+  `"execution.heartbeat"` — plus
   `timestamp`, `project_id`, `mvp_id`, `work_item_id`, `payload` (a
   plain `dict`), and optional metadata (`None` when genuinely unknown,
   never fabricated/guessed from `worker_id`): `execution_id`, `phase`,
@@ -171,25 +173,24 @@ live Store, SQLite connection, or any dataclass from
   `commit_sha`. See "Events" in `ARCHITECTURE.md`.
 - **`RunResult`**: `cycles_run`, `all_terminal`, `reached_max_cycles`,
   `work_items` (`tuple[WorkItemSnapshot, ...]`), `events`
-  (`tuple[EngineEvent, ...]`) — unchanged by P18: always the coarse
-  per-WorkItem tuple, regardless of whether `on_event` is used.
+  (`tuple[EngineEvent, ...]`) — still the coarse per-WorkItem tuple,
+  regardless of whether `on_event` is used — and P21 `diagnostics`
+  (`tuple[FailureDiagnostic, ...]`) for failures in the current run.
 
 ## Live events and graceful interruption (P18, `DONE`)
 
-Confirmed by direct introspection of the sibling engine this project's
-own `.venv` actually imports (editable install of
-`~/projects/ai-dev-orchestrator`, `main` at commit `23e68b7`,
-2026-09-28):
+P18's API was confirmed by direct introspection of the sibling engine
+on 2026-09-28 at commit `23e68b7`. The current P21 engine loaded by the
+stable runner is separately verified below.
 
 - `OrchestratorEngine.run(*, max_cycles=..., on_event=None)` — an
   optional `on_event: Callable[[EngineEvent], None]` callback, called
   synchronously in the same thread, once per real live progress fact,
   in the exact order those facts occur, never batched/reordered/from a
-  separate thread. Omitting it (the default) leaves every behavior,
-  including `RunResult`, exactly as before P18 — this is a pure
-  addition, never a breaking change to this contract's existing
-  surface. An exception raised by `on_event` itself propagates
-  immediately to `.run()`'s own caller, never swallowed.
+  separate thread. At P18, omitting it preserved the prior behavior;
+  P21 later added `RunResult.diagnostics` and observational output-event
+  delivery. An exception raised by the transition callback itself
+  propagates immediately to `.run()`'s own caller, never swallowed.
 - Graceful interruption: a `Ctrl+C`/`asyncio.CancelledError` during
   `.run()` is now handled explicitly inside the engine (POSIX
   process-group cleanup for Ralph and QA subprocess trees; no orphaned
@@ -200,13 +201,51 @@ own `.venv` actually imports (editable install of
   where it left off (QA-only resume when DEV already succeeded; DEV is
   never replayed).
 
-**Not yet true of this project's own code**: `EngineClient.run()`
-(`src/aido_code/engine_client.py`) still calls
-`self._engine.run(max_cycles=max_cycles)` with no `on_event` — wiring a
-live timeline and interruption UX on top of this now-available engine
-capability is M3's own unbuilt work (`ROADMAP.md`, M3, `WI-M3-01`/
-`WI-M3-02`), never something to build by parsing subprocess/Git/SQLite
-output instead of this contract.
+## Live worker output and failed-run diagnostics (P21, `DONE`)
+
+Verified with the stable runner interpreter on 2026-10-06:
+`aido_code` imports from `~/projects/aido-runner/src/aido_code`, while
+`orchestrator` imports from sibling `~/projects/ai-dev-orchestrator/src/
+orchestrator` at `main` SHA
+`6456c93828a89ffc72b1966e04bdd0fc693469a2`. The runner does not
+import the editable AIDO Code checkout it will govern.
+`OrchestratorEngine.run(*, max_cycles=50, on_event=None)` has the P21
+callback and `RunResult.diagnostics` is a tuple of
+`FailureDiagnostic`. The public P21 `EngineEvent` payloads are exactly:
+
+- `execution.output`: `stream` (`stdout` or `stderr`), `text` (observed output).
+- `execution.output_truncated`: `reason`, `delivered_events`, `delivered_chars`.
+- `execution.heartbeat`: `elapsed_seconds` (time elapsed, not claimed activity).
+
+`FailureDiagnostic` fields, in the loaded engine: `work_item_id`,
+`phase`, `execution_id`, `worker_id`, `worker_display_name`, `provider`,
+`backend`, `profile_id`, `model`, `execution_status`, `exit_code`,
+`business_verdict`, `ralph_termination_reason`, `ralph_iterations`,
+`last_output`, `last_output_stream`, `summary`, `next_action`,
+`output_delivery_failures`, `last_output_delivery_error`. Unknown facts
+remain `None`; a missing business verdict is reported as `absent`, not
+inferred from an exit code. No other field is assumed by M3.1.
+
+P21's disposable Arthur/Gravity acceptance observed 62 progressive
+stdout events, two heartbeats and subsequent output. Ralph then ended
+with `max_iterations` after five iterations, no business verdict, exit
+code 2, and no commit. These events do not prove which commands or
+tools Gravity used. M3.1 renders actual safe output and does not invent
+a provider-specific activity model or expose chain-of-thought.
+
+**AIDO Code consumption remains unbuilt**: `EngineClient.run()` still
+calls `self._engine.run(max_cycles=max_cycles)` without `on_event`;
+`ROADMAP.md` M3.1, WI-M3.1-01/02, governs the frontend wiring and
+interruption UX. A loaded engine missing the P21 API is an explicit
+compatibility failure, never a silent coarse-only fallback.
+
+**Packaging gate**: both the engine's current `pyproject.toml` and the
+minimum in AIDO Code's `pyproject.toml` still say `0.1.3`. That number
+alone does not identify a published engine build with P21. A normal
+packaged AIDO Code release must depend on a distinct, published engine
+version that contains P21; its number is chosen when that release
+exists. The sibling editable engine at the verified SHA is sufficient
+for governed M3.1 development, not proof of packaged-release parity.
 
 ## What this contract does not give AIDO Code (yet)
 
@@ -219,16 +258,14 @@ output instead of this contract.
   see `ROADMAP.md`, M8. AIDO Code must still never import
   `orchestrator.cli`'s private helpers to work around this gap.
 - Push/streaming updates over a socket/RPC boundary. `.run()` remains a
-  single blocking Python call (with the new optional in-process
-  `on_event` callback above); AIDO Code polls by calling it again, or
-  drives its own loop around repeated `.status()` calls for a read-only
-  view while a separate `.run()` is in flight elsewhere.
+  single blocking Python call with an optional in-process `on_event`
+  callback. M3.1 uses that callback during a run and fresh `.status()`
+  snapshots while idle; it adds no polling loop.
 
 None of these are invented here. They are real, still-open
 orchestrator-side gaps; AIDO Code must never work around them by
 reaching past this contract (parsing stdout/Git/SQLite, guessing a
 value). The live-timeline/execution-detail/interrupt gaps that used to
-be listed here were the engine-side prerequisite for M3 — they are
-resolved (`ai-dev-orchestrator` P18, `DONE`, commit `23e68b7`); only
-this project's own consumption of that capability (M3's WorkItems)
-remains unbuilt.
+be listed here were engine-side prerequisites for M3/M3.1 — they are
+resolved (`ai-dev-orchestrator` P18 and P21, both `DONE`); only this
+project's own frontend consumption (M3.1's WorkItems) remains unbuilt.

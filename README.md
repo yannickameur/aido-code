@@ -33,14 +33,20 @@ merge. AIDO Code never makes any of those decisions itself; see
 | M1.3 — Audit hardening | `DONE` |
 | M1.4 — Autonomous AIDO project contract | `DONE` |
 | M8 — `aido` command cutover | `DONE` — completed right after M1.4 (out of numeric order); see `ROADMAP.md`, M8 |
-| M2 — Sessions and resume | `SPECIFIED`, not started, unaffected by M1.4/M8 |
-| M3+ | `PLANNED` |
+| M2, M2.1, M2.2, M2.3 | `DONE` |
+| M3 — Conversational piloting and live execution | `PARTIAL` — deterministic intent router delivered; live frontend WorkItems failed/blocked in the governed run |
+| M3.1 — Live operational UX and conversational completion | `APPROVED`, documented; implementation not started |
+| M4+ | Future |
 
 Each milestone's real, governed build is recorded factually in
 [`docs/M1_REFERENCE_RUN.md`](docs/M1_REFERENCE_RUN.md) and
 [`docs/M1_1_REFERENCE_RUN.md`](docs/M1_1_REFERENCE_RUN.md), including
 two real engine defects those runs found and that were later fixed. Full
 milestone detail and acceptance criteria: [`ROADMAP.md`](ROADMAP.md).
+The engine's P21 live output, heartbeat, and failure diagnostics are
+available in the verified sibling checkout; M3.1 will make AIDO Code
+render them during `aido run`. The current frontend does not yet show
+that live stream.
 
 ### Product model (M1.4)
 

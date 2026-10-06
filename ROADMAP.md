@@ -12,7 +12,8 @@ there. This roadmap starts at M1.
 ## Where we stand
 
 DONE: M1, M1.1, M1.2, M1.3, M1.4, M8, M2, M2.1, M2.2, M2.3
-CURRENT: M3 — APPROVED
+PARTIAL: M3 — governed run closed with terminal failures/blockages
+CURRENT: M3.1 — APPROVED
 FUTURE: M4-M6, M9+
 
 M8 completed **out of numeric order**, right after M1.4: M1.4 itself
@@ -22,10 +23,9 @@ packaging follow-up rather than a separately-scheduled future milestone
 — see M8 below.
 
 **M7 was retired as a separate milestone (2026-09-26)**: real-time
-timeline visibility is needed as soon as M3, not later, so its need is
-now covered by M3 below instead of a second, later milestone. There is
-no other section in this file describing timeline delivery as future
-work beyond M3.
+timeline visibility was needed as soon as M3, not later, so its scope
+remains within M3 and its M3.1 continuation below instead of a second,
+later milestone.
 
 **M2.2 was inserted ahead of M3, then completed (2026-09-28)**: M1.4/M8's
 own claimed `init`/`validate`/`run`/`status` CLI-level parity turned out
@@ -36,9 +36,9 @@ direct commit or fold the fix into M3's unrelated scope, M2.2 was
 inserted so the governed flow could build the exact same,
 already-specified fix properly. A human GO was given, the governed
 WorkItem Flow ran WI-M2.2-01 to completion, and M2.2 reached `DONE` —
-see M2.2 below for the real run record. M3 itself was never modified
-by any of this; it is now resumed as `## Current milestone`, exactly as
-it was before being paused.
+see M2.2 below for the real run record. At that point M3's contract was
+untouched and it was resumed as `## Current milestone`; the later
+2026-10-06 run and partial outcome are recorded below.
 
 **M2.3 was inserted ahead of M3, then completed (2026-10-06)**: `ai-dev-orchestrator`'s
 P20 (`DONE`, `main` = `c9484b1`) removed the never-validated
@@ -48,8 +48,7 @@ AIDO Code's own packaged default pool still carries `dana`/`kai`. M2.3
 aligns it, through the governed flow (`CONTRIBUTING.md`), before M3
 starts. A human GO was given, the governed WorkItem Flow ran WI-M2.3-01 to
 completion, and M2.3 reached `DONE` — see M2.3 below for the real run
-record. M3 itself was never modified by any of this; it is now resumed as
-`## Current milestone`, exactly as it was before being paused.
+record. M3 subsequently ran; its partial outcome is recorded below.
 
 | Milestone | Status |
 |---|---|
@@ -62,7 +61,8 @@ record. M3 itself was never modified by any of this; it is now resumed as
 | M2.1 — Graceful interactive interruption | `DONE` (real governed run: 1/1 WorkItem `completed`; see M2.1 below) |
 | M2.2 — CLI-level `aido status` parity fix | `DONE` (real governed run: 1/1 WorkItem `completed`; see M2.2 below) |
 | M2.3 — Align AIDO worker pool with validated providers | `DONE` (real governed run: 1/1 WorkItem `completed`; see M2.3 below) |
-| M3 — Conversational piloting and live execution | `APPROVED` (human GO 2026-09-28; engine prerequisite `ai-dev-orchestrator` P18 `DONE`) — governed by this file's own `## Current milestone` below (absorbs former M7) |
+| M3 — Conversational piloting and live execution | `PARTIAL` (governed run 2026-10-06: WI-M3-03 completed; WI-M3-01 failed; WI-M3-02/04 blocked; original contract retained below) |
+| M3.1 — Live operational UX and conversational completion | `APPROVED` — unique current milestone; uses engine P21 and reuses WI-M3-03 |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
 | M6 — Doctor/diagnostics | `À VOTER` |
@@ -76,7 +76,7 @@ future milestone's contract is authored.** Starting at M1.4,
 `ROADMAP.md` is the single functional source of truth for a *project*
 this product governs (see M1.4 below and `docs/PROJECT_CONTRACT.md`).
 This file's own historical milestones (M1 through M1.4, M8) and
-not-yet-specified future milestones (M3 and beyond) stay free-form
+not-yet-specified future milestones (M4 and beyond) stay free-form
 prose by convention — but starting at M2, this file's own `## Current
 milestone` section is itself a direct instance of the exact same
 deterministic grammar `docs/PROJECT_CONTRACT.md` §3 defines for the
@@ -1036,12 +1036,10 @@ hand-authored direct commit.
 Deliberately **not** folded into M3's own scope: this is a leftover
 M1.4/M8 parity gap, unrelated to M3's conversational-piloting/live-
 execution concerns (`on_event`/`EngineEvent`/graceful interruption).
-M3 itself stays exactly as already `APPROVED` (human GO 2026-09-28,
-commit `dbe135c`) — unchanged, untouched, simply queued behind this
-smaller milestone: see "M3 — Conversational piloting and live
-execution" below, promoted out of this `## Current milestone` section
-into its own permanent heading for the duration of M2.2, to be moved
-back into `## Current milestone` once M2.2 reaches `DONE`.
+At the time of this M2.2 preparation, M3 stayed queued with its original
+approval (human GO 2026-09-28, commit `dbe135c`) and unchanged contract;
+it was resumed after M2.2, then ran on 2026-10-06. See its historical
+outcome and the current M3.1 contract below.
 
 ### Acceptance criteria
 
@@ -1081,7 +1079,7 @@ Argv: ["pytest", "-q"]
 
 ### Out of scope
 
-- any M3 work (conversational piloting, live timeline, graceful interruption UX, natural-language intent layer) — M3 stays queued, `Status: APPROVED`, unchanged, resumed as `## Current milestone` once this milestone reaches `DONE`.
+- any M3 work (conversational piloting, live timeline, graceful interruption UX, natural-language intent layer) — at the time this M2.2 WorkItem was prepared, M3 stayed queued and unchanged until M2.2 reached `DONE`.
 - any change to `/status`'s/`/workers`'s/`/config`'s own already-`IMPLEMENTED` behavior beyond exposing the same information at the CLI level.
 - `-p "<request>"` non-interactive mode (M4), structured output (M5), `doctor` (M6) — unrelated, unaffected.
 - merging PR #4 as-is: this milestone's own governed run is what lands on `main`, never that direct commit.
@@ -1188,7 +1186,7 @@ Argv: ["pytest", "-q"]
 
 ### Out of scope
 
-- any M3 work (conversational piloting, live timeline, graceful interruption UX, natural-language intent layer) — M3 stays queued, `Status: APPROVED`, unchanged, resumed as `## Current milestone` once this milestone reaches `DONE`.
+- any M3 work (conversational piloting, live timeline, graceful interruption UX, natural-language intent layer) — at the time this M2.3 WorkItem was prepared, M3 stayed queued and unchanged until M2.3 reached `DONE`.
 - any change to the engine (`ai-dev-orchestrator`), `WorkerSelector`, `QuotaManager` or `GravityAdapter`.
 - Gravity-specific status rendering, or any direct `agy` subprocess from AIDO Code.
 - the user's local worker override file: aligned by hand after the governed run, never committed.
@@ -1220,9 +1218,10 @@ renderer. No local worker override file existed on this machine
 alignment. No manual code correction was made by any human/assistant at
 any point.
 
-## Current milestone
+## M3 — Conversational piloting and live execution (`PARTIAL`)
 
-Status: APPROVED
+Historical outcome: `PARTIAL` after the governed run on 2026-10-06.
+The original approved contract and its WorkItem criteria remain below.
 
 ### ID
 
@@ -1427,6 +1426,146 @@ Argv: ["pytest", "-q"]
 - a free-form/LLM-based intent interpretation layer (WI-M3-03 is a deterministic, closed-set router only) — may be proposed separately later, against a real, demonstrated need (À VOTER).
 - any new persistent conversational history/session data — `SessionStore` gains nothing new in this milestone (see WI-M3-04's own product decision).
 - silently degrading to the old coarse-only summary when the loaded engine lacks the required P18 API — that is a hard compatibility failure, not a supported fallback (see Objective).
+
+### Governed outcome (2026-10-06)
+
+The real M3 run ended `PARTIAL`: WI-M3-01 failed terminally in DEV A
+(Arthur / `gravity_primary`, no commit, Ralph `max_iterations`, no
+business verdict); WI-M3-02 and WI-M3-04 became terminally blocked by
+that dependency. WI-M3-03 completed through the governed flow and its
+deterministic natural-language intent router is on `main` (`8ab3096`,
+`1559c22`, `9d3857f`). No M3 persisted status is reopened or edited.
+The failed run exposed missing engine observability; `ai-dev-orchestrator`
+P21 subsequently delivered progressive worker output, heartbeat, and
+typed failure diagnostics at `6456c93828a89ffc72b1966e04bdd0fc693469a2`.
+Unfinished frontend scope moves to M3.1 with new WorkItem IDs; WI-M3-03
+is reused, never implemented again.
+
+## Current milestone
+
+Status: APPROVED
+
+### ID
+
+m3.1
+
+### Objective
+
+Finish the user-facing M3 capabilities now that engine P21 supplies
+real worker output, neutral heartbeats, and typed failure diagnostics.
+During an explicit `aido run`, AIDO Code must show useful activity while
+the run is happening, then leave a clear final result. CLI `aido run`,
+REPL `/run`, and a recognized run/continue request use one shared live
+run path. AIDO Code remains a frontend: it renders only public engine
+facts and never calls Ralph or a provider, reads engine stores or `.ralph`
+files, reconstructs activity from Git, or makes orchestration decisions.
+
+The expected human experience includes real WorkItem/DEV A/DEV B/DEV
+FIX/QA/Git transitions, the selected worker and known execution
+metadata, progressive stdout/stderr text, a neutral elapsed-time
+heartbeat during silence, and an explicit truncation notice when P21
+bounds live output. On failure, the final view explains the phase,
+execution identity and available `FailureDiagnostic` facts rather than
+only displaying `WI-X: failed`. Output text is never reclassified as a
+tool call, test, or commit unless the engine actually states that fact.
+No chain-of-thought is presented; output that cannot be classified as
+safe operational text must not be shown as private reasoning.
+
+The hard development prerequisite is the verified sibling editable
+engine at SHA `6456c93828a89ffc72b1966e04bdd0fc693469a2`, loaded by
+the stable `aido-runner` executable. Its public P21 surface is described
+in `docs/ENGINE_CONTRACT.md`. The engine and AIDO Code still declare
+`0.1.3` and `ai-dev-orchestrator>=0.1.3` respectively; that minimum
+does not prove a packaged engine contains P21. A normal packaged AIDO
+Code release requires a distinct, actually published engine version
+containing P21 and a matching dependency minimum. No version is guessed
+or changed during this preparation.
+
+P21's real disposable Gravity spike delivered 62 progressive stdout
+chunks, two heartbeats, then more output. Ralph terminated with
+`max_iterations` after five iterations, no business verdict, exit code
+2, no commit, and no lingering Ralph/Gravity process. This proves the
+stream and diagnostic, not which tools or commands Gravity used. M3.1
+renders such output faithfully without a Gravity-specific parser or a
+fabricated Claude-Code-like activity model.
+
+### Acceptance criteria
+
+- `aido run`, `/run`, and the existing deterministic run/continue intent share one live `EngineClient.run(on_event=...)` path to `OrchestratorEngine.run(on_event=...)`.
+- P18 WorkItem/DEV A/DEV B/DEV FIX/QA/Git/interruption events and P21 output, truncation, and heartbeat events are rendered promptly from public `EngineEvent` fields, with no polling or scraping.
+- Actual stdout/stderr text is preserved when safe to display; dynamic terminal values pass through the existing `sanitize_for_terminal()` path; unknown or malformed events cannot abort the governed run.
+- Worker/provider/backend/profile/model/quality/reasoning and commit facts are shown only when the engine supplies them; a silent worker produces only a neutral elapsed-time heartbeat.
+- Each available `RunResult.diagnostics` entry gives a useful final failure explanation, including the business-verdict and Ralph facts actually reported, without asserting an unproved provider cause.
+- A loaded engine lacking the required P21 `on_event`, event payloads, or `RunResult.diagnostics` fails closed with a clear compatibility message; there is no silent coarse-only fallback presented as live observability.
+- Ctrl+C during CLI or REPL run produces no traceback; already rendered output remains visible, and the next run leaves recovery decisions entirely to the engine.
+- Session `aido resume` and `/resume` keep their M2 meaning and never substitute for engine run recovery.
+- WI-M3-03's shipped deterministic router is reused unchanged in concept; idle status questions use fresh engine snapshots and a run intent enters the shared live path.
+- All tests and QA are offline, preserve M1 through M2.3 and WI-M3-03 behavior, and leave `git diff --check` clean.
+
+### WorkItems
+
+#### WI-M3.1-01 — Render live orchestration and worker execution stream
+
+Dependencies: none
+Capabilities: development
+
+Acceptance criteria:
+
+- Build one shared live-run path for CLI `aido run` and REPL `/run`; `EngineClient` passes `on_event` to `OrchestratorEngine.run(on_event=...)`, with no second orchestration path.
+- Render the existing P18 WorkItem, DEV A, DEV B, DEV FIX, QA, Git, and interruption transitions as they arrive.
+- Render P21 `execution.output` promptly, preserving observed text and distinguishing stdout/stderr when useful without duplicate noise or invented semantic labels.
+- Render `execution.heartbeat` only as still-running with actual `elapsed_seconds`; render `execution.output_truncated` with its actual reason and delivered counts.
+- Route all dynamic terminal values, including output text and metadata, through the existing `sanitize_for_terminal()` path; do not expose chain-of-thought or classify unstructured backend text as a command/tool/test.
+- Handle unknown, malformed, or partial future `EngineEvent` kinds without allowing a presentation error to kill a governed run; retain the end-of-run summary after the live stream.
+- Show worker/display name, provider, backend, profile, model, quality tier, reasoning effort, and commit SHA only from real `EngineEvent` fields when available.
+- Consume every `RunResult.diagnostics` entry and render phase, worker/display name, provider, backend, model, execution status, known exit code, business verdict, known Ralph termination reason/iterations, last output if present, summary, and next action; never show only `WI-X: failed` when a diagnostic exists.
+- Do not causally blame a provider without supporting engine facts; do not read Git, SQLite, `.ralph`, or subprocess output outside the public `EngineEvent` stream.
+- Treat P21 as a hard API prerequisite and fail closed with a clear engine-compatibility message if `on_event`, required event fields/payloads, or `RunResult.diagnostics` are missing.
+- Add offline tests for progressive display before run completion, metadata, stdout/stderr, heartbeat, truncation, sanitization, diagnostics, unknown events, and missing P21 API; make zero real provider calls.
+
+#### WI-M3.1-02 — Handle graceful interruption and recovery UX
+
+Dependencies: WI-M3.1-01
+Capabilities: development
+
+Acceptance criteria:
+
+- Handle Ctrl+C once for the shared CLI `aido run` and REPL `/run` path, without a raw traceback or a second AIDO recovery state machine.
+- Render real `run.interruption_requested`, `*.interrupted`, `qa.interrupted`, and `run.interrupted` events when supplied; preserve output already emitted before interruption.
+- Tell the user that the governed engine state determines recovery on the next run; the next `aido run` calls the engine's existing recovery path unchanged.
+- Keep session `aido resume` and `/resume` session-only; do not conflate them with project execution recovery.
+- Add offline tests with simulated KeyboardInterrupt/cancellation only; do not call a real provider.
+
+#### WI-M3.1-03 — Complete conversational/session integration and regression acceptance
+
+Dependencies: WI-M3.1-01, WI-M3.1-02
+Capabilities: development
+
+Acceptance criteria:
+
+- Reuse the delivered WI-M3-03 deterministic router and its closed intents: status/state, why waiting/blocked, workers/providers, and run/continue; do not rewrite it or add an LLM classifier.
+- Route a recognized run/continue request through the exact same shared live-run path as `/run` and CLI `aido run`.
+- Answer idle status questions from fresh engine snapshots; add no background monitor, polling loop, or new conversational persistence.
+- Reuse only M2 `SessionStore`/project binding; add no RAG, vector database, long-term memory, or model training.
+- Cover M1 through M2.3 and WI-M3-03 behavior with offline regression tests; run full `pytest -q` and `git diff --check` with zero real provider calls.
+
+### QA
+
+#### QA-M3.1-01 — Full offline test suite
+
+Kind: unit_test
+Required: true
+Timeout: 300
+Argv: ["pytest", "-q"]
+
+### Out of scope
+
+- Reopening or changing the persisted FAILED/BLOCKED M3 WorkItems or reimplementing WI-M3-03.
+- Direct Ralph/provider invocation, engine SQLite/`.ralph`/Git scraping, or local worker selection/QA/Git decisions.
+- Provider-specific output parsing, fabricated command/tool activity, or chain-of-thought display.
+- New recovery state machines, background monitoring, polling, detached jobs, or remote attach.
+- New conversational storage, RAG, vector databases, model training, or an LLM intent classifier.
+- Publishing or inventing an engine release version as part of this documentary preparation.
 
 ## M4 — Non-interactive mode
 

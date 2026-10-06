@@ -37,8 +37,8 @@ P13.6).
 | `--continue`/`-c` | `M2` | Resume the most recent session | No |
 | `/resume` | `M2` | Resume picker, from inside the REPL | No |
 | `/new` | `M2` | New frontend session | No |
-| Free-form natural language | `M3` (`APPROVED`) | Status/steering questions | Depends |
-| Live timeline during `run` | `M3` (`APPROVED`) | Real-time event feed | No |
+| Free-form natural language | `M3` (`PARTIAL`, router delivered) / M3.1 (`APPROVED`) | Closed status/steering intents, shared live run path planned | Depends |
+| Live orchestration/output during `run` | `M3.1` (`APPROVED`, not implemented) | Public P18/P21 event feed and failure diagnostics | No |
 | `-p "<request>"` | `M4` | Non-interactive mode | Depends |
 | `--output json`/`stream-json` | `M5` | Structured output | No |
 | `doctor` | `M6` | Read-only diagnostics | No |
@@ -183,47 +183,31 @@ loading path (`load_project_command_context`/`build_engine_plan`/
 unrecognized flag fails cleanly (`Error: ...`/usage message on stderr,
 non-zero exit), never a traceback.
 
-## M3 — Conversational piloting and live execution (`APPROVED`)
+## M3 / M3.1 — Conversational piloting and live execution
 
-Full rationale, engine prerequisite, and WorkItems: `ROADMAP.md`, M3.
-Absorbs former M7 (real-time timeline) — there is no separate future
-timeline milestone.
+M3 ended `PARTIAL` after its governed run on 2026-10-06. Its
+deterministic natural-language router (WI-M3-03) is delivered; its live
+stream and interruption WorkItems did not complete. M3.1 is the unique
+`APPROVED` current milestone with three new WorkItem IDs. Full criteria:
+`ROADMAP.md`, M3.1. No terminal M3 WorkItem is reopened.
 
-Free-form questions/requests handled in the REPL, e.g.:
+The existing REPL router recognizes a closed set of status/state,
+waiting/blocked, workers/providers, and run/continue requests. M3.1
+reuses that router and routes a run request through the same path as
+`/run` and CLI `aido run`. Idle status questions use fresh engine
+snapshots; the router never decides worker, QA, Git, or recovery state.
 
-```
-où en est le projet ?
-quels workers sont disponibles ?
-continue le projet
-pourquoi WI-12 attend ?
-qu'est-ce qui bloque la QA ?
-```
-
-Every fact used to answer comes from an `OrchestratorEngine` snapshot.
-A conversational layer may explain/summarize; it never becomes a
-second authority on project state.
-
-During `aido run`, a live timeline renders `RunResult.events`/a future
-engine progress feed as it happens: WorkItem started; each DEV A/DEV
-B/DEV FIX execution's worker, provider, backend, execution profile,
-model, quality tier, and reasoning effort (when the engine exposes
-one), plus started/commit/completed/failed; QA
-started/PASS/FAIL/INCONCLUSIVE; Git merge-ready/merge completed/tag.
-Granularity is bounded by what the engine actually emits; see "Events"
-in `ARCHITECTURE.md`. Never reconstructed by parsing stdout, Git, or
-SQLite.
-
-A `Ctrl+C` during a real `aido run` is recognized explicitly (no raw
-traceback); the next `aido run` resumes/recovers using the engine's own
-existing durable recovery state — never a second, AIDO-side recovery
-mechanism. `aido resume`/`/resume` (M2) stays session-resume only.
-
-**Engine-side prerequisite `DONE`**: both the live timeline and clean
-run interruption depend on `on_event`/`EngineEvent`/extended
-`RecoveryCoordinator` recovery, now available from `ai-dev-orchestrator`
-P18 (`DONE`, commit `23e68b7` — see `docs/ENGINE_CONTRACT.md` and
-`ROADMAP.md`, M3). This milestone is `APPROVED`; its WorkItems are what
-the governed WorkItem Flow builds next.
+During a run, the terminal will render public engine events while they
+arrive: WorkItem/DEV A/DEV B/DEV FIX/QA/Git/interruption transitions,
+actual `execution.output`, neutral `execution.heartbeat`, and
+`execution.output_truncated`. A failed run will use
+`RunResult.diagnostics` for the available phase, worker, Ralph,
+business-verdict, last-output, and next-action facts. Text and metadata
+are sanitized for the terminal; output is not reinterpreted as a
+command/tool/test or private reasoning without evidence. `Ctrl+C`
+remains subject to engine recovery on the next run. `aido resume` and
+`/resume` remain session-only. The engine P21 API is a hard prerequisite
+(see `docs/ENGINE_CONTRACT.md`).
 
 ## M4 — Non-interactive mode
 
