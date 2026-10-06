@@ -569,7 +569,7 @@ class TestRun:
         assert "cycles_run: 1" in transcript
         assert "all_terminal: True" in transcript
         assert "wi-1: completed" in transcript
-        assert "work_item.completed: work_item=wi-1" in transcript
+        assert "[work_item.completed] wi-1" in transcript
         assert len(runner.calls) == 2
 
     def test_rerunning_an_already_completed_project_does_nothing_and_never_re_executes(

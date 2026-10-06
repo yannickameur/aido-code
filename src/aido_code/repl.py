@@ -195,7 +195,9 @@ def format_status(milestone: CurrentMilestone, snapshot: ProjectStatusSnapshot) 
     return "\n".join(lines)
 
 
-def format_run(result: RunResult) -> str:
+def format_run(result: RunResult, *, include_events: bool = True) -> str:
+    """``include_events=False`` omits the ``events:`` section, for callers
+    that already streamed those events live."""
     lines = [
         f"cycles_run: {sanitize_for_terminal(result.cycles_run)}",
         f"all_terminal: {sanitize_for_terminal(result.all_terminal)}",
@@ -214,7 +216,7 @@ def format_run(result: RunResult) -> str:
                 line += f" (blocked_reason={sanitize_for_terminal(work_item.blocked_reason)})"
             lines.append(line)
 
-    if result.events:
+    if include_events and result.events:
         lines.append("")
         lines.append("events:")
         for event in result.events:
@@ -222,6 +224,13 @@ def format_run(result: RunResult) -> str:
                 f"  {sanitize_for_terminal(event.kind)}: "
                 f"work_item={sanitize_for_terminal(event.work_item_id)}"
             )
+
+    from aido_code.live_run import format_diagnostics
+
+    diagnostics = format_diagnostics(getattr(result, "diagnostics", ()))
+    if diagnostics:
+        lines.append("")
+        lines.append(diagnostics)
 
     return "\n".join(lines)
 
@@ -425,6 +434,14 @@ def _run_config(config_path: str) -> str:
     return format_config(context, snapshot)
 
 
+def _live_sink(output_stream: TextIO | None) -> object | None:
+    if output_stream is None:
+        return None
+    from aido_code.live_run import LiveRunRenderer
+
+    return LiveRunRenderer(output_stream)
+
+
 def _run_validate(config_path: str) -> str:
     try:
         with EngineClient.open(config_path) as client:
@@ -437,6 +454,7 @@ def _run_validate(config_path: str) -> str:
 def _run_run(
     config_path: str,
     *,
+    output_stream: TextIO | None = None,
     provider_adapters: dict[str, object] | None = None,
     subprocess_runner: object | None = None,
 ) -> str:
@@ -444,10 +462,10 @@ def _run_run(
         with EngineClient.open(
             config_path, provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
         ) as client:
-            result = client.run()
+            result = client.run(on_event=_live_sink(output_stream))
     except EngineError as exc:
         return f"Error: {exc}"
-    return format_run(result)
+    return format_run(result, include_events=output_stream is None)
 
 
 def _run_session_validate(config_path: str) -> str:
@@ -461,6 +479,7 @@ def _run_session_validate(config_path: str) -> str:
 def _run_session_project(
     config_path: str,
     *,
+    output_stream: TextIO | None = None,
     provider_adapters: dict[str, object] | None = None,
     subprocess_runner: object | None = None,
 ) -> str:
@@ -473,7 +492,8 @@ def _run_session_project(
             plan, worker_registry=context.worker_registry,
             provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
         ) as client:
-            return format_run(client.run())
+            result = client.run(on_event=_live_sink(output_stream))
+            return format_run(result, include_events=output_stream is None)
     except _PROJECT_COMMAND_ERRORS as exc:
         return f"Error: {exc}"
 
@@ -681,6 +701,7 @@ def run(
             output_stream.write(
                 (_run_session_project if session is not None else _run_run)(
                     config_path,
+                    output_stream=output_stream,
                     provider_adapters=provider_adapters,
                     subprocess_runner=subprocess_runner,
                 )

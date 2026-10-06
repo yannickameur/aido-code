@@ -226,7 +226,7 @@ class TestApprovedRunReachesEngine:
             def __exit__(self, *exc_info: object) -> bool:
                 return False
 
-            def run(self):
+            def run(self, on_event=None):
                 return RunResult(cycles_run=0, all_terminal=True, reached_max_cycles=False, work_items=())
 
         def _capturing_from_config(config, *, worker_registry, **kwargs):
