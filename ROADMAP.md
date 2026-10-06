@@ -12,7 +12,8 @@ there. This roadmap starts at M1.
 ## Where we stand
 
 DONE: M1, M1.1, M1.2, M1.3, M1.4, M8, M2, M2.1, M2.2
-CURRENT: M3 — APPROVED
+CURRENT: M2.3 — APPROVED
+QUEUED: M3 — APPROVED (paused behind M2.3, resumes as `## Current milestone` once M2.3 reaches `DONE`)
 FUTURE: M4-M6, M9+
 
 M8 completed **out of numeric order**, right after M1.4: M1.4 itself
@@ -40,6 +41,15 @@ see M2.2 below for the real run record. M3 itself was never modified
 by any of this; it is now resumed as `## Current milestone`, exactly as
 it was before being paused.
 
+**M2.3 was inserted ahead of M3 (2026-10-06)**: `ai-dev-orchestrator`'s
+P20 (`DONE`, `main` = `c9484b1`) removed the never-validated
+DeepSeek/Kimi providers and normalized Gravity into two worker identities
+(Arthur/Nora): the engine's validated pool is now 8 workers, 4 providers.
+AIDO Code's own packaged default pool still carries `dana`/`kai`. M2.3
+aligns it, through the governed flow (`CONTRIBUTING.md`), before M3
+starts; M3 itself is untouched, simply paused (`## M3 — ...` below, still
+`Status: APPROVED`) until M2.3 reaches `DONE`. See M2.3 below.
+
 | Milestone | Status |
 |---|---|
 | M1 — Minimal interactive shell | `DONE` (see `docs/M1_REFERENCE_RUN.md`) |
@@ -50,7 +60,8 @@ it was before being paused.
 | M2 — Sessions and resume | `DONE` (real governed run: 5/5 WorkItems `completed`; see M2 below) |
 | M2.1 — Graceful interactive interruption | `DONE` (real governed run: 1/1 WorkItem `completed`; see M2.1 below) |
 | M2.2 — CLI-level `aido status` parity fix | `DONE` (real governed run: 1/1 WorkItem `completed`; see M2.2 below) |
-| M3 — Conversational piloting and live execution | `APPROVED` (human GO 2026-09-28; engine prerequisite `ai-dev-orchestrator` P18 `DONE`) — governed by this file's own `## Current milestone` below (absorbs former M7) |
+| M2.3 — Align AIDO worker pool with validated providers | `APPROVED` (human GO 2026-10-06; engine `ai-dev-orchestrator` P20 `DONE`) — governed by this file's own `## Current milestone` below; inserted ahead of M3 |
+| M3 — Conversational piloting and live execution | `APPROVED` (human GO 2026-09-28; engine prerequisite `ai-dev-orchestrator` P18 `DONE`) — **queued behind M2.3**, see `## M3 — ...` below (absorbs former M7) |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
 | M6 — Doctor/diagnostics | `À VOTER` |
@@ -1105,6 +1116,85 @@ closed without merging, per this milestone's own "Out of scope" above.
 ## Current milestone
 
 Status: APPROVED
+
+### ID
+
+m2.3
+
+### Objective
+
+Align AIDO Code's worker pool with the providers and worker identities
+validated by ai-dev-orchestrator P20, before starting M3.
+
+`ai-dev-orchestrator` P20 (`DONE`, `main` = `c9484b1`) kept only validated
+providers: Alice/Lydie (`anthropic`), Victor/Yannick (`openai`),
+Nathaniel/Juno (`mistral`) and Arthur/Nora (`gravity`) — 8 enabled workers,
+4 providers. DeepSeek/Kimi (`dana`/`kai`) were removed from the active
+product. AIDO Code's packaged default (`aido_code/resources/
+default_workers.yaml`) and `README.md` must say the same thing.
+
+`gravity` is a provider/backend, never a worker `display_name`. AIDO Code
+must not know how Gravity quota is obtained: `aido status --probe` stays
+`EngineClient.probe_workers()` -> `OrchestratorEngine` -> the engine's own
+`GravityAdapter`; AIDO only renders the resulting `ProviderState`, with no
+direct subprocess to `agy` and no Gravity-specific rendering where the
+generic quota renderer already handles `window_type`/`utilization`/
+`remaining`/`reset_at`. Arthur and Nora share one provider-level Gravity
+probe.
+
+Deliberately small: one functional WorkItem. M3 stays exactly as already
+`APPROVED` — unchanged, untouched, simply queued behind this milestone:
+see "M3 — Conversational piloting and live execution" below, promoted out
+of this `## Current milestone` section into its own permanent heading for
+the duration of M2.3, to be moved back into `## Current milestone` once
+M2.3 reaches `DONE`.
+
+### Acceptance criteria
+
+- The packaged default contains exactly 8 enabled workers, from exactly 4 providers: `anthropic`, `openai`, `mistral`, `gravity`.
+- Workers: `alice` (Alice), `bob` (Lydie), `victor` (Victor), `oscar` (Yannick), `milo` (Nathaniel), `juno` (Juno), `gravity_primary` (Arthur, priority 101), `gravity_secondary` (Nora, priority 91).
+- `dana`/`kai`/DeepSeek/Kimi are absent from the packaged default and from current operational documentation (historical references stay).
+- No worker has `display_name` Gravity; Arthur/Nora share provider `gravity`, backend `gravity`.
+- Both Gravity workers: `enabled: true`, capability `development` only, `default_profile_id`/`estimator_profile_id` `standard`, profile `standard` = `quality_tier: STANDARD`, `model: claude-sonnet-4-6`, `cost_rank: 20`; no `reasoning_effort`.
+- `README.md` lists exactly the 8 active workers.
+- `aido status --probe` and `/status --probe` render provider quota once per provider: two Gravity workers never cause two provider probes; unknown stays unknown.
+- No `WorkerSelector` logic is duplicated or changed; no direct `agy` call from AIDO Code.
+- Tests stay offline: no real provider/`agy`/Ralph call by pytest.
+- `pytest -q` passes; `git diff --check` stays clean.
+
+### WorkItems
+
+#### WI-M2.3-01 — Align AIDO worker pool with validated providers
+
+Dependencies: none
+Capabilities: development
+
+Acceptance criteria:
+
+- `src/aido_code/resources/default_workers.yaml` becomes exactly the 8-worker validated pool above (same content as the engine's packaged default after P20), removing `dana`/`kai` entirely.
+- `README.md`'s worker table lists exactly the 8 active workers (Alice, Lydie, Victor, Yannick, Nathaniel, Juno, Arthur, Nora, with their provider); no Dana/Kai/DeepSeek/Kimi in current operational text.
+- Other current docs/docstrings that present DeepSeek/Kimi as an active or pending provider (`CONTRIBUTORS.md`, `CONTRIBUTING.md`, `docs/ENGINE_CONTRACT.md`, test docstrings) are corrected or neutralized; clearly historical references stay.
+- Offline tests prove: 8 workers; exactly 4 providers; Arthur/Nora present; no Dana/Kai; no `display_name` Gravity; Arthur/Nora share provider `gravity`; priorities 101/91; profile model `claude-sonnet-4-6`; README facts consistent where already tested.
+- Offline tests prove `/status --probe` renders each provider's quota once and that two Gravity workers cause a single provider probe (fake engine/adapter only).
+- No other behavior changes.
+
+### QA
+
+#### QA-M2.3-01 — Full test suite
+
+Kind: unit_test
+Required: true
+Timeout: 300
+Argv: ["pytest", "-q"]
+
+### Out of scope
+
+- any M3 work (conversational piloting, live timeline, graceful interruption UX, natural-language intent layer) — M3 stays queued, `Status: APPROVED`, unchanged, resumed as `## Current milestone` once this milestone reaches `DONE`.
+- any change to the engine (`ai-dev-orchestrator`), `WorkerSelector`, `QuotaManager` or `GravityAdapter`.
+- Gravity-specific status rendering, or any direct `agy` subprocess from AIDO Code.
+- the user's local worker override file: aligned by hand after the governed run, never committed.
+
+## M3 — Conversational piloting and live execution (`APPROVED`, queued behind M2.3)
 
 ### ID
 
