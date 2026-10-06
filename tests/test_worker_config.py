@@ -167,14 +167,17 @@ def test_readme_worker_table_matches_packaged_default(
     monkeypatch.setenv("HOME", str(tmp_path / "home-empty"))
 
     readme = (Path(__file__).resolve().parent.parent / "README.md").read_text(encoding="utf-8")
+    worker_table = readme.split("| Worker ID | Name | Provider | Default model |", 1)[1].split("\n\n", 1)[0]
     rows = {
-        cells[0]: [cells[1], cells[2].lower()]
-        for line in readme.splitlines()
-        if line.startswith("| ") and len(cells := [c.strip() for c in line.strip("|").split("|")]) == 4
+        cells[0]: (cells[1], cells[2].lower(), cells[3])
+        for line in worker_table.splitlines()[2:]
+        if len(cells := [cell.strip() for cell in line.strip("|").split("|")]) == 4
     }
-    for worker in load_worker_registry().all_workers():
-        assert rows[worker.worker_id] == [worker.display_name, worker.provider.lower()]
-    assert "dana" not in rows and "kai" not in rows
+    workers = load_worker_registry().all_workers()
+    assert set(rows) == {worker.worker_id for worker in workers}
+    for worker in workers:
+        profile = next(p for p in worker.profiles if p.profile_id == worker.default_profile_id)
+        assert rows[worker.worker_id] == (worker.display_name, worker.provider, profile.model)
 
 
 def test_never_resolves_into_ai_dev_orchestrator_owned_paths(
