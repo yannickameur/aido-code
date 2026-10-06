@@ -95,8 +95,14 @@ class TestRendering:
     def test_stdout_and_stderr_are_distinguished_without_semantic_labels(self) -> None:
         out = render_event(_event("execution.output", {"stream": "stdout", "text": "running pytest\n"}))
         err = render_event(_event("execution.output", {"stream": "stderr", "text": "oops\n"}))
-        assert out == "    [stdout] running pytest"
-        assert err == "    [stderr] oops"
+        assert out == r"    [stdout] running pytest\n"
+        assert err == r"    [stderr] oops\n"
+
+    def test_output_preserves_chunk_boundaries_and_line_endings(self) -> None:
+        first = render_event(_event("execution.output", {"stream": "stdout", "text": "part"}))
+        second = render_event(_event("execution.output", {"stream": "stdout", "text": "ial\n\n"}))
+        assert first == "    [stdout] part"
+        assert second == r"    [stdout] ial\n\n"
 
     def test_heartbeat_is_only_still_running_with_elapsed(self) -> None:
         line = render_event(_event("execution.heartbeat", {"elapsed_seconds": 12.5}))
