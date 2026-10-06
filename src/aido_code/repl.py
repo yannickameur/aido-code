@@ -48,6 +48,7 @@ from aido_code.engine_client import (
     WorkerSnapshot,
 )
 from aido_code.engine_plan import EnginePlanError, build_engine_plan
+from aido_code.intent import Intent, interpret
 from aido_code.project_command import ProjectCommandContext, load_project_command_context
 from aido_code.project_manifest import ProjectManifestError
 from aido_code.project_resources import ProjectResourcesError
@@ -496,6 +497,63 @@ def _run_workers(
     return _format_workers_section(snapshots, providers)
 
 
+def _format_why_waiting(snapshot: ProjectStatusSnapshot, work_item_id: str | None) -> str:
+    """Answers only from the engine's own `status()` snapshot: a
+    WorkItem's recorded status, `blocked_reason`, `wait` and last
+    execution. Nothing is inferred or fabricated."""
+    if not snapshot.initialized:
+        return "Nothing has run yet (NOT_INITIALIZED); there is no WorkItem to explain. Run /run to start."
+    items = snapshot.work_items
+    if work_item_id is not None:
+        items = tuple(i for i in items if i.work_item_id.lower() == work_item_id.lower())
+        if not items:
+            return f"The engine reports no WorkItem {sanitize_for_terminal(work_item_id)!s}."
+    else:
+        items = tuple(i for i in items if i.blocked_reason or i.wait is not None)
+        if not items:
+            return "The engine reports no WorkItem that is waiting or blocked."
+    lines = []
+    for item in items:
+        line = f"{sanitize_for_terminal(item.work_item_id)}: status={sanitize_for_terminal(item.status)}"
+        if item.blocked_reason:
+            line += f", blocked_reason={sanitize_for_terminal(item.blocked_reason)}"
+        if item.wait is not None:
+            providers = ",".join(sanitize_for_terminal(p) for p in item.wait.providers) or "(any)"
+            line += (
+                f", wait: phase={sanitize_for_terminal(item.wait.phase)} "
+                f"eligible_at={sanitize_for_terminal(item.wait.eligible_at)} providers={providers}"
+            )
+        if not item.blocked_reason and item.wait is None:
+            line += " (the engine recorded no wait or block reason)"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _run_why_waiting(
+    config_path: str,
+    work_item_id: str | None,
+    *,
+    provider_adapters: dict[str, object] | None = None,
+    subprocess_runner: object | None = None,
+) -> str:
+    try:
+        _context, client = _open_project_command_engine(
+            config_path, provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
+        )
+        with client:
+            snapshot = client.status()
+    except _PROJECT_COMMAND_ERRORS as exc:
+        return f"Error: {exc}"
+    return _format_why_waiting(snapshot, work_item_id)
+
+
+NOT_UNDERSTOOD = (
+    "Not understood. I can answer: project status, why a WorkItem is waiting/blocked, "
+    "which workers/providers are available, or run/continue the project. "
+    "Type /help for commands."
+)
+
+
 def run(
     input_stream: TextIO,
     output_stream: TextIO,
@@ -529,6 +587,30 @@ def run(
         command = line.strip()
         if not command:
             continue
+        if not command.startswith("/"):
+            match = interpret(command)
+            if match.intent is Intent.WHY_WAITING:
+                if session is not None:
+                    try:
+                        config_path = str(project_manifest_path(session))
+                    except SessionProjectError as exc:
+                        output_stream.write(f"Error: {exc}\n")
+                        continue
+                output_stream.write(
+                    _run_why_waiting(
+                        config_path, match.work_item_id,
+                        provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
+                    ) + "\n"
+                )
+                continue
+            command = {
+                Intent.STATUS: "/status",
+                Intent.WORKERS: "/workers",
+                Intent.RUN: "/run",
+            }.get(match.intent, "")
+            if not command:
+                output_stream.write(NOT_UNDERSTOOD + "\n")
+                continue
         tokens = command.split()
         name, flags = tokens[0], tokens[1:]
         if name == "/exit" and not flags:
