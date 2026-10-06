@@ -55,8 +55,6 @@ def _output_line(event: object) -> str:
     text = payload.get("text")
     stream = payload.get("stream")
     text = "" if text is None else (text if isinstance(text, str) else str(text))
-    if text.endswith("\n"):  # the chunk's own line terminator, not content
-        text = text[:-1]
     label = _clean(stream) if stream is not None else "output"
     return f"    [{label}] {_clean(text)}"
 
