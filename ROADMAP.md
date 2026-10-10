@@ -48,7 +48,7 @@ decision belongs to the engine.
 | M2.3 — Worker pool aligned with validated providers | `DONE` |
 | M3 — Conversational piloting and live execution | `PARTIAL` (historical outcome, see below) |
 | M3.1 — Live operational UX and conversational completion | `DONE` (governed acceptance 2026-10-10) |
-| M3.2 — Conversational terminal interface (Textual, French by default) | `APPROVED` — current milestone |
+| M3.2 — Conversational terminal interface (Textual, French by default) | `DONE` (2026-10-10) |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
 | M6 — Doctor/diagnostics | `À VOTER` |
@@ -95,8 +95,12 @@ fact genuinely is.
 
 ## Next milestone to discuss
 
-M3.2 is the current milestone. M4 remains the next candidate after it and
-is not started.
+M3.2 is `DONE`: all four WorkItems completed through the governed flow,
+and a real terminal run confirmed the French interface, live output,
+Ctrl+C interruption without leftover processes, and engine recovery on the
+next run. The `## Current milestone` block below keeps M3.2's contract only
+because the parser requires one. M4 remains the next candidate and is not
+started.
 
 ## Current milestone
 
