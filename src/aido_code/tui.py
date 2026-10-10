@@ -17,7 +17,7 @@ import termios
 import threading
 import time
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
@@ -171,7 +171,20 @@ class Message(Static):
         super().__init__(Text(prefix + body, style=_KINDS[kind]), markup=False, classes=f"msg-{kind}")
 
 
+def _plain(kind: str, text: str) -> str:
+    """The public text a ``Message`` displays, without styling."""
+    prefix = "> " if kind == "user" else ""
+    return prefix + "\n".join(sanitize_for_terminal(line) for line in text.split("\n"))
+
+
+def _export_dir() -> Path:
+    base = os.environ.get("XDG_STATE_HOME")
+    root = Path(base) if base and os.path.isabs(base) else Path.home() / ".local" / "state"
+    return root / "aido" / "exports"
+
+
 class AidoApp(App[None]):
+    ALLOW_SELECT = False
     CSS = """
     #log { height: 1fr; }
     #header { height: auto; dock: top; }
@@ -211,6 +224,9 @@ class AidoApp(App[None]):
         self._resume_choices: list[str] | None = None
         self._quota_in_flight = False
         self._last_idle_ctrl_c = float('-inf')
+        self._evicted = 0
+        self._last_times: str | None = None
+        self._last_summary: str | None = None
 
     def compose(self) -> ComposeResult:
         with Vertical(id="header"):
@@ -275,6 +291,41 @@ class AidoApp(App[None]):
         except Exception:
             return t("times.unavailable", self.lang)
 
+    # -- export -------------------------------------------------------
+    def _export(self) -> None:
+        session = self.state.session
+        session_id = session.session_id if session is not None else "no-session"
+        now = datetime.now(timezone.utc)
+        stamp = now.strftime("%Y%m%dT%H%M%SZ")
+        lang = self.lang
+        entries = sorted((*self._conversation, *self._event_history), key=lambda entry: entry.sequence)
+        lines = [t("export.header", lang, session_id=sanitize_for_terminal(session_id), timestamp=stamp)]
+        if self._evicted:
+            lines.append(t("export.evicted", lang, count=self._evicted))
+        lines += ["", t("export.conversation", lang)]
+        lines += [_plain(entry.kind, entry.detailed) for entry in entries]
+        for key, value in (("export.times", self._last_times), ("export.summary", self._last_summary)):
+            if value is not None:
+                lines += ["", t(key, lang), _plain("result", value)]
+        try:
+            directory = _export_dir()
+            directory.mkdir(parents=True, exist_ok=True)
+            path = directory / f"{session_id}-{stamp}.txt"
+            counter = 1
+            while True:
+                try:
+                    handle = open(path, "x", encoding="utf-8")
+                    break
+                except FileExistsError:
+                    counter += 1
+                    path = directory / f"{session_id}-{stamp}-{counter}.txt"
+            with handle:
+                handle.write("\n".join(lines) + "\n")
+        except (OSError, ValueError) as exc:
+            self.add_message("error", t("export.error", lang, error=exc))
+            return
+        self.add_message("info", t("export.done", lang, path=path))
+
     # -- status bar ---------------------------------------------------
     def _refresh_status(self) -> None:
         session = self.state.session
@@ -315,6 +366,7 @@ class AidoApp(App[None]):
     def _add_live_event(self, kind: str, simplified: str | None, detailed: str) -> None:
         if len(self._event_history) == _EVENT_HISTORY_LIMIT:
             oldest = self._event_history.popleft()
+            self._evicted += 1
             if oldest.widget is not None:
                 oldest.widget.remove()
         entry = _LogEntry(self._sequence, kind, detailed, simplified)
@@ -396,6 +448,10 @@ class AidoApp(App[None]):
         event.input.value = ""
         if line.strip() == "/quit":
             line = "/exit"
+        if line.strip() == "/export":
+            self.add_message("user", line)
+            self._export()
+            return
         if self.running:
             if line.strip() == "/exit" and self._interrupt is not None:
                 self._quit_after = True
@@ -481,12 +537,17 @@ class AidoApp(App[None]):
             text += f"\n  /quit - {t('help.cmd./quit', self.lang)}"
             text += f"\n  Ctrl+D, F10 - {t('help.quit_keys', self.lang)}"
             text += f"\n  Ctrl+C - {t('help.ctrl_c', self.lang)}"
+            text += f"\n  /export - {t('help.cmd./export', self.lang)}"
+            text += f"\n  Shift+drag - {t('help.select', self.lang)}"
         if text:
             kind = "error" if text.startswith(("Error", "Validation failed")) else (
                 "info" if line.startswith(("/help", "/new", "/resume")) else "result"
             )
             self.add_message(kind, text)
+        if _is_run_request(line):
+            self._last_summary = text or None
         if times is not None:
+            self._last_times = times
             self.add_message("result", times)
         self._keep_running = keep
 
