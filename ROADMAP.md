@@ -49,7 +49,7 @@ decision belongs to the engine.
 | M3 — Conversational piloting and live execution | `PARTIAL` (historical outcome, see below) |
 | M3.1 — Live operational UX and conversational completion | `DONE` (governed acceptance 2026-10-10) |
 | M3.2 — Conversational terminal interface (Textual, French by default) | `DONE` (2026-10-10) |
-| M3.3 — Simplified interface display with on-demand details | `APPROVED` — current milestone |
+| M3.3 — Simplified interface display with on-demand details | `DONE` (2026-10-10) |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
 | M6 — Doctor/diagnostics | `À VOTER` |
@@ -96,8 +96,16 @@ fact genuinely is.
 
 ## Next milestone to discuss
 
-M3.2 is `DONE` (governed flow plus a real terminal acceptance). M3.3 is the
-current milestone. M4 remains the next candidate and is not started.
+M3.2 and M3.3 are `DONE` (governed flow plus real terminal acceptance).
+The `## Current milestone` block below keeps M3.3's contract only because
+the parser requires one. M4 remains a candidate and is not started.
+
+Open engine defect found during the M3.3 real acceptance (to fix in
+`ai-dev-orchestrator` before relying on interruption): after Ctrl+C the
+engine terminates the worker process group but waits only for the direct
+`ralph` wrapper; the real `ralph` binary survived, started a new provider
+CLI and committed on the WorkItem branch about 40 s after the run was
+reported interrupted. This affects the classic and Textual paths alike.
 
 ## Current milestone
 
