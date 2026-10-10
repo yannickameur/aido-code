@@ -78,6 +78,49 @@ def format_quota_line(snapshot: object, lang: str) -> str:
     return f"{label}: " + " · ".join(parts)
 
 
+def format_duration(seconds: float) -> str:
+    total = max(0, int(round(seconds)))
+    hours, rest = divmod(total, 3600)
+    minutes, secs = divmod(rest, 60)
+    if hours:
+        return f"{hours} h {minutes:02d} min {secs:02d} s"
+    if minutes:
+        return f"{minutes} min {secs:02d} s"
+    return f"{secs} s"
+
+
+def _time_cell(seconds: float | None, executions: int | None, unknown: int, lang: str) -> str:
+    if executions == 0:
+        return t("times.none", lang)
+    cell = t("times.unknown", lang) if seconds is None else format_duration(seconds)
+    if unknown > 0:
+        cell += f" ({t('times.unknown_executions', lang, count=unknown)})"
+    return cell
+
+
+def format_execution_times(snapshot: object, milestone: str, lang: str) -> str:
+    """Table from an engine ``ExecutionTimeSnapshot``; nothing is computed here."""
+    by_provider = {str(p.provider): p for p in snapshot.providers}
+    order = list(_PROVIDER_LABELS)
+    order += sorted(key for key in by_provider if key not in _PROVIDER_LABELS)
+    rows = []
+    for key in order:
+        entry = by_provider.get(key)
+        label = _PROVIDER_LABELS.get(key, key)
+        if entry is None:
+            rows.append((label, t("times.none", lang)))
+        else:
+            rows.append((label, _time_cell(entry.seconds, entry.executions, entry.unknown_executions, lang)))
+    rows.append((t("times.total", lang), _time_cell(
+        snapshot.total_seconds, None, snapshot.unknown_executions, lang)))
+    head = (t("times.provider", lang), t("times.executed", lang))
+    width = max(len(row[0]) for row in (head, *rows))
+    lines = [t("times.title", lang, milestone=milestone), f"{head[0]:<{width}} | {head[1]}"]
+    lines.append("-" * width + "-+-" + "-" * max(len(row[1]) for row in (head, *rows)))
+    lines += [f"{label:<{width}} | {value}" for label, value in rows]
+    return "\n".join(lines)
+
+
 @dataclass
 class _LogEntry:
     sequence: int
@@ -157,6 +200,7 @@ class AidoApp(App[None]):
         self._cursor = 0
         self._resume_choices: list[str] | None = None
         self._quota_in_flight = False
+        self._run_started = False
 
     def compose(self) -> ComposeResult:
         with Vertical(id="header"):
@@ -205,6 +249,21 @@ class AidoApp(App[None]):
     def _finish_quota(self, lines: list[str]) -> None:
         self._quota_in_flight = False
         self._set_quota(lines)
+
+    # -- execution time summary ------------------------------------------
+    def _load_times(self) -> None:
+        """Thread worker: one read of the engine's own snapshot after a run."""
+        text = t("times.unavailable", self.lang)
+        try:
+            session = self.state.session
+            if session is not None and session.project_path:
+                context, client = repl._open_project_command_engine(str(project_manifest_path(session)))
+                with client:
+                    snapshot = client.execution_times()
+                text = format_execution_times(snapshot, context.roadmap.milestone.id, self.lang)
+        except Exception:
+            text = t("times.unavailable", self.lang)
+        self.call_from_thread(self.add_message, "result", text)
 
     # -- status bar ---------------------------------------------------
     def _refresh_status(self) -> None:
@@ -352,6 +411,7 @@ class AidoApp(App[None]):
         kwargs = dict(self._dispatch_kwargs)
         if _is_run_request(line):
             self._interrupt = threading.Event()
+            self._run_started = True
             kwargs.update(interrupt=self._interrupt, event_sink=self._on_event, show_run_start=False)
             self.add_message("info", t("run.start", self.lang))
         self._refresh_status()
@@ -414,8 +474,11 @@ class AidoApp(App[None]):
         self._interrupt = None
         self._heartbeat = ""
         self._refresh_status()
+        run_ended, self._run_started = self._run_started, False
         if self._quit_after or not self._keep_running:
             self.exit()
+        elif run_ended:
+            self.run_worker(self._load_times, thread=True, group="times", exit_on_error=False)
 
 
 def run_tui(state: ReplState, lang: str, **dispatch_kwargs: object) -> None:

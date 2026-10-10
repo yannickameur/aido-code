@@ -158,6 +158,9 @@ class EngineClient:
     def probe_workers(self) -> tuple[ProviderSnapshot, ...]:
         return self._engine.probe_workers()
 
+    def execution_times(self) -> Any:
+        return self._engine.execution_times()
+
     def run(
         self, *, max_cycles: int = DEFAULT_MAX_CYCLES,
         on_event: Callable[[Any], None] | None = None,
