@@ -52,6 +52,7 @@ decision belongs to the engine.
 | M3.3 — Simplified interface display with on-demand details | `DONE` (2026-10-10) |
 | M3.4 — AI plan quotas and execution time summary (engine P14 simplified) | `DONE` (2026-10-10) |
 | Release v0.2.0 (GitHub Release, engine v0.2.0) | `DONE` (2026-10-10) |
+| M3.5 — Terminal reliability fix (workers isolated from the terminal, reliable exits, /export) | `APPROVED` — current milestone |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
 | M6 — Doctor/diagnostics | `À VOTER` |
@@ -112,74 +113,57 @@ Status: APPROVED
 
 ### ID
 
-m3.4
+m3.5
 
 ### Objective
 
-Show, at the top of the Textual interface, the AI plans still available,
-and, at the end of a development run, how long each provider actually
-worked on the current milestone.
-
-Quotas come only from the existing `EngineClient.probe_workers()` facts
-(the same data as `/status --probe`, one probe per provider even with
-several workers): Claude windows, Codex 5 h and 7 day limits when they
-exist, Gravity `/usage` per model group, and "Non communiqué" for Mistral
-Vibe when no reliable value exists. The panel shows the remaining
-percentage, the period and the known reset time; it refreshes once when
-the interface opens, without blocking it, then only on demand. No
-periodic polling.
-
-Execution time comes only from the engine prerequisite
-`OrchestratorEngine.execution_times()` (`ai-dev-orchestrator` `3f33795`):
-the engine sums recorded DEV A, DEV B and DEV FIX executions of the
-current MVP per provider, including every attempt and recovery, and never
-counts QA, quota waits or estimator runs. AIDO Code only displays it.
-Unknown values are shown as such, never invented. No tokens, no prices,
-no new storage, no change to worker selection or to the classic script
-output.
+Urgent fix found while developing the Flutter tic-tac-toe app for real:
+mouse reports appeared in the input, Ctrl+C and Ctrl+D stopped working,
+text could not be copied, and the terminal window had to be closed. The
+cause, reproduced in a real pseudo-terminal, is that workers inherit the
+terminal on stdin. M3.5 isolates the terminal from every worker, restores
+the terminal on every exit, makes exits reliable, and adds an honest way
+to recover displayed text. No interface redesign and no engine change.
 
 ### Acceptance criteria
 
-- The interface shows a quota panel under the status bar, filled from one `probe_workers()` call started in a background worker when the interface opens; the interface stays usable meanwhile.
-- A documented shortcut refreshes the quotas on demand; no other probe is ever started automatically.
-- Each provider shows its remaining percentage, period and known reset time per quota window; "Non communiqué" when the provider reports no window; "Non disponible" when the probe fails or no project is open.
-- After each run in the interface (completed, failed or interrupted) a "Fournisseur | Temps exécuté" table for the current milestone is shown, with a "Total IA" row and explicit unknown values.
-- French by default, English via the existing language selection; Ctrl+C, recovery, both M3.3 views and the classic output stay unchanged.
-- All tests and QA are offline; the full suite keeps passing; `git diff --check` is clean.
+- Workers started from the interface never receive the terminal on stdin; the terminal state is restored on every exit.
+- Ctrl+C, Ctrl+D, /exit, /quit and F10 behave as specified; /export recovers all displayed text.
+- Simplified/detailed views, quotas, execution times, French by default and the classic output are unchanged.
+- All tests and QA are offline; the full suite keeps passing.
 
 ### WorkItems
 
-#### WI-M3.4-01 — AI plan quota panel
+#### WI-M3.5-01 — Isolate the terminal from workers and make exits reliable
 
 Dependencies: none
 Capabilities: development
 
 Acceptance criteria:
 
-- Add a one-line-per-provider quota panel docked under the status bar of `tui.py`, built only from `ProviderSnapshot` facts returned by `EngineClient.probe_workers()`.
-- Provider labels: `anthropic` → Claude, `openai` → Codex, `mistral` → Mistral, `gravity` → Gravity; any other provider keeps its id. Window labels: `five_hour`/`primary_5h` → 5 h, `seven_day`/`secondary_7d` → 7 j (en: 7 d); any other window type, such as Gravity model groups, keeps its own label.
-- For each window show the remaining percentage, rounded, and the reset time in local time when known; "inconnu"/"unknown" for an unknown value; "Non communiqué"/"Not reported" when a provider has no window; "Non disponible"/"Not available" when the probe raised, the provider probe reported an error, or no project is open.
-- Probe once when the interface mounts, in a Textual thread worker; until it returns the panel shows a translated "Actualisation…" text; the input stays usable.
-- Ctrl+R refreshes the panel on demand; a refresh requested while one is in flight is ignored; there is no timer or periodic polling; the shortcut is listed in `/help` in both languages.
-- New texts go through `i18n.py` (fr default, en); provider names, window identifiers and raw values are not translated.
-- Offline tests with `App.run_test()` and a fake engine client: one probe on mount, non-blocking mount, Ctrl+R triggers exactly one more probe, no probe without a request, Claude/Codex/Gravity windows, Mistral "Non communiqué", probe error and no project "Non disponible", French and English, `/status --probe` and classic output unchanged.
+- Root cause, reproduced in a real pseudo-terminal: the engine starts workers without redirecting stdin, so ralph, the provider CLIs and tools such as the Flutter tool inherit the terminal on fd 0. A child that restores cooked mode (as Dart's stdin.lineMode/echoMode does) or reads stdin breaks Textual's raw mode: SGR mouse reports like ^[[<35;153;41M are echoed, typed keys stop reaching the app, Ctrl+C and Ctrl+D no longer work. Do not hide characters; fix the cause in AIDO Code. Do not change ai-dev-orchestrator.
+- In src/aido_code/tui.py, run_tui runs the app inside one context manager that, before App.run(): duplicates fd 0 to a private non-inheritable descriptor, saves its termios attributes, makes Textual read from it by temporarily replacing sys.__stdin__ and sys.stdin with a file object on that descriptor (Textual's Linux driver uses sys.__stdin__.fileno()), and points fd 0 to /dev/null so every process the engine starts inherits /dev/null instead of the terminal.
+- On every exit path of run_tui (normal quit, exception, KeyboardInterrupt) the context manager restores the saved termios attributes, writes the mouse/paste disable sequences (?1000l ?1002l ?1003l ?1006l ?1015l ?2004l) and shows the cursor, puts the terminal back on fd 0, restores sys.__stdin__/sys.stdin and closes the private descriptor. An atexit handler performs the same terminal restoration once if the process ends without leaving the context. The classic non-interactive path is unchanged.
+- Reliable exits in the interface: Ctrl+C during a run requests the engine interruption once, as today; Ctrl+C when idle clears a non-empty input, and on an empty input shows a translated hint and quits if pressed again within 2 seconds; Ctrl+D when idle quits; /exit and a new /quit command quit when idle; F10 is an emergency quit key that does not depend on Ctrl. Quitting during a run (Ctrl+D, /exit, /quit, F10) first requests the interruption and waits for the engine thread, as today. All new texts go through i18n.py (fr default, en) and are listed in /help.
+- Regression tests: a unit test proves that inside the context manager a child subprocess started with default stdin sees /dev/null (not a TTY) while Textual's descriptor still refers to the original input, and that fd 0, sys.__stdin__ and termios attributes are restored afterwards, including after an exception; Textual pilot tests cover the idle Ctrl+C double press, Ctrl+D, /exit, /quit and F10, and quitting during a run waits for the interrupted fake engine; a real pseudo-terminal test (pty.fork, Linux only, skipped elsewhere) starts the interface with a fake engine whose worker child restores cooked mode on its inherited stdin, then sends SGR mouse reports, text, Ctrl+C and Ctrl+D and asserts that the fake engine sees the interrupt and the process exits.
+- Do not install packages or modify any virtualenv; do not run the installed aido command; run tests with: PYTHONPATH=src python3 -m pytest -q -p no:cacheprovider. Keep simplified/detailed views, quotas, execution times, French by default and the engine behavior unchanged; existing tests must keep passing.
 
-#### WI-M3.4-02 — Execution time summary after a run
+#### WI-M3.5-02 — Recover displayed text with /export and honest selection
 
-Dependencies: WI-M3.4-01
+Dependencies: WI-M3.5-01
 Capabilities: development
 
 Acceptance criteria:
 
-- Add `EngineClient.execution_times()` as a thin pass-through to `OrchestratorEngine.execution_times()`; when the loaded engine lacks it, the interface shows a translated "Bilan des temps non disponible" line instead of failing.
-- After every run started from the interface (completed, failed or interrupted, including after Ctrl+C once the engine thread has ended), read the snapshot once and show a table titled with the milestone id: columns "Fournisseur" and "Temps exécuté" (en: "Provider", "Execution time"); rows Claude, Codex, Mistral and Gravity in that order, then any other provider from the snapshot, then "Total IA" (en: "Total AI").
-- Durations are formatted as hours, minutes and seconds ("1 h 02 min 05 s", "4 min 12 s", "38 s"); a provider without executions shows "Aucune exécution" (en: "No execution"); `seconds` None shows "Inconnu" (en: "Unknown"); when `unknown_executions` > 0 the row also says how many executions have no known duration.
-- The table appears in both simplified and detailed views and is never computed in AIDO Code from events or timestamps of its own.
-- Offline tests with a fake engine client: table after a completed run, after a failed run and after an interrupted run, provider order, missing providers, unknown durations, total row, duration formatting, engine without `execution_times()`, French and English; the classic `aido run` output is unchanged.
+- Text recovery without fake shortcuts: set AidoApp.ALLOW_SELECT = False so a mouse drag never shows a Textual selection that cannot be copied (Ctrl+C stays the interruption key); keep mouse wheel scrolling. Document in /help, in both languages, that the terminal's own selection works with Shift+drag while the mouse is captured.
+- Add a /export command that writes, in order, every conversation message and every entry of the bounded event history in its detailed rendering, plus the latest execution time table and run summary when present, to a UTF-8 text file under the XDG state directory (XDG_STATE_HOME or ~/.local/state)/aido/exports/<session-id>-<UTC timestamp>.txt, never inside the project directory; it prints the full path in the log; it works during a run and when idle; writing errors are shown as translated errors.
+- Exported text is the same sanitized public text the interface displays (no private reasoning, no markup); nothing shown is omitted except entries already evicted from the 2000-entry history, which the export header states explicitly when it happened.
+- Offline tests: ALLOW_SELECT is False; /export content order and completeness for conversation, history in detailed rendering, table and summary; export during a run; XDG_STATE_HOME honored and the project directory untouched; eviction notice; French and English texts; /help lists /export, /quit, F10 and Shift+drag.
+- Do not install packages or modify any virtualenv; do not run the installed aido command; run tests with: PYTHONPATH=src python3 -m pytest -q -p no:cacheprovider. Existing behavior and tests stay unchanged.
 
 ### QA
 
-#### QA-M3.4-01 — Full offline test suite
+#### QA-M3.5-01 — Full offline test suite
 
 Kind: unit_test
 Required: true
@@ -188,6 +172,5 @@ Argv: ["pytest", "-q"]
 
 ### Out of scope
 
-- Tokens, prices, costs, P15 or any consumption metric beyond execution time.
-- Any change to `ai-dev-orchestrator`, worker selection, probes or persistence.
-- Periodic quota polling, new storage, new `aido.yaml` keys, or changes to the classic script output.
+- Interface redesign, a multi-AI hub, or any change to `ai-dev-orchestrator`.
+- Changes to the classic non-interactive output.
