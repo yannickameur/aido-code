@@ -106,7 +106,7 @@ real, publishable path.
 This project's own `pytest -q` suite must always stay offline: it must
 never call a real Claude/Codex/Vibe/Gravity/Ralph provider, and
 no real provider consumption may ever come from this project's own QA
-either; see `MVP_SPEC.yaml`. This does not restrict real governed
+either. This does not restrict real governed
 development itself — once WorkItems are scheduled, the separate stable runner's
 `aido run` driving DEV A, DEV B, QA, and governed merge is expected and
 required to use real workers/providers.

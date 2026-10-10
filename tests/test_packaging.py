@@ -1,4 +1,4 @@
-"""Re-verifies M1_1_SPEC.yaml's WI-M1.1-01 packaging acceptance criteria
+"""Re-verifies M1.1's WI-M1.1-01 packaging acceptance criteria
 as part of this WorkItem's (WI-M1.1-04) own QA gate: the engine
 dependency is declared against the renamed ``ai-dev-orchestrator``
 distribution, never the old ``orchestrator`` PyPI name.
@@ -15,8 +15,7 @@ PYPROJECT_TEXT = (Path(__file__).resolve().parent.parent / "pyproject.toml").rea
 class TestEngineDependencyMetadata:
     def test_declares_ai_dev_orchestrator_at_or_above_0_1_3(self) -> None:
         """0.1.3 is the version that introduced
-        ``ProviderSnapshot.quota_windows``/``reset_credits`` (see
-        M1_2_SPEC.yaml); this project's --probe rendering depends on them."""
+        ``ProviderSnapshot.quota_windows``/``reset_credits`` (M1.2); this project's --probe rendering depends on them."""
         match = re.search(r'dependencies\s*=\s*\[([^\]]*)\]', PYPROJECT_TEXT)
         assert match is not None, "pyproject.toml has no [project.dependencies] list"
         dependencies = match.group(1)

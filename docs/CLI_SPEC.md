@@ -78,8 +78,8 @@ A project's own `aido.yaml` no longer resembles `ai-dev-orchestrator`'s
 own schema: no `workers:`/`providers:`/`models:`/`mvp:`/`work_items:`/
 `qa:`. It names a project, a `ROADMAP.md`, a `resources/` directory, and
 an `initial_prompt` — see `docs/PROJECT_CONTRACT.md` §2. `ROADMAP.md`
-itself, parsed deterministically (§3), replaces `MVP_SPEC.yaml`'s
-future role as the executable acceptance contract.
+itself, parsed deterministically (§3), is the executable acceptance
+contract.
 
 `/workers`/`/status`/`/config` are otherwise unchanged commands whose
 underlying data now comes from AIDO's own global worker configuration
@@ -87,8 +87,6 @@ underlying data now comes from AIDO's own global worker configuration
 from a project-level `workers.yaml`.
 
 ## M1.1 — `--probe` on `/status`/`/workers`
-
-Full contract: `M1_1_SPEC.yaml` and `aido.m1_1.example.yaml`.
 
 ```
 /status           # project + MVP + work items + all configured workers, zero provider calls
@@ -105,8 +103,6 @@ either command is the only thing here that calls
 probe/rendering code path. `/run` is unaffected.
 
 ## M1.2 — Rich provider quota status on `--probe`
-
-Full contract: `M1_2_SPEC.yaml` and `aido.m1_2.example.yaml`.
 
 `/status --probe` and `/workers --probe` keep M1.1's per-worker
 `probe=...` state and, through the same shared rendering path (see
