@@ -100,12 +100,10 @@ M3.2 and M3.3 are `DONE` (governed flow plus real terminal acceptance).
 The `## Current milestone` block below keeps M3.3's contract only because
 the parser requires one. M4 remains a candidate and is not started.
 
-Open engine defect found during the M3.3 real acceptance (to fix in
-`ai-dev-orchestrator` before relying on interruption): after Ctrl+C the
-engine terminates the worker process group but waits only for the direct
-`ralph` wrapper; the real `ralph` binary survived, started a new provider
-CLI and committed on the WorkItem branch about 40 s after the run was
-reported interrupted. This affects the classic and Textual paths alike.
+The interruption defect found during the M3.3 real acceptance (a surviving
+`ralph` kept working and committing after Ctrl+C) is fixed in
+`ai-dev-orchestrator` `bd176c3`: the engine now terminates the whole worker
+session and returns only once no worker process is left.
 
 ## Current milestone
 
