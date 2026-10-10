@@ -194,6 +194,19 @@ Acceptance criteria:
 - Only public `EngineEvent` fields and `RunResult` diagnostics are displayed; a private-reasoning sentinel placed outside public fields never appears.
 - Offline tests with a fake engine client: progressive display before the run completes, responsiveness during a run, Ctrl+C sets the interrupt and the app waits for the worker, notice displayed, the next run is delegated unchanged, incompatible engine message, no sentinel leak; zero real provider calls.
 
+#### WI-M3.2-04 — Interface acceptance fixes from the real terminal run
+
+Dependencies: WI-M3.2-03
+Capabilities: development
+
+Acceptance criteria:
+
+- The interactive Textual interface defaults to French when neither `--lang` nor `AIDO_LANG` is set; the classic non-interactive path keeps its current English output unchanged.
+- In the interface only, worker output (`execution.output`) is readable: ANSI SGR color/style sequences are rendered as styles or removed instead of shown as escaped `\x1b[...` text, real line breaks split lines instead of showing a literal `\n`, and any other control character is still escaped by `sanitize_for_terminal`.
+- The run start notice appears in the log as soon as a run starts, before the first live event, not after the run ends.
+- The status bar labels (project, session, language, idle/running state) are translated through the catalog.
+- Offline tests cover the French default of the interface, readable worker output with ANSI sequences and multi-line chunks, start-notice ordering before live events, translated status bar, and unchanged classic output; zero real provider calls.
+
 ### QA
 
 #### QA-M3.2-01 — Full offline test suite
