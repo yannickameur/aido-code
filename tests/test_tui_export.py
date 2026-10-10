@@ -120,6 +120,25 @@ def test_export_error_translated_fr(tmp_path, monkeypatch):
     assert shown[-1].startswith("Échec de l'export")
 
 
+@pytest.mark.parametrize("lang, error", [
+    ("en", "The export directory is inside the project."),
+    ("fr", "Le dossier d'export se trouve dans le projet."),
+])
+def test_export_rejects_state_directory_inside_project(tmp_path, monkeypatch, lang, error):
+    app = _app(tmp_path, monkeypatch, lang)
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "proj" / "state"))
+
+    async def go():
+        async with app.run_test(size=(100, 40)) as pilot:
+            await pilot.pause()
+            await _submit(app, pilot, "/export")
+            return [str(m.render()) for m in app.query(tui.Message)]
+
+    shown = asyncio.run(go())
+    assert error in shown[-1]
+    assert not list((tmp_path / "proj").iterdir())
+
+
 @pytest.mark.parametrize("lang,marker,shift", [("en", "Exported to", "Shift"), ("fr", "Exporté vers", "Maj")])
 def test_languages_and_help(tmp_path, monkeypatch, lang, marker, shift):
     app = _app(tmp_path, monkeypatch, lang)

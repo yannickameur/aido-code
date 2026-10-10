@@ -309,6 +309,9 @@ class AidoApp(App[None]):
                 lines += ["", t(key, lang), _plain("result", value)]
         try:
             directory = _export_dir()
+            if session is not None and session.project_path is not None:
+                if directory.resolve().is_relative_to(Path(session.project_path).resolve()):
+                    raise OSError(t("export.project_directory", lang))
             directory.mkdir(parents=True, exist_ok=True)
             path = directory / f"{session_id}-{stamp}.txt"
             counter = 1
