@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import fcntl
 import os
 import pty
@@ -22,6 +23,7 @@ import pytest
 from aido_code import repl
 from aido_code import tui
 from aido_code.i18n import t
+from aido_code.live_run import INTERRUPTED_NOTICE
 from aido_code.repl import ReplState
 from aido_code.session import SessionStore
 from aido_code.tui import AidoApp, Message, isolated_terminal
@@ -207,6 +209,58 @@ def test_help_lists_new_exits(tmp_path, monkeypatch):
 
 # -- real pseudo-terminal ---------------------------------------------------
 
+def test_sighup_interrupts_active_run_and_restores_handlers(tmp_path, monkeypatch):
+    release = threading.Event()
+    FakeClient.instances.clear()
+    monkeypatch.setattr(repl.EngineClient, "open", classmethod(lambda cls, *a, **k: FakeClient(release)))
+    monkeypatch.setattr(tui, "isolated_terminal", contextlib.nullcontext)
+    previous = {sig: signal.getsignal(sig) for sig in (signal.SIGHUP, signal.SIGTERM)}
+    seen = []
+    original = tui.dispatch_line
+
+    def dispatch(*args, **kwargs):
+        result = original(*args, **kwargs)
+        seen.append(args[3].getvalue())
+        return result
+
+    monkeypatch.setattr(tui, "dispatch_line", dispatch)
+
+    def run(app):
+        async def go():
+            async with app.run_test() as pilot:
+                await _type(pilot, "/run")
+                await _until(pilot, lambda: FakeClient.instances and FakeClient.instances[0].first_event.is_set())
+                os.kill(os.getpid(), signal.SIGHUP)
+                await _until(pilot, lambda: app._run_finished.is_set())
+                await pilot.pause()
+        asyncio.run(go())
+
+    monkeypatch.setattr(AidoApp, "run", run)
+    try:
+        tui.run_tui(ReplState(store=SessionStore(tmp_path / "sessions")), "en")
+        assert FakeClient.instances[0].interrupt.is_set()
+        assert any(INTERRUPTED_NOTICE in output for output in seen)
+        assert all(signal.getsignal(sig) is handler for sig, handler in previous.items())
+    finally:
+        release.set()
+
+
+def test_idle_sigterm_quits_and_restores_handlers(tmp_path, monkeypatch):
+    monkeypatch.setattr(tui, "isolated_terminal", contextlib.nullcontext)
+    previous = {sig: signal.getsignal(sig) for sig in (signal.SIGHUP, signal.SIGTERM)}
+
+    def run(app):
+        async def go():
+            async with app.run_test() as pilot:
+                os.kill(os.getpid(), signal.SIGTERM)
+                await _until(pilot, lambda: app._exit)
+        asyncio.run(go())
+
+    monkeypatch.setattr(AidoApp, "run", run)
+    tui.run_tui(ReplState(store=SessionStore(tmp_path / "sessions")), "en")
+    assert all(signal.getsignal(sig) is handler for sig, handler in previous.items())
+
+
 _CHILD = textwrap.dedent('''
     import sys, subprocess, threading, time
     from pathlib import Path
@@ -246,6 +300,31 @@ _CHILD = textwrap.dedent('''
     (marks / "exited").write_text("1")
 ''')
 
+_HUP_CHILD = textwrap.dedent('''
+    import sys, time
+    from pathlib import Path
+    from aido_code import repl
+    from aido_code.repl import ReplState
+    from aido_code.session import SessionStore
+    from aido_code.tui import run_tui
+
+    marks = Path(sys.argv[1])
+    class Fake:
+        def run(self, *, on_event=None, interrupt=None, **_):
+            (marks / "started").write_text("1")
+            while not interrupt.is_set():
+                time.sleep(0.01)
+            (marks / "interrupted").write_text("1")
+            raise KeyboardInterrupt
+        def execution_times(self): raise RuntimeError("n/a")
+        def close(self): pass
+        def __enter__(self): return self
+        def __exit__(self, *e): pass
+    repl.EngineClient.open = classmethod(lambda cls, *a, **k: Fake())
+    run_tui(ReplState(store=SessionStore(marks / "sessions")), "en")
+    (marks / "exited").write_text("1")
+''')
+
 
 def _wait(pred, master, buf, timeout=15):
     end = time.time() + timeout
@@ -258,6 +337,48 @@ def _wait(pred, master, buf, timeout=15):
             except OSError:
                 return
     raise AssertionError(f"timeout; output so far: {bytes(buf)[-400:]!r}")
+
+
+@posix_pty
+def test_closing_pty_interrupts_engine_before_exit(tmp_path):
+    script = tmp_path / "hup_child.py"
+    script.write_text(_HUP_CHILD)
+    marks = tmp_path / "marks"
+    marks.mkdir()
+    src = str(Path(tui.__file__).resolve().parents[1])
+    pid, master = pty.fork()
+    if pid == 0:
+        os.environ.update(TERM="xterm-256color", PYTHONPATH=src + os.pathsep + os.environ.get("PYTHONPATH", ""))
+        os.execv(sys.executable, [sys.executable, str(script), str(marks)])
+    buf = bytearray()
+    try:
+        _wait(lambda: b"/help" in buf or len(buf) > 2000, master, buf)
+        os.write(master, b"/run\r")
+        _wait(lambda: (marks / "started").exists(), master, buf)
+        os.close(master)
+        master = -1
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            done, status = os.waitpid(pid, os.WNOHANG)
+            if done:
+                assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0
+                assert (marks / "interrupted").exists()
+                assert (marks / "exited").exists()
+                break
+            time.sleep(0.05)
+        else:
+            raise AssertionError("process did not exit after terminal closed")
+    finally:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        try:
+            os.waitpid(pid, 0)
+        except ChildProcessError:
+            pass
+        if master >= 0:
+            os.close(master)
 
 
 @posix_pty

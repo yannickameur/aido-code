@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import atexit
 import contextlib
+import errno
 import io
 import os
 import re
+import signal
 import sys
 import termios
 import threading
@@ -209,6 +211,9 @@ class AidoApp(App[None]):
         self._dispatch_kwargs = dispatch_kwargs
         self.running = False
         self._interrupt: threading.Event | None = None
+        self._terminal_shutdown = threading.Event()
+        self._run_finished = threading.Event()
+        self._run_finished.set()
         self._quit_after = False
         self._active_worker: Worker | None = None
         self._keep_running = True
@@ -234,10 +239,16 @@ class AidoApp(App[None]):
         yield Input(id="prompt", placeholder="/help")
 
     def on_mount(self) -> None:
+        self.set_interval(0.05, self._check_terminal_shutdown)
         self._refresh_status()
         self.add_message("info", t("help.title", self.lang))
         self.query_one("#prompt", Input).focus()
         self.action_refresh_quota()
+
+    def _check_terminal_shutdown(self) -> None:
+        if self._terminal_shutdown.is_set():
+            if self._interrupt is None or self._run_finished.is_set():
+                self.exit()
 
     # -- quota panel ----------------------------------------------------
     def _set_quota(self, lines: list[str]) -> None:
@@ -489,6 +500,7 @@ class AidoApp(App[None]):
         kwargs = dict(self._dispatch_kwargs)
         if _is_run_request(line):
             self._interrupt = threading.Event()
+            self._run_finished.clear()
             kwargs.update(interrupt=self._interrupt, event_sink=self._on_event, show_run_start=False)
             self.add_message("info", t("run.start", self.lang))
         self._refresh_status()
@@ -496,6 +508,8 @@ class AidoApp(App[None]):
 
     def _on_event(self, event: object) -> None:
         """Engine-thread sink: renders public event fields and hands them to the UI loop."""
+        if self._terminal_shutdown.is_set():
+            return
         try:
             if getattr(event, "kind", None) == "execution.output":
                 payload = getattr(event, "payload", None)
@@ -528,8 +542,12 @@ class AidoApp(App[None]):
         except Exception as exc:  # surfaced as an error message, never a crash
             out.write(f"Error: {exc}\n")
             keep = True
-        times = self._load_times() if _is_run_request(line) else None
-        self.call_from_thread(self._finish, line, out.getvalue().rstrip("\n"), keep, times)
+        finally:
+            if _is_run_request(line):
+                self._run_finished.set()
+        if not self._terminal_shutdown.is_set():
+            times = self._load_times() if _is_run_request(line) else None
+            self.call_from_thread(self._finish, line, out.getvalue().rstrip("\n"), keep, times)
 
     def _finish(self, line: str, text: str, keep: bool, times: str | None) -> None:
         if line.strip() == "/help":
@@ -630,5 +648,41 @@ def isolated_terminal() -> Iterator[None]:
 
 
 def run_tui(state: ReplState, lang: str, **dispatch_kwargs: object) -> None:
-    with isolated_terminal():
-        AidoApp(state, lang, **dispatch_kwargs).run()
+    app = AidoApp(state, lang, **dispatch_kwargs)
+    try:
+        with isolated_terminal():
+            previous = {sig: signal.getsignal(sig) for sig in (signal.SIGHUP, signal.SIGTERM)}
+
+            def shutdown(_signum: int, _frame: object) -> None:
+                app._terminal_shutdown.set()
+                interrupt = app._interrupt
+                if interrupt is not None:
+                    interrupt.set()
+
+            try:
+                for sig in previous:
+                    signal.signal(sig, shutdown)
+                try:
+                    app.run()
+                except OSError as exc:
+                    if exc.errno not in (errno.EIO, errno.EBADF):
+                        raise
+                    shutdown(0, None)
+            finally:
+                for sig, handler in previous.items():
+                    signal.signal(sig, handler)
+                if app._terminal_shutdown.is_set():
+                    app._run_finished.wait(60)
+    finally:
+        if app._terminal_shutdown.is_set():
+            for fd, stream in ((1, sys.stdout), (2, sys.stderr)):
+                try:
+                    stream.flush()
+                except OSError as exc:
+                    if exc.errno not in (errno.EIO, errno.EBADF):
+                        raise
+                    devnull = os.open(os.devnull, os.O_WRONLY)
+                    try:
+                        os.dup2(devnull, fd)
+                    finally:
+                        os.close(devnull)
