@@ -154,7 +154,8 @@ def test_worker_output_uses_detailed_renderer_and_escapes_controls(tmp_path, mon
             await pilot.pause()
             await _until(pilot, lambda: any("red" in m for m in _texts(app)))
             output = next(m for m in _texts(app) if "red" in m)
-            assert "\\x1b[31mred\\x1b[0m\\r\\nnext\\tline\\x1b[2J" in output
+            assert "red\nnext\\tline\\x1b[2J" in output
+            assert "\\x1b[31m" not in output and "\\x1b[0m" not in output
             texts = _texts(app)
             assert texts.index(t("run.start", "fr")) < texts.index(output)
             release.set()

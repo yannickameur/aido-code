@@ -8,6 +8,7 @@ markup) after passing through ``sanitize_for_terminal``."""
 from __future__ import annotations
 
 import io
+import re
 import threading
 from collections import deque
 from dataclasses import dataclass
@@ -29,6 +30,7 @@ _KINDS = {
     "user": "bold cyan", "info": "dim", "error": "bold red", "result": "",
     "worker": "dim", "dev": "bold", "qa": "green", "git": "magenta", "warn": "yellow",
 }
+_SGR = re.compile(r"\x1b\[[0-9;:]*m")
 _EVENT_HISTORY_LIMIT = 2000
 
 
@@ -272,7 +274,16 @@ class AidoApp(App[None]):
     def _on_event(self, event: object) -> None:
         """Engine-thread sink: renders public event fields and hands them to the UI loop."""
         try:
-            text = render_event(event, lang=self.lang).strip("\n")
+            if getattr(event, "kind", None) == "execution.output":
+                payload = getattr(event, "payload", None)
+                payload = payload if isinstance(payload, dict) else {}
+                stream = payload.get("stream")
+                label = sanitize_for_terminal(stream) if stream is not None else "output"
+                output = payload.get("text")
+                output = "" if output is None else str(output)
+                text = f"    [{label}] {_SGR.sub('', output).replace(chr(13) + chr(10), chr(10))}"
+            else:
+                text = render_event(event, lang=self.lang).strip("\n")
         except Exception:
             text = "[unrenderable event]"
         kind = getattr(event, "kind", None)
