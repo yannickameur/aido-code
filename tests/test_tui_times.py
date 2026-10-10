@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -112,6 +113,38 @@ def test_english_table(tmp_path, monkeypatch):
     assert "Provider" in table and "Execution time" in table
     assert table.count("No execution") == 4
     assert "Total AI | Unknown" in table
+
+
+def test_table_after_ctrl_c_when_engine_thread_ends(tmp_path, monkeypatch):
+    started = threading.Event()
+
+    def interrupted_run(*args, interrupt=None, **kwargs):
+        started.set()
+        assert interrupt.wait(5)
+        return "Interruption requested"
+
+    owner = Owner()
+    app = _app(tmp_path, monkeypatch, owner, "en", "unused")
+    monkeypatch.setattr(repl, "_run_session_project", interrupted_run)
+
+    async def go():
+        async with app.run_test() as pilot:
+            for ch in "/run":
+                await pilot.press("slash" if ch == "/" else ch)
+            await pilot.press("enter")
+            for _ in range(100):
+                if started.is_set():
+                    break
+                await pilot.pause(0.01)
+            assert started.is_set()
+            await pilot.press("ctrl+c")
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+            assert not app.running
+            assert sum("AI execution time - m3.4" in str(m.render()) for m in app.query(Message)) == 1
+
+    asyncio.run(go())
+    assert owner.reads == 1
 
 
 def test_engine_without_execution_times(tmp_path, monkeypatch):

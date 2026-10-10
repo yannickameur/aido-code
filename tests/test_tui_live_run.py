@@ -194,9 +194,10 @@ def test_ctrl_c_interrupts_once_waits_then_next_run_unchanged(tmp_path, monkeypa
             await _type(pilot, "run the project")
             await app.workers.wait_for_complete()
             await pilot.pause()
-            assert len(FakeClient.instances) == 2
-            assert FakeClient.instances[1].interrupt is not FakeClient.instances[0].interrupt
-            assert not FakeClient.instances[1].interrupt.is_set()
+            run_clients = [client for client in FakeClient.instances if client.calls]
+            assert len(run_clients) == 2
+            assert run_clients[1].interrupt is not run_clients[0].interrupt
+            assert not run_clients[1].interrupt.is_set()
             assert not any(SENTINEL in m for m in _texts(app))
     try:
         asyncio.run(go())

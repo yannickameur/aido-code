@@ -200,7 +200,6 @@ class AidoApp(App[None]):
         self._cursor = 0
         self._resume_choices: list[str] | None = None
         self._quota_in_flight = False
-        self._run_started = False
 
     def compose(self) -> ComposeResult:
         with Vertical(id="header"):
@@ -251,19 +250,19 @@ class AidoApp(App[None]):
         self._set_quota(lines)
 
     # -- execution time summary ------------------------------------------
-    def _load_times(self) -> None:
-        """Thread worker: one read of the engine's own snapshot after a run."""
-        text = t("times.unavailable", self.lang)
+    def _load_times(self) -> str:
+        """Read the engine snapshot after its run, before accepting another command."""
         try:
             session = self.state.session
             if session is not None and session.project_path:
-                context, client = repl._open_project_command_engine(str(project_manifest_path(session)))
-                with client:
-                    snapshot = client.execution_times()
-                text = format_execution_times(snapshot, context.roadmap.milestone.id, self.lang)
+                _context, client = repl._open_project_command_engine(str(project_manifest_path(session)))
+            else:
+                client = repl.EngineClient.open(self.state.config_path)
+            with client:
+                snapshot = client.execution_times()
+            return format_execution_times(snapshot, snapshot.mvp_id, self.lang)
         except Exception:
-            text = t("times.unavailable", self.lang)
-        self.call_from_thread(self.add_message, "result", text)
+            return t("times.unavailable", self.lang)
 
     # -- status bar ---------------------------------------------------
     def _refresh_status(self) -> None:
@@ -411,7 +410,6 @@ class AidoApp(App[None]):
         kwargs = dict(self._dispatch_kwargs)
         if _is_run_request(line):
             self._interrupt = threading.Event()
-            self._run_started = True
             kwargs.update(interrupt=self._interrupt, event_sink=self._on_event, show_run_start=False)
             self.add_message("info", t("run.start", self.lang))
         self._refresh_status()
@@ -451,9 +449,10 @@ class AidoApp(App[None]):
         except Exception as exc:  # surfaced as an error message, never a crash
             out.write(f"Error: {exc}\n")
             keep = True
-        self.call_from_thread(self._finish, line, out.getvalue().rstrip("\n"), keep)
+        times = self._load_times() if _is_run_request(line) else None
+        self.call_from_thread(self._finish, line, out.getvalue().rstrip("\n"), keep, times)
 
-    def _finish(self, line: str, text: str, keep: bool) -> None:
+    def _finish(self, line: str, text: str, keep: bool, times: str | None) -> None:
         if line.strip() == "/help":
             text += f"\n  Ctrl+O - {t('help.toggle_view', self.lang)}"
             text += f"\n  Ctrl+R - {t('help.refresh_quota', self.lang)}"
@@ -462,6 +461,8 @@ class AidoApp(App[None]):
                 "info" if line.startswith(("/help", "/new", "/resume")) else "result"
             )
             self.add_message(kind, text)
+        if times is not None:
+            self.add_message("result", times)
         self._keep_running = keep
 
     def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
@@ -474,11 +475,8 @@ class AidoApp(App[None]):
         self._interrupt = None
         self._heartbeat = ""
         self._refresh_status()
-        run_ended, self._run_started = self._run_started, False
         if self._quit_after or not self._keep_running:
             self.exit()
-        elif run_ended:
-            self.run_worker(self._load_times, thread=True, group="times", exit_on_error=False)
 
 
 def run_tui(state: ReplState, lang: str, **dispatch_kwargs: object) -> None:
