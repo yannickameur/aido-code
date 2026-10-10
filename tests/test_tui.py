@@ -61,6 +61,14 @@ def test_input_docked_and_scroll_reaches_earlier_messages(tmp_path):
                 await pilot.press("pageup")
             await pilot.pause()
             assert log.scroll_y == 0
+            await pilot.press("ctrl+o")
+            await pilot.pause()
+            assert log.scroll_y == 0
+            log.scroll_end(animate=False)
+            await pilot.pause()
+            await pilot.press("ctrl+o")
+            await pilot.pause()
+            assert log.scroll_y >= log.max_scroll_y - 1
             assert prompt.region.bottom == 20
     asyncio.run(go())
 
@@ -227,8 +235,21 @@ def test_status_bar_uses_catalog_labels_and_states(tmp_path):
         app = _app(tmp_path, "fr")
         async with app.run_test():
             status = app.query_one("#status")
-            assert str(status.render()) == "projet: - | session: - | langue: fr | inactif"
+            assert str(status.render()) == "projet: - | session: - | langue: fr | vue: simplifiée | inactif"
             app.running = True
             app._refresh_status()
-            assert str(status.render()) == "projet: - | session: - | langue: fr | en cours"
+            assert str(status.render()) == "projet: - | session: - | langue: fr | vue: simplifiée | en cours"
+    asyncio.run(go())
+
+
+@pytest.mark.parametrize("lang, label", [("en", "view: detailed"), ("fr", "vue: détaillée")])
+def test_help_lists_toggle_in_both_languages(tmp_path, lang, label):
+    async def go():
+        app = _app(tmp_path, lang)
+        async with app.run_test() as pilot:
+            await _submit(pilot, "/help")
+            assert any("Ctrl+O" in text for text in _texts(app))
+            await pilot.press("ctrl+o")
+            await pilot.pause()
+            assert label in str(app.query_one("#status").render())
     asyncio.run(go())

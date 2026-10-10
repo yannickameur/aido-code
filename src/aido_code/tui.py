@@ -8,8 +8,9 @@ markup) after passing through ``sanitize_for_terminal``."""
 from __future__ import annotations
 
 import io
-import re
 import threading
+from collections import deque
+from dataclasses import dataclass
 from pathlib import Path
 
 from rich.text import Text
@@ -21,14 +22,23 @@ from textual.worker import Worker, WorkerState
 
 from aido_code.i18n import t
 from aido_code.intent import Intent, interpret
-from aido_code.live_run import render_event
+from aido_code.live_run import render_event, simplified_event_sentence
 from aido_code.repl import ReplState, dispatch_line, sanitize_for_terminal
 
 _KINDS = {
     "user": "bold cyan", "info": "dim", "error": "bold red", "result": "",
     "worker": "dim", "dev": "bold", "qa": "green", "git": "magenta", "warn": "yellow",
 }
-_SGR = re.compile(r"\x1b\[[0-9;:]*m")
+_EVENT_HISTORY_LIMIT = 2000
+
+
+@dataclass
+class _LogEntry:
+    sequence: int
+    kind: str
+    detailed: str
+    simplified: str | None = None
+    widget: Message | None = None
 
 
 def _event_kind(kind: object) -> str:
@@ -74,6 +84,7 @@ class AidoApp(App[None]):
     BINDINGS = [
         Binding("ctrl+c", "interrupt", "Interrupt", priority=True),
         Binding("ctrl+d", "quit_idle", "Quit", priority=True),
+        Binding("ctrl+o", "toggle_view", "Toggle view", priority=True),
         Binding("pageup", "scroll_log(-1)", show=False),
         Binding("pagedown", "scroll_log(1)", show=False),
     ]
@@ -89,6 +100,10 @@ class AidoApp(App[None]):
         self._active_worker: Worker | None = None
         self._keep_running = True
         self._heartbeat = ""
+        self.view = "simplified"
+        self._sequence = 0
+        self._conversation: list[_LogEntry] = []
+        self._event_history: deque[_LogEntry] = deque(maxlen=_EVENT_HISTORY_LIMIT)
         self._history: list[str] = []
         self._cursor = 0
         self._resume_choices: list[str] | None = None
@@ -114,7 +129,8 @@ class AidoApp(App[None]):
         line = (
             f"{t('status.project', self.lang)}: {project} | "
             f"{t('status.session', self.lang)}: {session_id} | "
-            f"{t('status.language', self.lang)}: {self.lang} | {mode}"
+            f"{t('status.language', self.lang)}: {self.lang} | "
+            f"{t('status.view', self.lang)}: {t(f'view.{self.view}', self.lang)} | {mode}"
         )
         if self.running and self._heartbeat:
             line += f" | {self._heartbeat}"
@@ -122,11 +138,53 @@ class AidoApp(App[None]):
 
     # -- conversation log ---------------------------------------------
     def add_message(self, kind: str, text: str) -> None:
+        entry = _LogEntry(self._sequence, kind, text, text)
+        self._sequence += 1
+        self._conversation.append(entry)
+        self._mount_entry(entry)
+
+    def _mount_entry(self, entry: _LogEntry) -> None:
+        text = entry.simplified if self.view == "simplified" else entry.detailed
+        if text is None:
+            entry.widget = None
+            return
         log = self.query_one("#log", VerticalScroll)
         at_bottom = log.scroll_y >= log.max_scroll_y - 1
-        log.mount(Message(kind, text))
+        entry.widget = Message(entry.kind, text)
+        log.mount(entry.widget)
         if at_bottom:
             log.call_after_refresh(log.scroll_end, animate=False)
+
+    def _add_live_event(self, kind: str, simplified: str | None, detailed: str) -> None:
+        if len(self._event_history) == _EVENT_HISTORY_LIMIT:
+            oldest = self._event_history.popleft()
+            if oldest.widget is not None:
+                oldest.widget.remove()
+        entry = _LogEntry(self._sequence, kind, detailed, simplified)
+        self._sequence += 1
+        self._event_history.append(entry)
+        self._mount_entry(entry)
+
+    def action_toggle_view(self) -> None:
+        log = self.query_one("#log", VerticalScroll)
+        at_bottom = log.scroll_y >= log.max_scroll_y - 1
+        previous_y = log.scroll_y
+        self.view = "detailed" if self.view == "simplified" else "simplified"
+        log.remove_children()
+        entries = sorted((*self._conversation, *self._event_history), key=lambda entry: entry.sequence)
+        widgets = []
+        for entry in entries:
+            text = entry.simplified if self.view == "simplified" else entry.detailed
+            entry.widget = Message(entry.kind, text) if text is not None else None
+            if entry.widget is not None:
+                widgets.append(entry.widget)
+        if widgets:
+            log.mount(*widgets)
+        if at_bottom:
+            log.call_after_refresh(log.scroll_end, animate=False)
+        else:
+            log.call_after_refresh(log.scroll_to, y=previous_y, animate=False)
+        self._refresh_status()
 
     def action_scroll_log(self, direction: int) -> None:
         log = self.query_one("#log", VerticalScroll)
@@ -214,23 +272,16 @@ class AidoApp(App[None]):
     def _on_event(self, event: object) -> None:
         """Engine-thread sink: renders public event fields and hands them to the UI loop."""
         try:
-            if getattr(event, "kind", None) == "execution.output":
-                payload = getattr(event, "payload", None)
-                payload = payload if isinstance(payload, dict) else {}
-                stream = payload.get("stream")
-                label = sanitize_for_terminal(stream) if stream is not None else "output"
-                output = payload.get("text")
-                output = "" if output is None else str(output)
-                text = f"    [{label}] {_SGR.sub('', output).replace(chr(13) + chr(10), chr(10))}"
-            else:
-                text = render_event(event, lang=self.lang).strip("\n")
+            text = render_event(event, lang=self.lang).strip("\n")
         except Exception:
             text = "[unrenderable event]"
         kind = getattr(event, "kind", None)
+        simple = simplified_event_sentence(event, lang=self.lang)
+        if simple is None and _event_kind(kind) == "error":
+            simple = text
         if kind == "execution.heartbeat":
             self.call_from_thread(self._set_heartbeat, text.strip())
-        else:
-            self.call_from_thread(self.add_message, _event_kind(kind), text)
+        self.call_from_thread(self._add_live_event, _event_kind(kind), simple, text)
 
     def _set_heartbeat(self, text: str) -> None:
         self._heartbeat = text
@@ -246,6 +297,8 @@ class AidoApp(App[None]):
         self.call_from_thread(self._finish, line, out.getvalue().rstrip("\n"), keep)
 
     def _finish(self, line: str, text: str, keep: bool) -> None:
+        if line.strip() == "/help":
+            text += f"\n  Ctrl+O - {t('help.toggle_view', self.lang)}"
         if text:
             kind = "error" if text.startswith(("Error", "Validation failed")) else (
                 "info" if line.startswith(("/help", "/new", "/resume")) else "result"

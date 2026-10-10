@@ -7,6 +7,7 @@ import asyncio
 import threading
 from types import SimpleNamespace
 
+import pytest
 from orchestrator.engine import RunResult
 
 from aido_code import repl
@@ -97,15 +98,20 @@ def test_progressive_display_responsive_and_busy_refusal(tmp_path, monkeypatch):
         app = _app(tmp_path, monkeypatch, release)
         async with app.run_test(size=(100, 30)) as pilot:
             await _type(pilot, "/run")
-            await _until(pilot, lambda: any("hello from worker" in m for m in _texts(app)))
+            await _until(pilot, lambda: any("Worker A is developing" in m for m in _texts(app)))
             assert app.running and not release.is_set()  # shown before the run completes
             texts = _texts(app)
             assert texts.count(t("run.start", "en")) == 1
-            assert texts.index(t("run.start", "en")) < next(i for i, m in enumerate(texts) if "dev_a.started" in m)
+            assert texts.index(t("run.start", "en")) < next(i for i, m in enumerate(texts) if "Worker A is developing" in m)
+            assert not any("hello from worker" in m or "output truncated" in m or "still running" in m for m in texts)
+            assert "still running" in str(app.query_one("#status").render())
+            await pilot.press("ctrl+o")
+            await pilot.pause()
+            texts = _texts(app)
             assert any("dev_a.started" in m and "Worker A" in m for m in texts)
             assert any("output truncated" in m for m in texts)
-            assert not any("still running" in m for m in texts)  # heartbeat is not a line
-            assert "still running" in str(app.query_one("#status").render())
+            assert any("still running" in m for m in texts)
+            assert "view: detailed" in str(app.query_one("#status").render())
             worker = [m for m in app.query(Message) if "hello from worker" in str(m.render())][0]
             assert worker.has_class("msg-worker")
             # responsive: history and other commands refused, no concurrent engine work
@@ -126,7 +132,7 @@ def test_progressive_display_responsive_and_busy_refusal(tmp_path, monkeypatch):
         release.set()
 
 
-def test_worker_output_strips_sgr_preserves_lines_and_escapes_other_controls(tmp_path, monkeypatch):
+def test_worker_output_uses_detailed_renderer_and_escapes_controls(tmp_path, monkeypatch):
     release = threading.Event()
 
     class ColorClient(FakeClient):
@@ -143,10 +149,12 @@ def test_worker_output_strips_sgr_preserves_lines_and_escapes_other_controls(tmp
         app = AidoApp(ReplState(store=SessionStore(tmp_path / "sessions")), "fr")
         async with app.run_test() as pilot:
             await _type(pilot, "/run")
+            await _until(pilot, lambda: app._event_history)
+            await pilot.press("ctrl+o")
+            await pilot.pause()
             await _until(pilot, lambda: any("red" in m for m in _texts(app)))
             output = next(m for m in _texts(app) if "red" in m)
-            assert "red\nnext\\tline\\x1b[2J" in output
-            assert "\\x1b[31m" not in output and "\\x1b[0m" not in output
+            assert "\\x1b[31mred\\x1b[0m\\r\\nnext\\tline\\x1b[2J" in output
             texts = _texts(app)
             assert texts.index(t("run.start", "fr")) < texts.index(output)
             release.set()
@@ -158,7 +166,8 @@ def test_worker_output_strips_sgr_preserves_lines_and_escapes_other_controls(tmp
         release.set()
 
 
-def test_ctrl_c_interrupts_once_waits_then_next_run_unchanged(tmp_path, monkeypatch):
+@pytest.mark.parametrize("detailed", [False, True])
+def test_ctrl_c_interrupts_once_waits_then_next_run_unchanged(tmp_path, monkeypatch, detailed):
     release = threading.Event()
 
     async def go():
@@ -166,6 +175,8 @@ def test_ctrl_c_interrupts_once_waits_then_next_run_unchanged(tmp_path, monkeypa
         async with app.run_test(size=(100, 30)) as pilot:
             await _type(pilot, "/run")
             await _until(pilot, lambda: FakeClient.instances and FakeClient.instances[0].first_event.is_set())
+            if detailed:
+                await pilot.press("ctrl+o")
             await pilot.press("ctrl+c")
             await pilot.press("ctrl+c")
             await app.workers.wait_for_complete()
@@ -173,9 +184,10 @@ def test_ctrl_c_interrupts_once_waits_then_next_run_unchanged(tmp_path, monkeypa
             texts = _texts(app)
             assert texts.count(t("run.interrupt_requested", "en")) == 1
             assert FakeClient.instances[0].interrupt.is_set()
-            assert any("run.interrupted" in m for m in texts)
+            event_text = "run.interrupted" if detailed else "Run interrupted"
+            assert any(event_text in m for m in texts)
             assert INTERRUPTED_NOTICE in texts and not app.running
-            assert texts.index(INTERRUPTED_NOTICE) > max(i for i, m in enumerate(texts) if "run.interrupted" in m)
+            assert texts.index(INTERRUPTED_NOTICE) > max(i for i, m in enumerate(texts) if event_text in m)
             # next run delegated unchanged: fresh client and fresh, unset interrupt
             release.set()
             await _type(pilot, "run the project")
@@ -239,7 +251,7 @@ def test_exit_command_waits_for_engine_thread_and_shows_interruption(tmp_path, m
             await app.workers.wait_for_complete()
             await pilot.pause()
             assert app._exit
-            assert any("run.interrupted" in text for text in _texts(app))
+            assert any("Run interrupted" in text for text in _texts(app))
             assert INTERRUPTED_NOTICE in _texts(app)
 
     try:
@@ -308,3 +320,43 @@ def test_engine_client_interrupt_forwarding_and_classic_path(monkeypatch):
         assert "interrupt" in str(exc)
     else:
         raise AssertionError("expected EngineCompatibilityError")
+
+
+def test_toggle_preserves_order_and_non_event_messages(tmp_path):
+    async def go():
+        app = AidoApp(ReplState(store=SessionStore(tmp_path / "sessions")), "en")
+        async with app.run_test() as pilot:
+            app.add_message("user", "/run")
+            app._add_live_event("dev", "First task", "[work_item.started] WI-1")
+            app.add_message("error", "Error: engine unavailable")
+            app._add_live_event("worker", None, "[stdout] worker details")
+            app.add_message("result", "diagnostics: retry later")
+            app._add_live_event("dev", "Task completed", "[work_item.completed] WI-1")
+            await pilot.pause()
+            assert _texts(app)[-5:] == ["> /run", "First task", "Error: engine unavailable", "diagnostics: retry later", "Task completed"]
+            await pilot.press("ctrl+o")
+            await pilot.pause()
+            assert _texts(app)[-6:] == ["> /run", "[work_item.started] WI-1", "Error: engine unavailable", "[stdout] worker details", "diagnostics: retry later", "[work_item.completed] WI-1"]
+            await pilot.press("ctrl+o")
+            await pilot.pause()
+            assert _texts(app)[-5:] == ["> /run", "First task", "Error: engine unavailable", "diagnostics: retry later", "Task completed"]
+    asyncio.run(go())
+
+
+def test_event_history_has_fixed_bound(tmp_path):
+    async def go():
+        app = AidoApp(ReplState(store=SessionStore(tmp_path / "sessions")), "en")
+        async with app.run_test() as pilot:
+            for number in range(2005):
+                app._add_live_event("worker", None, f"output {number}")
+            assert app._event_history.maxlen == 2000
+            assert len(app._event_history) == 2000
+            assert app._event_history[0].detailed == "output 5"
+            await pilot.press("ctrl+o")
+            await pilot.pause()
+            texts = _texts(app)
+            assert "output 0" not in texts and "output 5" in texts and "output 2004" in texts
+            app._add_live_event("worker", None, "output 2005")
+            await pilot.pause()
+            assert "output 5" not in _texts(app) and "output 2005" in _texts(app)
+    asyncio.run(go())
