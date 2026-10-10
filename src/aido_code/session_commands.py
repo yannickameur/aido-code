@@ -4,30 +4,33 @@ from __future__ import annotations
 
 from typing import TextIO
 
+from aido_code.i18n import t
 from aido_code.session import Session, SessionStore
 
 
-def pick_session(store: SessionStore, input_stream: TextIO, output_stream: TextIO) -> str | None:
+def pick_session(
+    store: SessionStore, input_stream: TextIO, output_stream: TextIO, *, lang: str = "en",
+) -> str | None:
     sessions = store.list()
     if not sessions:
-        output_stream.write("No sessions found.\n")
+        output_stream.write(t("session.none_found", lang) + "\n")
         return None
-    output_stream.write("Sessions (most recently used first):\n")
+    output_stream.write(t("session.list_header", lang) + "\n")
     for number, session in enumerate(sessions, 1):
-        project = session.project_path if session.project_path is not None else "(no project)"
+        project = session.project_path if session.project_path is not None else t("session.no_project", lang)
         output_stream.write(f"  {number}. {session.session_id}  {session.updated_at}  {project}\n")
-    output_stream.write("Select a session number (blank to cancel): ")
+    output_stream.write(t("session.select_prompt", lang))
     output_stream.flush()
     try:
         choice = input_stream.readline().strip()
     except KeyboardInterrupt:
-        output_stream.write("\nSession selection cancelled.\n")
+        output_stream.write("\n" + t("session.cancelled", lang) + "\n")
         return None
     if not choice:
-        output_stream.write("Session selection cancelled.\n")
+        output_stream.write(t("session.cancelled", lang) + "\n")
         return None
     if not choice.isdecimal() or not 1 <= int(choice) <= len(sessions):
-        output_stream.write("Invalid session selection.\n")
+        output_stream.write(t("session.invalid", lang) + "\n")
         return None
     return sessions[int(choice) - 1].session_id
 

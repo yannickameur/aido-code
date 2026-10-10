@@ -12,6 +12,7 @@ from aido_code.project_init import run_init
 from aido_code.project_manifest import ProjectManifestError
 from aido_code.project_resources import ProjectResourcesError
 from aido_code.roadmap import RoadmapError
+from aido_code.i18n import LanguageError, resolve_lang
 from aido_code.live_run import INTERRUPTED_NOTICE, LiveRunRenderer, run_interruptibly
 from aido_code.repl import build_status_output, format_run, run
 from aido_code.session import SessionError, SessionStore
@@ -58,11 +59,39 @@ def _program_name() -> str:
     return Path(sys.argv[0]).name or "aido"
 
 
+def _extract_lang(argv: list[str]) -> tuple[list[str], str | None]:
+    """Removes ``--lang <value>`` / ``--lang=<value>`` wherever it appears;
+    the last occurrence wins. A bare trailing ``--lang`` yields ``""``
+    (an invalid value)."""
+    rest: list[str] = []
+    value: str | None = None
+    index = 0
+    while index < len(argv):
+        arg = argv[index]
+        if arg == "--lang":
+            value = argv[index + 1] if index + 1 < len(argv) else ""
+            index += 2
+            continue
+        if arg.startswith("--lang="):
+            value = arg[len("--lang="):]
+        else:
+            rest.append(arg)
+        index += 1
+    return rest, value
+
+
 def main(argv: list[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
 
     prog = _program_name()
+
+    argv, lang_arg = _extract_lang(list(argv))
+    try:
+        resolve_lang(lang_arg)
+    except LanguageError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
 
     if argv and argv[0] == "init":
         if len(argv) != 3:

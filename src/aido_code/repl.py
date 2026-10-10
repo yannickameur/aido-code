@@ -35,6 +35,7 @@ and nothing about work items is fabricated to fill the gap."""
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TextIO
 
@@ -48,6 +49,7 @@ from aido_code.engine_client import (
     WorkerSnapshot,
 )
 from aido_code.engine_plan import EnginePlanError, build_engine_plan
+from aido_code.i18n import t
 from aido_code.intent import Intent, interpret
 from aido_code.project_command import ProjectCommandContext, load_project_command_context
 from aido_code.project_manifest import ProjectManifestError
@@ -95,9 +97,9 @@ def sanitize_for_terminal(value: object) -> str:
     return _CONTROL_CHAR_RE.sub(_escape, text)
 
 
-def format_help() -> str:
-    lines = ["Available commands:"]
-    lines.extend(f"  {name} - {description}" for name, description in COMMANDS.items())
+def format_help(lang: str = "en") -> str:
+    lines = [t("help.title", lang)]
+    lines.extend(f"  {name} - {t(f'help.cmd.{name}', lang)}" for name in COMMANDS)
     return "\n".join(lines)
 
 
@@ -579,11 +581,134 @@ def _run_why_waiting(
     return _format_why_waiting(snapshot, work_item_id)
 
 
-NOT_UNDERSTOOD = (
-    "Not understood. I can answer: project status, why a WorkItem is waiting/blocked, "
-    "which workers/providers are available, or run/continue the project. "
-    "Type /help for commands."
-)
+NOT_UNDERSTOOD = t("not_understood", "en")
+
+
+@dataclass
+class ReplState:
+    """The mutable per-REPL state the dispatcher threads between lines."""
+
+    config_path: str = DEFAULT_CONFIG_PATH
+    session: Session | None = None
+    store: SessionStore = field(default_factory=SessionStore)
+
+
+def dispatch_line(
+    line: str,
+    state: ReplState,
+    input_stream: TextIO,
+    output_stream: TextIO,
+    *,
+    provider_adapters: dict[str, object] | None = None,
+    subprocess_runner: object | None = None,
+    lang: str = "en",
+) -> bool:
+    """The one per-line handler shared by ``run()`` and any other
+    front end: handles one raw input line, writes its output, updates
+    ``state`` and returns ``False`` only when the REPL must exit."""
+    command = line.strip()
+    if not command:
+        return True
+    if not command.startswith("/"):
+        match = interpret(command)
+        if match.intent is Intent.WHY_WAITING:
+            if state.session is not None:
+                try:
+                    state.config_path = str(project_manifest_path(state.session))
+                except SessionProjectError as exc:
+                    output_stream.write(f"Error: {exc}\n")
+                    return True
+            output_stream.write(
+                _run_why_waiting(
+                    state.config_path, match.work_item_id,
+                    provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
+                ) + "\n"
+            )
+            return True
+        command = {
+            Intent.STATUS: "/status",
+            Intent.WORKERS: "/workers",
+            Intent.RUN: "/run",
+        }.get(match.intent, "")
+        if not command:
+            output_stream.write(t("not_understood", lang) + "\n")
+            return True
+    tokens = command.split()
+    name, flags = tokens[0], tokens[1:]
+    if name == "/exit" and not flags:
+        return False
+    if name == "/help" and not flags:
+        output_stream.write(format_help(lang) + "\n")
+        return True
+    if command == "/resume":
+        try:
+            session_id = pick_session(state.store, input_stream, output_stream, lang=lang)
+            if session_id is not None:
+                state.session = resume_selected(state.store, session_id)
+                output_stream.write(t("session.resumed", lang, session_id=state.session.session_id) + "\n")
+        except (SessionError, OSError, ValueError) as exc:
+            output_stream.write(f"Error: {exc}\n")
+        return True
+    if command == "/new":
+        project_path = state.session.project_path if state.session is not None else (
+            str(Path(state.config_path).resolve().parent) if Path(state.config_path).is_file() else None
+        )
+        try:
+            state.session = state.store.create(project_path)
+            output_stream.write(t("session.created", lang, session_id=state.session.session_id) + "\n")
+        except (SessionError, OSError, ValueError) as exc:
+            output_stream.write(f"Error: {exc}\n")
+        return True
+    needs_project = (
+        (name in ("/status", "/workers") and flags in ([], ["--probe"]))
+        or command in ("/config", "/validate", "/run")
+    )
+    if needs_project and state.session is not None:
+        try:
+            state.config_path = str(project_manifest_path(state.session))
+        except SessionProjectError as exc:
+            output_stream.write(f"Error: {exc}\n")
+            return True
+    config_path = state.config_path
+    if name == "/status" and flags in ([], ["--probe"]):
+        output_stream.write(
+            _run_status(
+                config_path,
+                probe=flags == ["--probe"],
+                provider_adapters=provider_adapters,
+                subprocess_runner=subprocess_runner,
+            )
+            + "\n"
+        )
+    elif name == "/workers" and flags in ([], ["--probe"]):
+        output_stream.write(
+            _run_workers(
+                config_path,
+                probe=flags == ["--probe"],
+                provider_adapters=provider_adapters,
+                subprocess_runner=subprocess_runner,
+            )
+            + "\n"
+        )
+    elif command == "/config":
+        output_stream.write(_run_config(config_path) + "\n")
+    elif command == "/validate":
+        output_stream.write(
+            (_run_session_validate(config_path) if state.session is not None else _run_validate(config_path)) + "\n"
+        )
+    elif command == "/run":
+        output_stream.write(
+            (_run_session_project if state.session is not None else _run_run)(
+                config_path,
+                output_stream=output_stream,
+                provider_adapters=provider_adapters,
+                subprocess_runner=subprocess_runner,
+            )
+            + "\n"
+        )
+    else:
+        output_stream.write(t("unknown_command", lang, command=repr(command)) + "\n")
+    return True
 
 
 def run(
@@ -604,7 +729,10 @@ def run(
     the shared M1.4 project loader. ``provider_adapters`` and
     ``subprocess_runner`` are test seams for engine construction.
     """
-    store = session_store if session_store is not None else SessionStore()
+    state = ReplState(
+        config_path=config_path, session=session,
+        store=session_store if session_store is not None else SessionStore(),
+    )
     while True:
         output_stream.write(prompt)
         output_stream.flush()
@@ -615,110 +743,8 @@ def run(
             return
         if line == "":
             return
-
-        command = line.strip()
-        if not command:
-            continue
-        if not command.startswith("/"):
-            match = interpret(command)
-            if match.intent is Intent.WHY_WAITING:
-                if session is not None:
-                    try:
-                        config_path = str(project_manifest_path(session))
-                    except SessionProjectError as exc:
-                        output_stream.write(f"Error: {exc}\n")
-                        continue
-                output_stream.write(
-                    _run_why_waiting(
-                        config_path, match.work_item_id,
-                        provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
-                    ) + "\n"
-                )
-                continue
-            command = {
-                Intent.STATUS: "/status",
-                Intent.WORKERS: "/workers",
-                Intent.RUN: "/run",
-            }.get(match.intent, "")
-            if not command:
-                output_stream.write(NOT_UNDERSTOOD + "\n")
-                continue
-        tokens = command.split()
-        name, flags = tokens[0], tokens[1:]
-        if name == "/exit" and not flags:
+        if not dispatch_line(
+            line, state, input_stream, output_stream,
+            provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
+        ):
             return
-        if name == "/help" and not flags:
-            output_stream.write(format_help() + "\n")
-            continue
-        if command == "/resume":
-            try:
-                session_id = pick_session(store, input_stream, output_stream)
-                if session_id is not None:
-                    session = resume_selected(store, session_id)
-                    output_stream.write(f"Resumed session {session.session_id}\n")
-            except (SessionError, OSError, ValueError) as exc:
-                output_stream.write(f"Error: {exc}\n")
-            continue
-        if command == "/new":
-            project_path = session.project_path if session is not None else (
-                str(Path(config_path).resolve().parent) if Path(config_path).is_file() else None
-            )
-            try:
-                session = store.create(project_path)
-                output_stream.write(f"Created session {session.session_id}\n")
-            except (SessionError, OSError, ValueError) as exc:
-                output_stream.write(f"Error: {exc}\n")
-            continue
-        needs_project = (
-            (name in ("/status", "/workers") and flags in ([], ["--probe"]))
-            or command in ("/config", "/validate", "/run")
-        )
-        if needs_project and session is not None:
-            try:
-                config_path = str(project_manifest_path(session))
-            except SessionProjectError as exc:
-                output_stream.write(f"Error: {exc}\n")
-                continue
-        if name == "/status" and flags in ([], ["--probe"]):
-            output_stream.write(
-                _run_status(
-                    config_path,
-                    probe=flags == ["--probe"],
-                    provider_adapters=provider_adapters,
-                    subprocess_runner=subprocess_runner,
-                )
-                + "\n"
-            )
-            continue
-        if name == "/workers" and flags in ([], ["--probe"]):
-            output_stream.write(
-                _run_workers(
-                    config_path,
-                    probe=flags == ["--probe"],
-                    provider_adapters=provider_adapters,
-                    subprocess_runner=subprocess_runner,
-                )
-                + "\n"
-            )
-            continue
-        if command == "/config":
-            output_stream.write(_run_config(config_path) + "\n")
-            continue
-        if command == "/validate":
-            output_stream.write(
-                (_run_session_validate(config_path) if session is not None else _run_validate(config_path)) + "\n"
-            )
-            continue
-        if command == "/run":
-            output_stream.write(
-                (_run_session_project if session is not None else _run_run)(
-                    config_path,
-                    output_stream=output_stream,
-                    provider_adapters=provider_adapters,
-                    subprocess_runner=subprocess_runner,
-                )
-                + "\n"
-            )
-            continue
-
-        output_stream.write(f"Unknown command: {command!r}. Type /help for a list of commands.\n")
