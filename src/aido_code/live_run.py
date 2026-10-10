@@ -122,13 +122,15 @@ INTERRUPTED_NOTICE = (
 )
 
 
-def run_interruptibly(client: Any, sink: object | None) -> Any | None:
+def run_interruptibly(client: Any, sink: object | None, interrupt: object | None = None) -> Any | None:
     """The one Ctrl+C handler shared by ``aido run`` and ``/run``: runs
     ``client.run`` and returns its ``RunResult``, or ``None`` after a
     ``KeyboardInterrupt``. AIDO keeps no recovery state of its own; any
     ``*.interrupted`` events the engine emitted were already rendered."""
     try:
-        return client.run(on_event=sink)
+        if interrupt is None:
+            return client.run(on_event=sink)
+        return client.run(on_event=sink, interrupt=interrupt)
     except KeyboardInterrupt:
         return None
 

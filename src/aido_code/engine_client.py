@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import dataclasses
 import inspect
+import threading
 from typing import Any, Callable
 
 from orchestrator.engine import (
@@ -160,13 +161,27 @@ class EngineClient:
     def run(
         self, *, max_cycles: int = DEFAULT_MAX_CYCLES,
         on_event: Callable[[Any], None] | None = None,
+        interrupt: threading.Event | None = None,
     ) -> RunResult:
         """The one run path: ``on_event`` goes straight to
         ``OrchestratorEngine.run(on_event=...)``. Raises
         ``EngineCompatibilityError`` before running if the engine lacks
-        the P21 live-run API."""
+        the P21 live-run API, or if ``interrupt`` is given and the
+        engine's ``run`` cannot accept it (forwarded only when set, so
+        the classic path never requires it)."""
         check_live_run_api(self._engine)
-        return self._engine.run(max_cycles=max_cycles, on_event=on_event)
+        if interrupt is None:
+            return self._engine.run(max_cycles=max_cycles, on_event=on_event)
+        try:
+            has_interrupt = "interrupt" in inspect.signature(self._engine.run).parameters
+        except (TypeError, ValueError):
+            has_interrupt = False
+        if not has_interrupt:
+            raise EngineCompatibilityError(
+                "installed ai-dev-orchestrator is incompatible with interruptible live runs: "
+                "missing OrchestratorEngine.run(interrupt=...). Upgrade ai-dev-orchestrator."
+            )
+        return self._engine.run(max_cycles=max_cycles, on_event=on_event, interrupt=interrupt)
 
     def close(self) -> None:
         self._engine.close()

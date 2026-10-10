@@ -8,6 +8,7 @@ markup) after passing through ``sanitize_for_terminal``."""
 from __future__ import annotations
 
 import io
+import threading
 from pathlib import Path
 
 from rich.text import Text
@@ -17,9 +18,37 @@ from textual.containers import VerticalScroll
 from textual.widgets import Input, Static
 
 from aido_code.i18n import t
+from aido_code.intent import Intent, interpret
+from aido_code.live_run import render_event
 from aido_code.repl import ReplState, dispatch_line, sanitize_for_terminal
 
-_KINDS = {"user": "bold cyan", "info": "dim", "error": "bold red", "result": ""}
+_KINDS = {
+    "user": "bold cyan", "info": "dim", "error": "bold red", "result": "",
+    "worker": "dim", "dev": "bold", "qa": "green", "git": "magenta", "warn": "yellow",
+}
+
+
+def _event_kind(kind: object) -> str:
+    """Display role of a live ``EngineEvent`` from its public ``kind`` only."""
+    name = str(kind)
+    if name == "execution.output":
+        return "worker"
+    if name == "execution.output_truncated":
+        return "warn"
+    if any(word in name for word in ("failed", "error", "blocked")):
+        return "error"
+    if name.startswith("qa"):
+        return "qa"
+    if name.startswith(("git", "merge", "commit")) or "commit" in name:
+        return "git"
+    if name.startswith("dev"):
+        return "dev"
+    return "result"
+
+
+def _is_run_request(line: str) -> bool:
+    command = line.strip()
+    return command == "/run" or (not command.startswith("/") and interpret(command).intent is Intent.RUN)
 
 
 class Message(Static):
@@ -37,8 +66,10 @@ class AidoApp(App[None]):
     #status { height: 1; dock: top; background: $boost; padding: 0 1; }
     #prompt { dock: bottom; }
     .msg-user { margin-top: 1; }
+    .msg-worker { padding-left: 2; }
     """
     BINDINGS = [
+        Binding("ctrl+c", "interrupt", "Interrupt", priority=True),
         Binding("ctrl+d", "quit_idle", "Quit", priority=True),
         Binding("pageup", "scroll_log(-1)", show=False),
         Binding("pagedown", "scroll_log(1)", show=False),
@@ -50,6 +81,9 @@ class AidoApp(App[None]):
         self.lang = lang
         self._dispatch_kwargs = dispatch_kwargs
         self.running = False
+        self._interrupt: threading.Event | None = None
+        self._quit_after = False
+        self._heartbeat = ""
         self._history: list[str] = []
         self._cursor = 0
         self._resume_choices: list[str] | None = None
@@ -73,6 +107,8 @@ class AidoApp(App[None]):
         session_id = session.session_id if session is not None else "-"
         mode = "running" if self.running else "idle"
         line = f"project: {project} | session: {session_id} | lang: {self.lang} | {mode}"
+        if self.running and self._heartbeat:
+            line += f" | {self._heartbeat}"
         self.query_one("#status", Static).update(Text(sanitize_for_terminal(line)))
 
     # -- conversation log ---------------------------------------------
@@ -87,9 +123,27 @@ class AidoApp(App[None]):
         log = self.query_one("#log", VerticalScroll)
         (log.scroll_page_down if direction > 0 else log.scroll_page_up)(animate=False)
 
+    def _request_interrupt(self) -> None:
+        if self._interrupt is not None and not self._interrupt.is_set():
+            self._interrupt.set()
+            self.add_message("info", t("run.interrupt_requested", self.lang))
+
+    def action_interrupt(self) -> None:
+        if self._interrupt is not None:
+            self._request_interrupt()
+        elif not self.running:
+            self.query_one("#prompt", Input).value = ""
+            self.add_message("info", t("run.idle_ctrl_c", self.lang))
+
     def action_quit_idle(self) -> None:
         if not self.running:
             self.exit()
+        elif self._interrupt is not None:
+            self._quit_after = True
+            self._request_interrupt()
+
+    async def action_quit(self) -> None:
+        self.action_quit_idle()
 
     # -- input ----------------------------------------------------------
     def on_key(self, event) -> None:
@@ -104,9 +158,12 @@ class AidoApp(App[None]):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         line = event.value
-        if self.running or not line.strip():
+        if not line.strip():
             return
         event.input.value = ""
+        if self.running:
+            self.add_message("info", t("run.busy", self.lang))
+            return
         self._history.append(line)
         self._cursor = len(self._history)
         self.add_message("user", line)
@@ -133,16 +190,33 @@ class AidoApp(App[None]):
             self.add_message("info", "\n".join(lines))
             return
         self.running = True
-        event.input.disabled = True
+        kwargs = dict(self._dispatch_kwargs)
+        if _is_run_request(line):
+            self._interrupt = threading.Event()
+            kwargs.update(interrupt=self._interrupt, event_sink=self._on_event)
         self._refresh_status()
-        self.run_worker(lambda: self._dispatch(line), thread=True, exclusive=True)
+        self.run_worker(lambda: self._dispatch(line, kwargs), thread=True, exclusive=True)
 
-    def _dispatch(self, line: str) -> None:
+    def _on_event(self, event: object) -> None:
+        """Engine-thread sink: renders public event fields and hands them to the UI loop."""
+        try:
+            text = render_event(event, lang=self.lang).strip("\n")
+        except Exception:
+            text = "[unrenderable event]"
+        kind = getattr(event, "kind", None)
+        if kind == "execution.heartbeat":
+            self.call_from_thread(self._set_heartbeat, text.strip())
+        else:
+            self.call_from_thread(self.add_message, _event_kind(kind), text)
+
+    def _set_heartbeat(self, text: str) -> None:
+        self._heartbeat = text
+        self._refresh_status()
+
+    def _dispatch(self, line: str, kwargs: dict[str, object]) -> None:
         out = io.StringIO()
         try:
-            keep = dispatch_line(
-                line, self.state, io.StringIO(), out, lang=self.lang, **self._dispatch_kwargs
-            )
+            keep = dispatch_line(line, self.state, io.StringIO(), out, lang=self.lang, **kwargs)
         except Exception as exc:  # surfaced as an error message, never a crash
             out.write(f"Error: {exc}\n")
             keep = True
@@ -155,10 +229,10 @@ class AidoApp(App[None]):
             )
             self.add_message(kind, text)
         self.running = False
-        self.query_one("#prompt", Input).disabled = False
-        self.query_one("#prompt", Input).focus()
+        self._interrupt = None
+        self._heartbeat = ""
         self._refresh_status()
-        if not keep:
+        if self._quit_after or not keep:
             self.exit()
 
 

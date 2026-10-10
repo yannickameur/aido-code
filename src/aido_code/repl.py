@@ -449,7 +449,9 @@ def _interrupt_helpers() -> tuple[object, str]:
     return run_interruptibly, INTERRUPTED_NOTICE
 
 
-def _live_sink(output_stream: TextIO | None, lang: str = "en") -> object | None:
+def _live_sink(output_stream: TextIO | None, lang: str = "en", event_sink: object | None = None) -> object | None:
+    if event_sink is not None:
+        return event_sink
     if output_stream is None:
         return None
     from aido_code.live_run import LiveRunRenderer
@@ -473,13 +475,15 @@ def _run_run(
     provider_adapters: dict[str, object] | None = None,
     subprocess_runner: object | None = None,
     lang: str = "en",
+    interrupt: object | None = None,
+    event_sink: object | None = None,
 ) -> str:
     try:
         with EngineClient.open(
             config_path, provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
         ) as client:
             run_interruptibly, notice = _interrupt_helpers()
-            result = run_interruptibly(client, _live_sink(output_stream, lang))
+            result = run_interruptibly(client, _live_sink(output_stream, lang, event_sink), interrupt)
     except EngineError as exc:
         return f"Error: {exc}"
     if result is None:
@@ -502,6 +506,8 @@ def _run_session_project(
     provider_adapters: dict[str, object] | None = None,
     subprocess_runner: object | None = None,
     lang: str = "en",
+    interrupt: object | None = None,
+    event_sink: object | None = None,
 ) -> str:
     try:
         context = load_project_command_context(config_path)
@@ -513,7 +519,7 @@ def _run_session_project(
             provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
         ) as client:
             run_interruptibly, notice = _interrupt_helpers()
-            result = run_interruptibly(client, _live_sink(output_stream, lang))
+            result = run_interruptibly(client, _live_sink(output_stream, lang, event_sink), interrupt)
             if result is None:
                 return t("interrupted", lang) if lang != "en" else notice
             return format_run(result, include_events=output_stream is None, lang=lang)
@@ -611,6 +617,8 @@ def dispatch_line(
     provider_adapters: dict[str, object] | None = None,
     subprocess_runner: object | None = None,
     lang: str = "en",
+    interrupt: object | None = None,
+    event_sink: object | None = None,
 ) -> bool:
     """The one per-line handler shared by ``run()`` and any other
     front end: handles one raw input line, writes its output, updates
@@ -715,6 +723,8 @@ def dispatch_line(
                 provider_adapters=provider_adapters,
                 subprocess_runner=subprocess_runner,
                 lang=lang,
+                interrupt=interrupt,
+                event_sink=event_sink,
             )
             + "\n"
         )

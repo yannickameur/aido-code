@@ -52,6 +52,9 @@ EN: dict[str, str] = {
     "run.work_items": "work items:",
     "run.events": "events:",
     "run.summary": "Run summary",
+    "run.busy": "A run is in progress; wait for it to finish (Ctrl+C requests an interruption).",
+    "run.interrupt_requested": "Interruption requested; waiting for the engine to stop.",
+    "run.idle_ctrl_c": "Input cleared. Press Ctrl+D or type /exit to quit.",
     "interrupted": (
         "Interrupted. Output already shown is preserved. The governed engine state "
         "determines recovery: the next `aido run` (or `/run`) calls the engine's "
@@ -135,6 +138,9 @@ FR: dict[str, str] = {
     "run.work_items": "tâches :",
     "run.events": "événements :",
     "run.summary": "Résumé de l'exécution",
+    "run.busy": "Une exécution est en cours ; attendez sa fin (Ctrl+C demande une interruption).",
+    "run.interrupt_requested": "Interruption demandée ; attente de l'arrêt du moteur.",
+    "run.idle_ctrl_c": "Saisie effacée. Appuyez sur Ctrl+D ou tapez /exit pour quitter.",
     "interrupted": (
         "Interrompu. Les sorties déjà affichées sont conservées. L'état du moteur gouverné "
         "détermine la reprise : le prochain `aido run` (ou `/run`) appelle inchangée la "
