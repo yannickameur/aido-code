@@ -132,7 +132,7 @@ def test_worker_output_strips_sgr_preserves_lines_and_escapes_other_controls(tmp
     class ColorClient(FakeClient):
         def run(self, *, on_event=None, interrupt=None, **_):
             self.interrupt = interrupt
-            on_event(_ev("execution.output", stream="stdout", text="\x1b[31mred\x1b[0m\nnext\tline\x1b[2J"))
+            on_event(_ev("execution.output", stream="stdout", text="\x1b[31mred\x1b[0m\r\nnext\tline\x1b[2J"))
             self.first_event.set()
             release.wait(5)
             return RunResult(0, True, False, ())

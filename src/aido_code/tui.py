@@ -221,7 +221,7 @@ class AidoApp(App[None]):
                 label = sanitize_for_terminal(stream) if stream is not None else "output"
                 output = payload.get("text")
                 output = "" if output is None else str(output)
-                text = f"    [{label}] {_SGR.sub('', output)}"
+                text = f"    [{label}] {_SGR.sub('', output).replace(chr(13) + chr(10), chr(10))}"
             else:
                 text = render_event(event, lang=self.lang).strip("\n")
         except Exception:
