@@ -161,6 +161,19 @@ Acceptance criteria:
 - Offline tests: ALLOW_SELECT is False; /export content order and completeness for conversation, history in detailed rendering, table and summary; export during a run; XDG_STATE_HOME honored and the project directory untouched; eviction notice; French and English texts; /help lists /export, /quit, F10 and Shift+drag.
 - Do not install packages or modify any virtualenv; do not run the installed aido command; run tests with: PYTHONPATH=src python3 -m pytest -q -p no:cacheprovider. Existing behavior and tests stay unchanged.
 
+#### WI-M3.5-03 — Interrupt the engine cleanly when the terminal window closes
+
+Dependencies: WI-M3.5-02
+Capabilities: development
+
+Acceptance criteria:
+
+- Found in the real terminal test: closing the terminal window during a run (SIGHUP) killed the interface without asking the engine to interrupt; the worker kept running unattended for about 40 s, committed on the WorkItem branch, and the execution and WorkItem were left 'running' for engine recovery.
+- While the Textual interface runs (inside run_tui's terminal isolation), install handlers for SIGHUP and SIGTERM that request the same engine interruption as Ctrl+C (set the active run's interrupt event, thread-safe, no Textual call from the signal handler that can block), then wait for the engine thread to finish for at most 60 seconds before the process exits; when idle they simply quit. Writes to a vanished terminal (EIO/EBADF) must not raise out of this path. Previous handlers are restored when run_tui returns.
+- Do not change ai-dev-orchestrator, the classic non-interactive path, or the existing Ctrl+C/Ctrl+D/quit behavior.
+- Regression tests: a unit test sends SIGHUP to the process while a fake engine run is active and asserts that the fake engine sees the interrupt, the run is reported interrupted, and run_tui returns; idle SIGTERM quits; previous signal handlers are restored; a real pseudo-terminal test (pty.fork, Linux only) closes the master side during a fake run and asserts that the fake engine sees the interrupt before the process exits.
+- Do not install packages or modify any virtualenv; do not run the installed aido command; run tests with: PYTHONPATH=src python3 -m pytest -q -p no:cacheprovider. Existing tests keep passing.
+
 ### QA
 
 #### QA-M3.5-01 — Full offline test suite
