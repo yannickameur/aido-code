@@ -81,6 +81,26 @@ def _extract_lang(argv: list[str]) -> tuple[list[str], str | None]:
     return rest, value
 
 
+def _interactive() -> bool:
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def _run_interactive(session, store, lang: str) -> None:
+    """Textual app on a TTY; the classic loop otherwise (Textual is then
+    never imported)."""
+    token = set_interactive_lang(lang)
+    try:
+        if _interactive():
+            from aido_code.repl import ReplState
+            from aido_code.tui import run_tui
+
+            run_tui(ReplState(session=session, store=store), lang)
+        else:
+            run(sys.stdin, sys.stdout, session=session, session_store=store)
+    finally:
+        reset_interactive_lang(token)
+
+
 def main(argv: list[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
@@ -145,11 +165,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Error: {exc}", file=sys.stderr)
             return 1
         print(t("session.resumed", lang, session_id=session.session_id))
-        token = set_interactive_lang(lang)
-        try:
-            run(sys.stdin, sys.stdout, session=session, session_store=store)
-        finally:
-            reset_interactive_lang(token)
+        _run_interactive(session, store, lang)
         return 0
 
     if argv:
@@ -178,11 +194,7 @@ def main(argv: list[str] | None = None) -> int:
     except (SessionError, OSError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
-    token = set_interactive_lang(lang)
-    try:
-        run(sys.stdin, sys.stdout, session=session, session_store=store)
-    finally:
-        reset_interactive_lang(token)
+    _run_interactive(session, store, lang)
     return 0
 
 
