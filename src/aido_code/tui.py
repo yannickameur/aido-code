@@ -10,6 +10,7 @@ from __future__ import annotations
 import io
 import re
 import threading
+from datetime import datetime
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,14 +18,16 @@ from pathlib import Path
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import VerticalScroll
+from textual.containers import Vertical, VerticalScroll
 from textual.widgets import Input, Static
 from textual.worker import Worker, WorkerState
 
+from aido_code import repl
 from aido_code.i18n import t
 from aido_code.intent import Intent, interpret
 from aido_code.live_run import render_event, simplified_event_sentence
 from aido_code.repl import ReplState, dispatch_line, sanitize_for_terminal
+from aido_code.session import project_manifest_path
 
 _KINDS = {
     "user": "bold cyan", "info": "dim", "error": "bold red", "result": "",
@@ -32,6 +35,49 @@ _KINDS = {
 }
 _SGR = re.compile(r"\x1b\[[0-9;:]*m")
 _EVENT_HISTORY_LIMIT = 2000
+_PROVIDER_LABELS = {"anthropic": "Claude", "openai": "Codex", "mistral": "Mistral", "gravity": "Gravity"}
+_FIVE_HOUR = ("five_hour", "primary_5h")
+_SEVEN_DAY = ("seven_day", "secondary_7d")
+
+
+def _window_label(window_type: str, lang: str) -> str:
+    if window_type in _FIVE_HOUR:
+        return "5 h"
+    if window_type in _SEVEN_DAY:
+        return t("quota.window_7d", lang)
+    return window_type
+
+
+def _local_reset(reset_at: str | None, lang: str) -> str | None:
+    """Local-time reset text, or None when the provider reported none."""
+    if reset_at is None:
+        return None
+    try:
+        moment = datetime.fromisoformat(reset_at.replace("Z", "+00:00"))
+        when = moment.astimezone().strftime("%d/%m %H:%M")
+    except (ValueError, OverflowError, OSError):
+        when = reset_at
+    return t("quota.reset", lang, when=when)
+
+
+def format_quota_line(snapshot: object, lang: str) -> str:
+    """One panel line from a ``ProviderSnapshot``; only its public facts."""
+    provider = str(snapshot.provider)
+    label = _PROVIDER_LABELS.get(provider, provider)
+    if str(snapshot.reason).startswith("probe_error"):
+        return f"{label}: {t('quota.not_available', lang)}"
+    if not snapshot.quota_windows:
+        return f"{label}: {t('quota.not_reported', lang)}"
+    parts = []
+    for window in snapshot.quota_windows:
+        remaining = window.remaining
+        value = f"{round(remaining * 100)} %" if remaining is not None else t("quota.unknown", lang)
+        part = f"{_window_label(str(window.window_type), lang)} {value}"
+        reset = _local_reset(window.reset_at, lang)
+        if reset is not None:
+            part += f" ({reset})"
+        parts.append(part)
+    return f"{label}: " + " · ".join(parts)
 
 
 @dataclass
@@ -78,7 +124,9 @@ class Message(Static):
 class AidoApp(App[None]):
     CSS = """
     #log { height: 1fr; }
-    #status { height: 1; dock: top; background: $boost; padding: 0 1; }
+    #header { height: auto; dock: top; }
+    #status { height: 1; background: $boost; padding: 0 1; }
+    #quota { height: auto; padding: 0 1; color: $text-muted; }
     #prompt { dock: bottom; }
     .msg-user { margin-top: 1; }
     .msg-worker { padding-left: 2; }
@@ -87,6 +135,7 @@ class AidoApp(App[None]):
         Binding("ctrl+c", "interrupt", "Interrupt", priority=True),
         Binding("ctrl+d", "quit_idle", "Quit", priority=True),
         Binding("ctrl+o", "toggle_view", "Toggle view", priority=True),
+        Binding("ctrl+r", "refresh_quota", "Refresh quotas", priority=True),
         Binding("pageup", "scroll_log(-1)", show=False),
         Binding("pagedown", "scroll_log(1)", show=False),
     ]
@@ -109,9 +158,12 @@ class AidoApp(App[None]):
         self._history: list[str] = []
         self._cursor = 0
         self._resume_choices: list[str] | None = None
+        self._quota_in_flight = False
 
     def compose(self) -> ComposeResult:
-        yield Static(Text(""), id="status", markup=False)
+        with Vertical(id="header"):
+            yield Static(Text(""), id="status", markup=False)
+            yield Static(Text(""), id="quota", markup=False)
         yield VerticalScroll(id="log")
         yield Input(id="prompt", placeholder="/help")
 
@@ -119,6 +171,42 @@ class AidoApp(App[None]):
         self._refresh_status()
         self.add_message("info", t("help.title", self.lang))
         self.query_one("#prompt", Input).focus()
+        self.action_refresh_quota()
+
+    # -- quota panel ----------------------------------------------------
+    def _set_quota(self, lines: list[str]) -> None:
+        text = "\n".join(sanitize_for_terminal(line) for line in lines)
+        self.query_one("#quota", Static).update(Text(text))
+
+    def action_refresh_quota(self) -> None:
+        if self._quota_in_flight:
+            return
+        self._quota_in_flight = True
+        self._set_quota([t("quota.refreshing", self.lang)])
+        self.run_worker(self._probe_quota, thread=True, group="quota", exit_on_error=False)
+
+    def _probe_quota(self) -> None:
+        """Thread worker: one real probe; any failure renders "not available"."""
+        lines: list[str] | None = None
+        try:
+            session = self.state.session
+            if session is not None and session.project_path:
+                config_path = str(project_manifest_path(session))
+                _context, client = repl._open_project_command_engine(config_path)
+                with client:
+                    providers = client.probe_workers()
+                lines = [format_quota_line(p, self.lang) for p in sorted(providers, key=lambda p: p.provider)]
+        except Exception:
+            lines = None
+        if lines is None:
+            lines = [t("quota.not_available", self.lang)]
+        elif not lines:
+            lines = [t("quota.not_reported", self.lang)]
+        self.call_from_thread(self._finish_quota, lines)
+
+    def _finish_quota(self, lines: list[str]) -> None:
+        self._quota_in_flight = False
+        self._set_quota(lines)
 
     # -- status bar ---------------------------------------------------
     def _refresh_status(self) -> None:
@@ -310,6 +398,7 @@ class AidoApp(App[None]):
     def _finish(self, line: str, text: str, keep: bool) -> None:
         if line.strip() == "/help":
             text += f"\n  Ctrl+O - {t('help.toggle_view', self.lang)}"
+            text += f"\n  Ctrl+R - {t('help.refresh_quota', self.lang)}"
         if text:
             kind = "error" if text.startswith(("Error", "Validation failed")) else (
                 "info" if line.startswith(("/help", "/new", "/resume")) else "result"
