@@ -223,8 +223,11 @@ unrecognized requests get an explanation of what is understood.
 | Up/Down | Recall previous lines |
 | Ctrl+O | Toggle simplified/detailed view (also during a run) |
 | Ctrl+R | Refresh the AI plan quota panel (one `probe_workers()` call) |
-| Ctrl+C | During a run: request the engine interruption once and wait; idle: clear the input |
-| Ctrl+D, `/exit` | Quit when idle |
+| Ctrl+C | During a run: request the engine interruption once and wait; idle: clear a non-empty input, then press twice within 2 s to quit |
+| Ctrl+D, `/exit`, `/quit` | Quit (during a run: interrupt first and wait) |
+| F10 | Emergency quit that does not depend on Ctrl (interrupts a run first) |
+| `/export` | Write every displayed message and the detailed event history to `$XDG_STATE_HOME/aido/exports/` (never in the project) |
+| Shift+drag | The terminal's own text selection while the mouse is captured |
 
 The simplified view shows short sentences built from real engine events
 ("Alice développe…", "Tests validés", "Tâche terminée"); the detailed view
@@ -233,6 +236,13 @@ in-memory history. The quota panel is filled once at start, in the
 background, then only on Ctrl+R. After each run, a table shows the AI
 execution time per provider for the current milestone, read from
 `OrchestratorEngine.execution_times()`.
+
+Workers never receive the terminal: while the interface runs, Textual reads
+the terminal on a private descriptor and fd 0 points to `/dev/null`, so a
+worker or a tool it starts (for example the Flutter tool) cannot change
+the terminal mode or read keystrokes. The terminal state is restored on
+every exit. Closing the terminal window (SIGHUP) or SIGTERM during a run
+requests the engine interruption and waits for it before exiting.
 
 ## M4 — Non-interactive mode
 

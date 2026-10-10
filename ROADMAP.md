@@ -52,7 +52,7 @@ decision belongs to the engine.
 | M3.3 — Simplified interface display with on-demand details | `DONE` (2026-10-10) |
 | M3.4 — AI plan quotas and execution time summary (engine P14 simplified) | `DONE` (2026-10-10) |
 | Release v0.2.0 (GitHub Release, engine v0.2.0) | `DONE` (2026-10-10) |
-| M3.5 — Terminal reliability fix (workers isolated from the terminal, reliable exits, /export) | `APPROVED` — current milestone |
+| M3.5 — Terminal reliability fix (workers isolated from the terminal, reliable exits, /export) | `DONE` (2026-10-10) |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
 | M6 — Doctor/diagnostics | `À VOTER` |

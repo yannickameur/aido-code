@@ -50,6 +50,8 @@ bottom, the conversation and live engine events scroll above, Up/Down
 recall previous lines, Ctrl+O switches between the simplified and the
 detailed view, Ctrl+R refreshes the AI plan quota panel, and Ctrl+C
 interrupts a run cleanly (the next `/run` resumes through the engine).
+Ctrl+D, `/exit`, `/quit` or F10 quit; `/export` saves everything shown to
+a text file, and Shift+drag uses the terminal's own selection.
 After each run a table shows the AI execution time per provider for the
 current milestone. Scripts and non-interactive input keep the classic
 line interface and output.
