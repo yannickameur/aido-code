@@ -112,7 +112,9 @@ def main(argv: list[str] | None = None) -> int:
         # An unqualified CLI invocation keeps its established English output.
         # Catalog lookup itself defaults to French; explicit CLI/environment
         # selection controls the interactive language.
-        lang = resolve_lang(lang_arg, {"AIDO_LANG": os.environ.get("AIDO_LANG", "en")})
+        interface = _interactive() and (not argv or argv[0] in ("resume", "--continue", "-c"))
+        default = "fr" if interface else "en"
+        lang = resolve_lang(lang_arg, {"AIDO_LANG": os.environ.get("AIDO_LANG", default)})
     except LanguageError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2

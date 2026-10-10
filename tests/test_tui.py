@@ -185,14 +185,15 @@ def test_non_tty_runs_classic_loop_without_textual(tmp_path):
     code = (
         "import sys, io; sys.stdin = io.StringIO('/help\\n/exit\\n');"
         "from aido_code.__main__ import main; "
-        "rc = main(['--lang','en']); print('textual' in sys.modules, rc, file=sys.stderr)"
+        "rc = main([]); print('textual' in sys.modules, rc, file=sys.stderr)"
     )
     proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
                           cwd=tmp_path,
-                          env={**os.environ,
+                          env={**{key: value for key, value in os.environ.items() if key != "AIDO_LANG"},
                                "PYTHONPATH": os.pathsep.join([str(Path("src").resolve()), *sys.path]),
                                "HOME": str(tmp_path), "XDG_STATE_HOME": str(tmp_path)})
     assert "aido> " in proc.stdout and "/help" in proc.stdout
+    assert "Available commands:" in proc.stdout
     assert proc.stderr.strip().endswith("False 0")
 
 
@@ -205,3 +206,29 @@ def test_tty_selects_textual_app(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     assert entry.main(["--lang", "en"]) == 0
     assert called == {"lang": "en"}
+
+
+def test_tty_defaults_to_french_and_environment_can_select_english(monkeypatch, tmp_path):
+    called = []
+    monkeypatch.setattr(entry, "_interactive", lambda: True)
+    import aido_code.tui as tui
+    monkeypatch.setattr(tui, "run_tui", lambda state, lang: called.append(lang))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+    monkeypatch.delenv("AIDO_LANG", raising=False)
+    monkeypatch.chdir(tmp_path)
+    assert entry.main([]) == 0
+    monkeypatch.setenv("AIDO_LANG", "en")
+    assert entry.main([]) == 0
+    assert called == ["fr", "en"]
+
+
+def test_status_bar_uses_catalog_labels_and_states(tmp_path):
+    async def go():
+        app = _app(tmp_path, "fr")
+        async with app.run_test():
+            status = app.query_one("#status")
+            assert str(status.render()) == "projet: - | session: - | langue: fr | inactif"
+            app.running = True
+            app._refresh_status()
+            assert str(status.render()) == "projet: - | session: - | langue: fr | en cours"
+    asyncio.run(go())

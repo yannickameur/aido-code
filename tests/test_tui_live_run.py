@@ -100,6 +100,8 @@ def test_progressive_display_responsive_and_busy_refusal(tmp_path, monkeypatch):
             await _until(pilot, lambda: any("hello from worker" in m for m in _texts(app)))
             assert app.running and not release.is_set()  # shown before the run completes
             texts = _texts(app)
+            assert texts.count(t("run.start", "en")) == 1
+            assert texts.index(t("run.start", "en")) < next(i for i, m in enumerate(texts) if "dev_a.started" in m)
             assert any("dev_a.started" in m and "Worker A" in m for m in texts)
             assert any("output truncated" in m for m in texts)
             assert not any("still running" in m for m in texts)  # heartbeat is not a line
@@ -118,6 +120,38 @@ def test_progressive_display_responsive_and_busy_refusal(tmp_path, monkeypatch):
             assert any("qa.passed" in m for m in _texts(app))
             assert not any(SENTINEL in m for m in _texts(app))
             assert not any(SENTINEL in str(app.query_one("#status").render()) for _ in (0,))
+    try:
+        asyncio.run(go())
+    finally:
+        release.set()
+
+
+def test_worker_output_strips_sgr_preserves_lines_and_escapes_other_controls(tmp_path, monkeypatch):
+    release = threading.Event()
+
+    class ColorClient(FakeClient):
+        def run(self, *, on_event=None, interrupt=None, **_):
+            self.interrupt = interrupt
+            on_event(_ev("execution.output", stream="stdout", text="\x1b[31mred\x1b[0m\nnext\tline\x1b[2J"))
+            self.first_event.set()
+            release.wait(5)
+            return RunResult(0, True, False, ())
+
+    monkeypatch.setattr(repl.EngineClient, "open", classmethod(lambda cls, *a, **k: ColorClient(release)))
+
+    async def go():
+        app = AidoApp(ReplState(store=SessionStore(tmp_path / "sessions")), "fr")
+        async with app.run_test() as pilot:
+            await _type(pilot, "/run")
+            await _until(pilot, lambda: any("red" in m for m in _texts(app)))
+            output = next(m for m in _texts(app) if "red" in m)
+            assert "red\nnext\\tline\\x1b[2J" in output
+            assert "\\x1b[31m" not in output and "\\x1b[0m" not in output
+            texts = _texts(app)
+            assert texts.index(t("run.start", "fr")) < texts.index(output)
+            release.set()
+            await app.workers.wait_for_complete()
+
     try:
         asyncio.run(go())
     finally:

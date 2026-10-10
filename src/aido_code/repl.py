@@ -619,6 +619,7 @@ def dispatch_line(
     lang: str = "en",
     interrupt: object | None = None,
     event_sink: object | None = None,
+    show_run_start: bool = True,
 ) -> bool:
     """The one per-line handler shared by ``run()`` and any other
     front end: handles one raw input line, writes its output, updates
@@ -714,7 +715,7 @@ def dispatch_line(
             (_run_session_validate(config_path) if state.session is not None else _run_validate(config_path)) + "\n"
         )
     elif command == "/run":
-        if lang != "en":
+        if show_run_start and lang != "en":
             output_stream.write(t("run.start", lang) + "\n")
         output_stream.write(
             (_run_session_project if state.session is not None else _run_run)(

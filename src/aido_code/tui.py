@@ -8,6 +8,7 @@ markup) after passing through ``sanitize_for_terminal``."""
 from __future__ import annotations
 
 import io
+import re
 import threading
 from pathlib import Path
 
@@ -27,6 +28,7 @@ _KINDS = {
     "user": "bold cyan", "info": "dim", "error": "bold red", "result": "",
     "worker": "dim", "dev": "bold", "qa": "green", "git": "magenta", "warn": "yellow",
 }
+_SGR = re.compile(r"\x1b\[[0-9;:]*m")
 
 
 def _event_kind(kind: object) -> str:
@@ -108,8 +110,12 @@ class AidoApp(App[None]):
         if session is not None and session.project_path:
             project = Path(session.project_path).name or str(session.project_path)
         session_id = session.session_id if session is not None else "-"
-        mode = "running" if self.running else "idle"
-        line = f"project: {project} | session: {session_id} | lang: {self.lang} | {mode}"
+        mode = t("status.running" if self.running else "status.idle", self.lang)
+        line = (
+            f"{t('status.project', self.lang)}: {project} | "
+            f"{t('status.session', self.lang)}: {session_id} | "
+            f"{t('status.language', self.lang)}: {self.lang} | {mode}"
+        )
         if self.running and self._heartbeat:
             line += f" | {self._heartbeat}"
         self.query_one("#status", Static).update(Text(sanitize_for_terminal(line)))
@@ -200,14 +206,24 @@ class AidoApp(App[None]):
         kwargs = dict(self._dispatch_kwargs)
         if _is_run_request(line):
             self._interrupt = threading.Event()
-            kwargs.update(interrupt=self._interrupt, event_sink=self._on_event)
+            kwargs.update(interrupt=self._interrupt, event_sink=self._on_event, show_run_start=False)
+            self.add_message("info", t("run.start", self.lang))
         self._refresh_status()
         self._active_worker = self.run_worker(lambda: self._dispatch(line, kwargs), thread=True, exclusive=True)
 
     def _on_event(self, event: object) -> None:
         """Engine-thread sink: renders public event fields and hands them to the UI loop."""
         try:
-            text = render_event(event, lang=self.lang).strip("\n")
+            if getattr(event, "kind", None) == "execution.output":
+                payload = getattr(event, "payload", None)
+                payload = payload if isinstance(payload, dict) else {}
+                stream = payload.get("stream")
+                label = sanitize_for_terminal(stream) if stream is not None else "output"
+                output = payload.get("text")
+                output = "" if output is None else str(output)
+                text = f"    [{label}] {_SGR.sub('', output)}"
+            else:
+                text = render_event(event, lang=self.lang).strip("\n")
         except Exception:
             text = "[unrenderable event]"
         kind = getattr(event, "kind", None)
