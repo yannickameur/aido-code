@@ -177,6 +177,43 @@ def test_quit_during_run_requests_interruption_and_waits(tmp_path, monkeypatch):
         release.set()
 
 
+def test_exit_command_waits_for_engine_thread_and_shows_interruption(tmp_path, monkeypatch):
+    release = threading.Event()
+
+    class SlowInterruptClient(FakeClient):
+        def run(self, *, on_event=None, interrupt=None, **_):
+            self.interrupt = interrupt
+            self.first_event.set()
+            release.wait(5)
+            on_event(_ev("run.interrupted"))
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(
+        repl.EngineClient, "open", classmethod(lambda cls, *a, **k: SlowInterruptClient(release)),
+    )
+
+    async def go():
+        app = AidoApp(ReplState(store=SessionStore(tmp_path / "sessions")), "en")
+        async with app.run_test() as pilot:
+            await _type(pilot, "/run")
+            await _until(pilot, lambda: FakeClient.instances and FakeClient.instances[0].first_event.is_set())
+            await _type(pilot, "/exit")
+            assert FakeClient.instances[0].interrupt.is_set()
+            assert app.running and not app._exit
+            assert t("run.interrupt_requested", "en") in _texts(app)
+            release.set()
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+            assert app._exit
+            assert any("run.interrupted" in text for text in _texts(app))
+            assert INTERRUPTED_NOTICE in _texts(app)
+
+    try:
+        asyncio.run(go())
+    finally:
+        release.set()
+
+
 def test_ctrl_c_idle_clears_input_and_reminds(tmp_path, monkeypatch):
     async def go():
         app = _app(tmp_path, monkeypatch, threading.Event())

@@ -16,6 +16,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import VerticalScroll
 from textual.widgets import Input, Static
+from textual.worker import Worker, WorkerState
 
 from aido_code.i18n import t
 from aido_code.intent import Intent, interpret
@@ -83,6 +84,8 @@ class AidoApp(App[None]):
         self.running = False
         self._interrupt: threading.Event | None = None
         self._quit_after = False
+        self._active_worker: Worker | None = None
+        self._keep_running = True
         self._heartbeat = ""
         self._history: list[str] = []
         self._cursor = 0
@@ -162,7 +165,11 @@ class AidoApp(App[None]):
             return
         event.input.value = ""
         if self.running:
-            self.add_message("info", t("run.busy", self.lang))
+            if line.strip() == "/exit" and self._interrupt is not None:
+                self._quit_after = True
+                self._request_interrupt()
+            else:
+                self.add_message("info", t("run.busy", self.lang))
             return
         self._history.append(line)
         self._cursor = len(self._history)
@@ -195,7 +202,7 @@ class AidoApp(App[None]):
             self._interrupt = threading.Event()
             kwargs.update(interrupt=self._interrupt, event_sink=self._on_event)
         self._refresh_status()
-        self.run_worker(lambda: self._dispatch(line, kwargs), thread=True, exclusive=True)
+        self._active_worker = self.run_worker(lambda: self._dispatch(line, kwargs), thread=True, exclusive=True)
 
     def _on_event(self, event: object) -> None:
         """Engine-thread sink: renders public event fields and hands them to the UI loop."""
@@ -228,11 +235,19 @@ class AidoApp(App[None]):
                 "info" if line.startswith(("/help", "/new", "/resume")) else "result"
             )
             self.add_message(kind, text)
+        self._keep_running = keep
+
+    def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
+        if event.worker is not self._active_worker or event.state not in (
+            WorkerState.SUCCESS, WorkerState.ERROR,
+        ):
+            return
+        self._active_worker = None
         self.running = False
         self._interrupt = None
         self._heartbeat = ""
         self._refresh_status()
-        if self._quit_after or not keep:
+        if self._quit_after or not self._keep_running:
             self.exit()
 
 
