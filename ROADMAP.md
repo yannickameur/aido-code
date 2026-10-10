@@ -50,6 +50,7 @@ decision belongs to the engine.
 | M3.1 — Live operational UX and conversational completion | `DONE` (governed acceptance 2026-10-10) |
 | M3.2 — Conversational terminal interface (Textual, French by default) | `DONE` (2026-10-10) |
 | M3.3 — Simplified interface display with on-demand details | `DONE` (2026-10-10) |
+| M3.4 — AI plan quotas and execution time summary (engine P14 simplified) | `APPROVED` — current milestone |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
 | M6 — Doctor/diagnostics | `À VOTER` |
@@ -96,9 +97,9 @@ fact genuinely is.
 
 ## Next milestone to discuss
 
-M3.2 and M3.3 are `DONE` (governed flow plus real terminal acceptance).
-The `## Current milestone` block below keeps M3.3's contract only because
-the parser requires one. M4 remains a candidate and is not started.
+M3.2 and M3.3 are `DONE`. M3.4 is the current milestone (P14 simplified:
+remaining AI plan quotas and execution time per provider; no tokens, no
+prices). M4 remains a candidate and is not started.
 
 The interruption defect found during the M3.3 real acceptance (a surviving
 `ralph` kept working and committing after Ctrl+C) is fixed in
@@ -111,70 +112,74 @@ Status: APPROVED
 
 ### ID
 
-m3.3
+m3.4
 
 ### Objective
 
-Make the Textual interface as readable as possible. By default a run shows
-short, human sentences built only from real public engine events, for
-example "Alice développe…", "Alice a terminé son développement", "Victor
-vérifie le code…", "Tests en cours…", "Tests validés", "Fusion du code
-terminée", "Tâche terminée". Technical prefixes such as `[dev_b.started]`,
-unneeded identifiers and Ralph's internal logs are hidden in that view.
-A keyboard shortcut switches, at any time including during a run, to a
-detailed view with the technical events, worker output and diagnostics.
-The details come from a bounded in-memory history; no second permanent
-copy of the logs is written.
+Show, at the top of the Textual interface, the AI plans still available,
+and, at the end of a development run, how long each provider actually
+worked on the current milestone.
 
-The work reuses `tui.py`, `live_run.py`, the `i18n.py` catalog and the
-public `EngineEvent` stream. No engine change, no governance change, and
-the classic script output stays unchanged. Errors, useful diagnostics,
-Ctrl+C interruption and recovery stay visible in both views. No action,
-result or progress is ever invented, and no private reasoning is shown.
+Quotas come only from the existing `EngineClient.probe_workers()` facts
+(the same data as `/status --probe`, one probe per provider even with
+several workers): Claude windows, Codex 5 h and 7 day limits when they
+exist, Gravity `/usage` per model group, and "Non communiqué" for Mistral
+Vibe when no reliable value exists. The panel shows the remaining
+percentage, the period and the known reset time; it refreshes once when
+the interface opens, without blocking it, then only on demand. No
+periodic polling.
+
+Execution time comes only from the engine prerequisite
+`OrchestratorEngine.execution_times()` (`ai-dev-orchestrator` `3f33795`):
+the engine sums recorded DEV A, DEV B and DEV FIX executions of the
+current MVP per provider, including every attempt and recovery, and never
+counts QA, quota waits or estimator runs. AIDO Code only displays it.
+Unknown values are shown as such, never invented. No tokens, no prices,
+no new storage, no change to worker selection or to the classic script
+output.
 
 ### Acceptance criteria
 
-- The interface starts in the simplified view; a run shows one short translated sentence per meaningful real event and nothing for events without a sentence.
-- A documented shortcut toggles simplified/detailed view instantly, also during a run, without blocking the engine or losing entries.
-- The detailed view shows the current technical rendering (event kinds, metadata, worker output, truncation, diagnostics) from a bounded in-memory history.
-- Errors, failures, waiting/blocked states, diagnostics, interruption and recovery notices appear in both views.
-- French by default, English via the existing language selection; worker output, technical names and commands are never translated.
-- The classic non-interactive output is byte-identical to before.
-- All tests and QA are offline; the full existing suite keeps passing; `git diff --check` is clean.
+- The interface shows a quota panel under the status bar, filled from one `probe_workers()` call started in a background worker when the interface opens; the interface stays usable meanwhile.
+- A documented shortcut refreshes the quotas on demand; no other probe is ever started automatically.
+- Each provider shows its remaining percentage, period and known reset time per quota window; "Non communiqué" when the provider reports no window; "Non disponible" when the probe fails or no project is open.
+- After each run in the interface (completed, failed or interrupted) a "Fournisseur | Temps exécuté" table for the current milestone is shown, with a "Total IA" row and explicit unknown values.
+- French by default, English via the existing language selection; Ctrl+C, recovery, both M3.3 views and the classic output stay unchanged.
+- All tests and QA are offline; the full suite keeps passing; `git diff --check` is clean.
 
 ### WorkItems
 
-#### WI-M3.3-01 — Simplified event sentences
+#### WI-M3.4-01 — AI plan quota panel
 
 Dependencies: none
 Capabilities: development
 
 Acceptance criteria:
 
-- Add a pure function in `live_run.py` that returns the simplified sentence for one public `EngineEvent`, or `None` when the event has no simplified form; it reads only public event fields and never raises for a malformed or unknown event.
-- Sentences come from new `i18n.py` keys in `fr` and `en`, with the worker display name when the event supplies it: DEV A started/completed ("{worker} développe…", "{worker} a terminé son développement"), DEV B started/completed ("{worker} vérifie le code…", "{worker} a terminé sa vérification"), DEV FIX started/completed ("{worker} corrige le code…", "{worker} a terminé sa correction"), QA started/pass/fail/inconclusive ("Tests en cours…", "Tests validés", "Tests en échec", "Tests non concluants"), merge completed ("Fusion du code terminée"), WorkItem started/completed/needs rework ("Nouvelle tâche : {work_item}", "Tâche terminée", "Tâche à reprendre"), and the run interruption events.
-- Failure, blocked, waiting and recovery-required events always produce a sentence that keeps the essential reported facts (WorkItem, worker when known, reason or eligible time when the engine supplies it); unknown event kinds whose name contains failed/error/blocked produce a generic translated error sentence with the kind.
-- `execution.output`, `execution.heartbeat`, `execution.output_truncated` and `*.selected` events have no simplified sentence; a missing worker name yields a neutral sentence ("Développement en cours…"), never an invented name.
-- The existing `render_event`, `LiveRunRenderer`, `format_diagnostics` and classic output are unchanged.
-- Offline tests: every listed event in fr and en, missing worker name, failure facts preserved, unknown and malformed events, a private-reasoning sentinel outside public fields never appears, classic output unchanged.
+- Add a one-line-per-provider quota panel docked under the status bar of `tui.py`, built only from `ProviderSnapshot` facts returned by `EngineClient.probe_workers()`.
+- Provider labels: `anthropic` → Claude, `openai` → Codex, `mistral` → Mistral, `gravity` → Gravity; any other provider keeps its id. Window labels: `five_hour`/`primary_5h` → 5 h, `seven_day`/`secondary_7d` → 7 j (en: 7 d); any other window type, such as Gravity model groups, keeps its own label.
+- For each window show the remaining percentage, rounded, and the reset time in local time when known; "inconnu"/"unknown" for an unknown value; "Non communiqué"/"Not reported" when a provider has no window; "Non disponible"/"Not available" when the probe raised, the provider probe reported an error, or no project is open.
+- Probe once when the interface mounts, in a Textual thread worker; until it returns the panel shows a translated "Actualisation…" text; the input stays usable.
+- Ctrl+R refreshes the panel on demand; a refresh requested while one is in flight is ignored; there is no timer or periodic polling; the shortcut is listed in `/help` in both languages.
+- New texts go through `i18n.py` (fr default, en); provider names, window identifiers and raw values are not translated.
+- Offline tests with `App.run_test()` and a fake engine client: one probe on mount, non-blocking mount, Ctrl+R triggers exactly one more probe, no probe without a request, Claude/Codex/Gravity windows, Mistral "Non communiqué", probe error and no project "Non disponible", French and English, `/status --probe` and classic output unchanged.
 
-#### WI-M3.3-02 — Simplified/detailed views in the Textual interface
+#### WI-M3.4-02 — Execution time summary after a run
 
-Dependencies: WI-M3.3-01
+Dependencies: WI-M3.4-01
 Capabilities: development
 
 Acceptance criteria:
 
-- The interface starts in simplified view; live events display the WI-M3.3-01 sentence in that view and the existing `render_event` text in detailed view; events without a sentence (worker output, heartbeat, truncation, selection) appear only in detailed view; the heartbeat keeps updating the status bar in both views.
-- Ctrl+O toggles the view at any time, including during a run, and the status bar shows the current view in the current language; the shortcut is listed in `/help` in both languages.
-- Each live entry keeps both renderings in a bounded in-memory history (a `collections.deque` with a fixed maximum, at least 2000 entries); toggling rebuilds the log from that history plus the non-event conversation messages, keeps their order, and follows the bottom only if the view was at the bottom; nothing is written to disk.
-- Errors, diagnostics, interruption and recovery notices, and command results appear in both views.
-- Event handling stays on the existing `call_from_thread` path; toggling never blocks or cancels the engine worker, and Ctrl+C keeps its current behavior in both views.
-- Offline tests with `App.run_test()` and a fake engine client: simplified default, toggle during a run, both views keep all entries in order, history bound respected, French and English labels, errors and diagnostics visible in simplified view, Ctrl+C during a run still sets the interrupt and the app waits, classic non-TTY path unchanged.
+- Add `EngineClient.execution_times()` as a thin pass-through to `OrchestratorEngine.execution_times()`; when the loaded engine lacks it, the interface shows a translated "Bilan des temps non disponible" line instead of failing.
+- After every run started from the interface (completed, failed or interrupted, including after Ctrl+C once the engine thread has ended), read the snapshot once and show a table titled with the milestone id: columns "Fournisseur" and "Temps exécuté" (en: "Provider", "Execution time"); rows Claude, Codex, Mistral and Gravity in that order, then any other provider from the snapshot, then "Total IA" (en: "Total AI").
+- Durations are formatted as hours, minutes and seconds ("1 h 02 min 05 s", "4 min 12 s", "38 s"); a provider without executions shows "Aucune exécution" (en: "No execution"); `seconds` None shows "Inconnu" (en: "Unknown"); when `unknown_executions` > 0 the row also says how many executions have no known duration.
+- The table appears in both simplified and detailed views and is never computed in AIDO Code from events or timestamps of its own.
+- Offline tests with a fake engine client: table after a completed run, after a failed run and after an interrupted run, provider order, missing providers, unknown durations, total row, duration formatting, engine without `execution_times()`, French and English; the classic `aido run` output is unchanged.
 
 ### QA
 
-#### QA-M3.3-01 — Full offline test suite
+#### QA-M3.4-01 — Full offline test suite
 
 Kind: unit_test
 Required: true
@@ -183,6 +188,6 @@ Argv: ["pytest", "-q"]
 
 ### Out of scope
 
-- Any change to `ai-dev-orchestrator`, the governance, the engine event model or the classic script output.
-- Summarizing or classifying raw worker output, inventing progress, or showing private reasoning.
-- Persisting logs, new `aido.yaml` keys, M4 or P14.
+- Tokens, prices, costs, P15 or any consumption metric beyond execution time.
+- Any change to `ai-dev-orchestrator`, worker selection, probes or persistence.
+- Periodic quota polling, new storage, new `aido.yaml` keys, or changes to the classic script output.
