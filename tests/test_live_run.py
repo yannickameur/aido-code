@@ -13,7 +13,7 @@ from orchestrator.engine import EngineEvent, RunResult
 from orchestrator.engine_events import FailureDiagnostic
 
 from aido_code.engine_client import EngineClient, EngineCompatibilityError
-from aido_code.live_run import LiveRunRenderer, format_diagnostics, render_event
+from aido_code.live_run import LiveRunRenderer, format_diagnostics, render_event, simplified_event_sentence
 from aido_code.repl import format_run
 
 
@@ -152,6 +152,66 @@ class TestRendering:
         assert "cycles_run: 1" in format_run(result, include_events=False)
         assert "events:" not in format_run(result, include_events=False)
         assert "events:" in format_run(result)
+
+
+class TestSimplifiedSentences:
+    @pytest.mark.parametrize(("kind", "fr", "en"), [
+        ("dev_a.started", "Alice développe…", "Alice is developing…"),
+        ("dev_a.completed", "Alice a terminé son développement", "Alice finished development"),
+        ("dev_b.started", "Alice vérifie le code…", "Alice is reviewing the code…"),
+        ("dev_b.completed", "Alice a terminé sa vérification", "Alice finished reviewing"),
+        ("dev_fix.started", "Alice corrige le code…", "Alice is fixing the code…"),
+        ("dev_fix.completed", "Alice a terminé sa correction", "Alice finished the fix"),
+        ("qa.started", "Tests en cours…", "Tests in progress…"),
+        ("qa.pass", "Tests validés", "Tests passed"),
+        ("qa.fail", "Tests en échec (tâche : wi-1; worker : Alice)", "Tests failed (task: wi-1; worker: Alice)"),
+        ("qa.inconclusive", "Tests non concluants", "Tests inconclusive"),
+        ("git.merge_completed", "Fusion du code terminée", "Code merge completed"),
+        ("work_item.started", "Nouvelle tâche : wi-1", "New task: wi-1"),
+        ("work_item.completed", "Tâche terminée", "Task completed"),
+        ("work_item.needs_rework", "Tâche à reprendre", "Task needs rework"),
+        ("run.interruption_requested", "Interruption de l'exécution demandée", "Run interruption requested"),
+        ("run.interrupted", "Exécution interrompue (tâche : wi-1; worker : Alice)", "Run interrupted (task: wi-1; worker: Alice)"),
+    ])
+    def test_known_sentences(self, kind, fr, en) -> None:
+        event = _event(kind, worker_display_name="Alice")
+        assert simplified_event_sentence(event, lang="fr") == fr
+        assert simplified_event_sentence(event, lang="en") == en
+
+    def test_missing_worker_has_neutral_text(self) -> None:
+        assert simplified_event_sentence(_event("dev_a.started"), lang="fr") == "Développement en cours…"
+        assert "Alice" not in simplified_event_sentence(_event("dev_b.completed"), lang="en")
+
+    @pytest.mark.parametrize("kind", [
+        "work_item.failed", "work_item.blocked", "work_item.waiting",
+        "work_item.recovery_required", "dev_a.failed", "dev_b.failed",
+        "dev_fix.failed", "qa.failed", "waiting_for_provider",
+    ])
+    @pytest.mark.parametrize("lang", ["fr", "en"])
+    def test_failure_facts(self, kind, lang) -> None:
+        event = _event(kind, {"reason": "quota", "wait_eligible_at": "2026-01-02T10:00Z"}, worker_display_name="Alice")
+        sentence = simplified_event_sentence(event, lang=lang)
+        for fact in ("wi-1", "Alice", "quota", "2026-01-02T10:00Z"):
+            assert fact in sentence
+
+    @pytest.mark.parametrize("kind", ["execution.output", "execution.heartbeat", "execution.output_truncated", "dev_a.selected", "future.selected"])
+    def test_suppressed_events(self, kind) -> None:
+        assert simplified_event_sentence(_event(kind, {"text": "PRIVATE_REASONING_SENTINEL"})) is None
+
+    def test_unknown_malformed_and_private_data(self) -> None:
+        assert simplified_event_sentence(_event("future.failed"), lang="fr") == "Erreur (future.failed) (tâche : wi-1)"
+        assert simplified_event_sentence(_event("future.thing")) is None
+        assert simplified_event_sentence(SimpleNamespace(kind=42)) is None
+        assert simplified_event_sentence(object()) is None
+        event = _event("dev_a.failed", {"private_reasoning": "PRIVATE_REASONING_SENTINEL", "reason": "timeout"}, worker_display_name="Alice")
+        assert "PRIVATE_REASONING_SENTINEL" not in simplified_event_sentence(event)
+        assert "timeout" in simplified_event_sentence(event)
+        private = SimpleNamespace(kind="dev_a.started", worker_display_name="Alice", private_reasoning="PRIVATE_REASONING_SENTINEL")
+        assert "PRIVATE_REASONING_SENTINEL" not in simplified_event_sentence(private)
+
+    def test_classic_output_unchanged(self) -> None:
+        event = _event("dev_a.started", worker_display_name="Alice")
+        assert render_event(event) == "[dev_a.started] wi-1 worker=Alice"
 
 
 class TestDiagnostics:

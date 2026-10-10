@@ -34,6 +34,78 @@ def _get(obj: object, name: str) -> Any:
     return getattr(obj, name, None)
 
 
+def simplified_event_sentence(event: object, *, lang: str = "en") -> str | None:
+    """Return one short sentence from public engine facts, if applicable.
+
+    This is a pure, defensive presentation helper. It deliberately ignores
+    arbitrary payload text, including execution output.
+    """
+    try:
+        kind = _get(event, "kind")
+        if not isinstance(kind, str):
+            return None
+        if kind in {"execution.output", "execution.heartbeat", "execution.output_truncated"} or kind.endswith(".selected"):
+            return None
+
+        worker = _get(event, "worker_display_name")
+        worker = _clean(worker) if isinstance(worker, str) and worker.strip() else None
+        key = {
+            "work_item.started": "simple.work_item.started",
+            "work_item.completed": "simple.work_item.completed",
+            "work_item.needs_rework": "simple.work_item.needs_rework",
+            "qa.started": "simple.qa.started",
+            "qa.pass": "simple.qa.pass",
+            "qa.fail": "simple.qa.fail",
+            "qa.inconclusive": "simple.qa.inconclusive",
+            "git.merge_completed": "simple.git.merge_completed",
+            "run.interruption_requested": "simple.run.interruption_requested",
+            "run.interrupted": "simple.run.interrupted",
+        }.get(kind)
+        if key is None:
+            for phase in ("dev_a", "dev_b", "dev_fix"):
+                if kind in (f"{phase}.started", f"{phase}.completed"):
+                    key = f"simple.{phase}.{kind.rsplit('.', 1)[1]}" if worker else f"simple.{phase}.neutral"
+                    break
+        if key is None and kind.endswith(".interrupted"):
+            key = "simple.phase.interrupted"
+        failure = kind in {
+            "work_item.failed", "work_item.blocked", "work_item.waiting",
+            "work_item.recovery_required", "dev_a.failed", "dev_b.failed",
+            "dev_fix.failed", "qa.failed", "qa.fail", "waiting_for_provider",
+        } or any(word in kind.lower() for word in ("failed", "error", "blocked"))
+        if key is None and failure:
+            key = f"simple.{kind}" if f"simple.{kind}" in _SIMPLE_FAILURE_KEYS else "simple.error"
+        if key is None:
+            return None
+
+        item = _get(event, "work_item_id")
+        payload = _get(event, "payload")
+        payload = payload if isinstance(payload, dict) else {}
+        facts = []
+        if item is not None and (failure or kind == "work_item.started" or kind.endswith(".interrupted")):
+            facts.append(t("simple.fact.work_item", lang, value=_clean(item)))
+        if worker and (failure or kind.endswith(".interrupted")):
+            facts.append(t("simple.fact.worker", lang, value=worker))
+        if failure:
+            reason = payload.get("blocked_reason") or payload.get("reason")
+            eligible = payload.get("wait_eligible_at") or payload.get("eligible_at")
+            if reason is not None:
+                facts.append(t("simple.fact.reason", lang, value=_clean(reason)))
+            if eligible is not None:
+                facts.append(t("simple.fact.eligible_at", lang, value=_clean(eligible)))
+        sentence = t(key, lang, worker=worker, work_item=_clean(item) if item is not None else t("simple.unknown_item", lang), kind=_clean(kind))
+        return sentence + (f" ({'; '.join(facts)})" if facts and kind != "work_item.started" else "")
+    except Exception:
+        return None
+
+
+_SIMPLE_FAILURE_KEYS = {
+    "simple.work_item.failed", "simple.work_item.blocked", "simple.work_item.waiting",
+    "simple.work_item.recovery_required", "simple.dev_a.failed", "simple.dev_b.failed",
+    "simple.dev_fix.failed", "simple.qa.failed", "simple.waiting_for_provider",
+}
+
+
 def _metadata(event: object) -> str:
     parts = []
     for label, attr in _METADATA_FIELDS:
