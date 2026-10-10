@@ -50,7 +50,7 @@ decision belongs to the engine.
 | M3.1 — Live operational UX and conversational completion | `DONE` (governed acceptance 2026-10-10) |
 | M3.2 — Conversational terminal interface (Textual, French by default) | `DONE` (2026-10-10) |
 | M3.3 — Simplified interface display with on-demand details | `DONE` (2026-10-10) |
-| M3.4 — AI plan quotas and execution time summary (engine P14 simplified) | `APPROVED` — current milestone |
+| M3.4 — AI plan quotas and execution time summary (engine P14 simplified) | `DONE` (2026-10-10) |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
 | M6 — Doctor/diagnostics | `À VOTER` |
@@ -97,9 +97,10 @@ fact genuinely is.
 
 ## Next milestone to discuss
 
-M3.2 and M3.3 are `DONE`. M3.4 is the current milestone (P14 simplified:
-remaining AI plan quotas and execution time per provider; no tokens, no
-prices). M4 remains a candidate and is not started.
+M3.2, M3.3 and M3.4 are `DONE` (governed flow plus real terminal
+acceptance). The `## Current milestone` block below keeps M3.4's contract
+only because the parser requires one. M4 remains a candidate and is not
+started.
 
 The interruption defect found during the M3.3 real acceptance (a surviving
 `ralph` kept working and committing after Ctrl+C) is fixed in
