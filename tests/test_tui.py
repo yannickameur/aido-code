@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import os
 import subprocess
 import sys
 import threading
@@ -188,8 +189,9 @@ def test_non_tty_runs_classic_loop_without_textual(tmp_path):
     )
     proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
                           cwd=tmp_path,
-                          env={"PYTHONPATH": str(Path("src").resolve()), "HOME": str(tmp_path),
-                               "XDG_STATE_HOME": str(tmp_path)})
+                          env={**os.environ,
+                               "PYTHONPATH": os.pathsep.join([str(Path("src").resolve()), *sys.path]),
+                               "HOME": str(tmp_path), "XDG_STATE_HOME": str(tmp_path)})
     assert "aido> " in proc.stdout and "/help" in proc.stdout
     assert proc.stderr.strip().endswith("False 0")
 
