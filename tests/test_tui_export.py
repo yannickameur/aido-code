@@ -7,6 +7,7 @@ import asyncio
 import pytest
 
 from aido_code import tui
+from aido_code.i18n import t
 from aido_code.repl import ReplState
 from aido_code.session import SessionStore
 from aido_code.tui import AidoApp
@@ -103,6 +104,31 @@ def test_no_notice_without_eviction(tmp_path, monkeypatch):
 
     asyncio.run(go())
     assert "evicted" not in _exports(tmp_path)[0].read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("lang", ["en", "fr"])
+def test_export_only_labels_real_run_summary_and_time_table(tmp_path, monkeypatch, lang):
+    app = _app(tmp_path, monkeypatch, lang)
+    summary = "cycles_run: 1" if lang == "en" else t("run.summary", lang) + "\ncycles_run (cycles_run): 1"
+    table = "AI execution time - m1" if lang == "en" else "Temps d'exécution IA - m1"
+
+    async def go():
+        async with app.run_test(size=(100, 40)) as pilot:
+            await pilot.pause()
+            app._finish("/run", "Error: engine unavailable", True, t("times.unavailable", lang))
+            await _submit(app, pilot, "/export")
+            first_text = _exports(tmp_path)[0].read_text(encoding="utf-8")
+            app._finish("/run", summary, True, table)
+            app._finish("/run", t("interrupted", lang), True, t("times.unavailable", lang))
+            await _submit(app, pilot, "/export")
+            second = next(path for path in _exports(tmp_path) if path.read_text(encoding="utf-8") != first_text)
+            return first_text, second.read_text(encoding="utf-8")
+
+    first_text, second_text = asyncio.run(go())
+    assert t("export.summary", lang) not in first_text
+    assert t("export.times", lang) not in first_text
+    assert t("export.summary", lang) + "\n" + summary in second_text
+    assert t("export.times", lang) + "\n" + table in second_text
 
 
 def test_export_error_translated_fr(tmp_path, monkeypatch):

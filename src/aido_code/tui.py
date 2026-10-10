@@ -166,9 +166,7 @@ class Message(Static):
     """One conversation entry, rendered as plain text."""
 
     def __init__(self, kind: str, text: str) -> None:
-        prefix = "> " if kind == "user" else ""
-        body = "\n".join(sanitize_for_terminal(line) for line in text.split("\n"))
-        super().__init__(Text(prefix + body, style=_KINDS[kind]), markup=False, classes=f"msg-{kind}")
+        super().__init__(Text(_plain(kind, text), style=_KINDS[kind]), markup=False, classes=f"msg-{kind}")
 
 
 def _plain(kind: str, text: str) -> str:
@@ -547,10 +545,13 @@ class AidoApp(App[None]):
                 "info" if line.startswith(("/help", "/new", "/resume")) else "result"
             )
             self.add_message(kind, text)
-        if _is_run_request(line):
-            self._last_summary = text or None
+        if _is_run_request(line) and text.startswith(
+            "cycles_run:" if self.lang == "en" else t("run.summary", self.lang) + "\n"
+        ):
+            self._last_summary = text
         if times is not None:
-            self._last_times = times
+            if times != t("times.unavailable", self.lang):
+                self._last_times = times
             self.add_message("result", times)
         self._keep_running = keep
 
