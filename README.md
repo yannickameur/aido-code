@@ -36,12 +36,23 @@ merge. AIDO Code never makes any of those decisions itself; see
 | M2, M2.1, M2.2, M2.3 | `DONE` |
 | M3 — Conversational piloting and live execution | `PARTIAL` — deterministic intent router delivered; live frontend WorkItems failed/blocked in the governed run |
 | M3.1 — Live operational UX and conversational completion | `DONE` (governed acceptance 2026-10-10) |
+| M3.2 — Conversational terminal interface (Textual, French by default) | `DONE` |
+| M3.3 — Simplified display with on-demand details | `DONE` |
+| M3.4 — AI plan quotas and execution time per provider | `DONE` |
 | M4+ | Future |
 
 Milestone detail, open work and acceptance criteria:
-[`ROADMAP.md`](ROADMAP.md). Past governed runs are in Git history. The
-engine's live output, heartbeat, failure diagnostics and safe public
-output are rendered during `aido run`.
+[`ROADMAP.md`](ROADMAP.md). Past governed runs are in Git history.
+
+In an interactive terminal, `aido` opens a Textual interface, in French by
+default (`--lang en` or `AIDO_LANG=en` for English): the input stays at the
+bottom, the conversation and live engine events scroll above, Up/Down
+recall previous lines, Ctrl+O switches between the simplified and the
+detailed view, Ctrl+R refreshes the AI plan quota panel, and Ctrl+C
+interrupts a run cleanly (the next `/run` resumes through the engine).
+After each run a table shows the AI execution time per provider for the
+current milestone. Scripts and non-interactive input keep the classic
+line interface and output.
 
 ### Product model (M1.4)
 
@@ -73,18 +84,22 @@ becomes its own product, here.
 
 ## Quick start
 
-AIDO Code is not published on PyPI yet. Build and install it from this
-repository (or a local wheel):
+AIDO Code and its engine are published as GitHub Releases, not on PyPI.
+Install both wheels in a fresh environment:
 
 ```bash
-git clone https://github.com/yannickameur/aido-code.git
-cd aido-code
-python -m pip install -e .
+python3 -m venv .venv
+. .venv/bin/activate
+pip install \
+  https://github.com/yannickameur/ai-dev-orchestrator/releases/download/v0.2.0/ai_dev_orchestrator-0.2.0-py3-none-any.whl \
+  https://github.com/yannickameur/aido-code/releases/download/v0.2.0/aido_code-0.2.0-py3-none-any.whl
 ```
 
-This installs `ai-dev-orchestrator` (the engine) as a dependency — no
-separate checkout, and no manual worker configuration: AIDO Code
-resolves its own global worker pool (see "Workers" below).
+AIDO Code requires `ai-dev-orchestrator>=0.2.0,<0.3`. No sibling checkout
+and no manual worker configuration are needed: AIDO Code resolves its own
+global worker pool (see "Workers" below). For development, clone this
+repository and install it editable next to an engine checkout
+(`CONTRIBUTING.md`).
 
 ### Command names
 

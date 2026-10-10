@@ -51,6 +51,7 @@ decision belongs to the engine.
 | M3.2 — Conversational terminal interface (Textual, French by default) | `DONE` (2026-10-10) |
 | M3.3 — Simplified interface display with on-demand details | `DONE` (2026-10-10) |
 | M3.4 — AI plan quotas and execution time summary (engine P14 simplified) | `DONE` (2026-10-10) |
+| Release v0.2.0 (GitHub Release, engine v0.2.0) | `DONE` (2026-10-10) |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
 | M6 — Doctor/diagnostics | `À VOTER` |
@@ -88,12 +89,10 @@ fact genuinely is.
 
 ### Known constraints
 
-- No public distribution channel yet (no PyPI publish or release for
-  either package). Development uses two sibling checkouts with
-  `pip install -e ../ai-dev-orchestrator`.
-- `ai-dev-orchestrator>=0.1.3` does not prove a packaged engine contains
-  P21/P21.1; a packaged release needs a published engine version with
-  them and a matching dependency minimum.
+- Both packages are published as GitHub Releases v0.2.0 (wheel and
+  sdist); AIDO Code requires `ai-dev-orchestrator>=0.2.0,<0.3`. PyPI
+  publication is a separate, undecided step. Development still uses two
+  sibling checkouts with `pip install -e ../ai-dev-orchestrator`.
 
 ## Next milestone to discuss
 

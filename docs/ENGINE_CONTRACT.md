@@ -66,7 +66,8 @@ file-based construction path too, but M1.4 never uses `.open()` at all.
 | `.workers()` | `tuple[WorkerSnapshot, ...]` | none, never a provider probe |
 | `.probe_workers()` | `tuple[ProviderSnapshot, ...]` | a real, explicit provider probe (network/CLI), no SQLite |
 | `.status()` | `ProjectStatusSnapshot` | none, strictly read-only, matches `aido status` |
-| `.run(max_cycles=50, on_event=None)` | `RunResult` | the only call that writes: SQLite, Git, a real provider execution; optional synchronous live events |
+| `.run(max_cycles=50, on_event=None, interrupt=None)` | `RunResult` | the only call that writes: SQLite, Git, a real provider execution; optional synchronous live events; setting the optional `threading.Event` interrupts like Ctrl+C from another thread (raises `KeyboardInterrupt`) |
+| `.execution_times()` | `ExecutionTimeSnapshot` | none, strictly read-only: AI execution time per provider for the current MVP (DEV A/B/FIX, every attempt) |
 | `.close()` | `None` | none, a documented no-op (no persistent connection is ever held) |
 
 `OrchestratorEngine` also supports `with OrchestratorEngine.open(...)
@@ -242,19 +243,15 @@ terminal. The no-chain-of-thought requirement remains unmet; see
 `ROADMAP.md`. Neither control-character sanitization nor event transport
 alone proves output is safe operational text.
 
-**Packaging gate**: both the engine's current `pyproject.toml` and the
-minimum in AIDO Code's `pyproject.toml` still say `0.1.3`. That number
-alone does not identify a published engine build with P21. A normal
-packaged AIDO Code release must depend on a distinct, published engine
-version that contains P21; its number is chosen when that release
-exists. The sibling editable engine at the verified SHA is sufficient
-for governed M3.1 development, not proof of packaged-release parity.
+**Packaging**: AIDO Code depends on the published engine release
+`ai-dev-orchestrator>=0.2.0,<0.3` (GitHub Release v0.2.0), which contains
+P21/P21.1, `run(interrupt=...)` and `execution_times()`.
 
 ## What this contract does not give AIDO Code (yet)
 
 - A public `.init()` method. This contract's methods today are exactly
   `.validate()`/`.status()`/`.workers()`/`.probe_workers()`/`.run()`/
-  `.close()` — there is no engine-level equivalent of the
+  `.execution_times()`/`.close()` — there is no engine-level equivalent of the
   orchestrator's own `aido init`. This turned out not to block M8
   (`aido` command cutover, `DONE`): `aido init` is entirely AIDO Code's
   own logic (`aido_code.project_init`), never a call into the engine —

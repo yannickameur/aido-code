@@ -37,8 +37,10 @@ P13.6).
 | `--continue`/`-c` | `M2` | Resume the most recent session | No |
 | `/resume` | `M2` | Resume picker, from inside the REPL | No |
 | `/new` | `M2` | New frontend session | No |
-| Free-form natural language | `M3` (`PARTIAL`, router delivered) / M3.1 (`APPROVED`) | Closed status/steering intents, shared live run path delivered | Depends |
-| Live orchestration/output during `run` | `M3.1` (implemented, live acceptance open) | Public P18/P21 event feed and failure diagnostics | No |
+| Free-form natural language | `M3` router / `M3.1` | Closed status/steering intents through the shared live run path | Depends |
+| Live orchestration/output during `run` | `M3.1` | Public P18/P21 event feed and failure diagnostics | No |
+| `--lang en\|fr` / `AIDO_LANG` | `M3.2` | Interface language, French by default; invalid value exits 2 | No |
+| Textual interface (interactive TTY) | `M3.2`–`M3.4` | Docked input, scrolling log, Up/Down history, Ctrl+O view toggle, Ctrl+R quota refresh, Ctrl+C interruption, execution time table | Ctrl+R: yes |
 | `-p "<request>"` | `M4` | Non-interactive mode | Depends |
 | `--output json`/`stream-json` | `M5` | Structured output | No |
 | `doctor` | `M6` | Read-only diagnostics | No |
@@ -199,13 +201,38 @@ actual `execution.output`, neutral `execution.heartbeat`, and
 `execution.output_truncated`. A failed run uses
 `RunResult.diagnostics` for the available phase, worker, Ralph,
 business-verdict, last-output, and next-action facts. Text and metadata
-are sanitized for terminal control characters. Live acceptance nevertheless
-found raw backend `thinking` content reaching the display; M3.1 remains
-open until this contract violation is corrected through governance.
-No provider-specific semantic activity model is inferred. `Ctrl+C`
+are sanitized for terminal control characters; the engine (P21.1) only
+publishes a safe public projection, never private reasoning. No provider-specific semantic activity model is inferred. `Ctrl+C`
 remains subject to engine recovery on the next run. `aido resume` and
 `/resume` remain session-only. The engine P21 API is a hard prerequisite
 (see `docs/ENGINE_CONTRACT.md`).
+
+## M3.2–M3.4 — Textual interface
+
+When stdin and stdout are terminals, `aido`, `aido resume` and
+`aido --continue` open a Textual application; otherwise the classic line
+interface and its output are unchanged. The input line is docked at the
+bottom, the conversation and live events scroll above (PageUp/PageDown,
+mouse wheel), and Up/Down recall submitted lines. Every slash command and
+recognized intent goes through the same dispatcher as the classic loop;
+unrecognized requests get an explanation of what is understood.
+
+| Key | Effect |
+|---|---|
+| Enter | Submit the line |
+| Up/Down | Recall previous lines |
+| Ctrl+O | Toggle simplified/detailed view (also during a run) |
+| Ctrl+R | Refresh the AI plan quota panel (one `probe_workers()` call) |
+| Ctrl+C | During a run: request the engine interruption once and wait; idle: clear the input |
+| Ctrl+D, `/exit` | Quit when idle |
+
+The simplified view shows short sentences built from real engine events
+("Alice développe…", "Tests validés", "Tâche terminée"); the detailed view
+shows the technical events, worker output and diagnostics from a bounded
+in-memory history. The quota panel is filled once at start, in the
+background, then only on Ctrl+R. After each run, a table shows the AI
+execution time per provider for the current milestone, read from
+`OrchestratorEngine.execution_times()`.
 
 ## M4 — Non-interactive mode
 
@@ -272,5 +299,5 @@ aido doctor
 ## M9+
 
 Only as real needs are established: background jobs, attach, logs,
-stop, respawn, MCP, hooks, plugins, a TUI. None of these are scoped or
+stop, respawn, MCP, hooks, plugins. None of these are scoped or
 designed yet.
