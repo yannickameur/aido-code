@@ -52,6 +52,7 @@ class AidoApp(App[None]):
         self.running = False
         self._history: list[str] = []
         self._cursor = 0
+        self._resume_choices: list[str] | None = None
 
     def compose(self) -> ComposeResult:
         yield Static(Text(""), id="status", markup=False)
@@ -103,16 +104,36 @@ class AidoApp(App[None]):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         line = event.value
-        event.input.value = ""
-        if not line.strip() or self.running:
+        if self.running or not line.strip():
             return
+        event.input.value = ""
         self._history.append(line)
         self._cursor = len(self._history)
         self.add_message("user", line)
         if line.strip() == "/exit":
-            self.exit()
+            self._resume_choices = None
+        elif self._resume_choices is not None:
+            choices, self._resume_choices = self._resume_choices, None
+            if line.strip().isdecimal() and 1 <= int(line.strip()) <= len(choices):
+                line = f"/resume {choices[int(line.strip()) - 1]}"
+            else:
+                self.add_message("error", t("session.invalid", self.lang))
+                return
+        elif line.strip() == "/resume":
+            sessions = self.state.store.list()
+            if not sessions:
+                self.add_message("info", t("session.none_found", self.lang))
+                return
+            self._resume_choices = [session.session_id for session in sessions]
+            lines = [t("session.list_header", self.lang)]
+            for number, session in enumerate(sessions, 1):
+                project = session.project_path or t("session.no_project", self.lang)
+                lines.append(f"  {number}. {session.session_id}  {session.updated_at}  {project}")
+            lines.append(t("session.select_prompt", self.lang))
+            self.add_message("info", "\n".join(lines))
             return
         self.running = True
+        event.input.disabled = True
         self._refresh_status()
         self.run_worker(lambda: self._dispatch(line), thread=True, exclusive=True)
 
@@ -125,12 +146,17 @@ class AidoApp(App[None]):
         except Exception as exc:  # surfaced as an error message, never a crash
             out.write(f"Error: {exc}\n")
             keep = True
-        self.call_from_thread(self._finish, out.getvalue().rstrip("\n"), keep)
+        self.call_from_thread(self._finish, line, out.getvalue().rstrip("\n"), keep)
 
-    def _finish(self, text: str, keep: bool) -> None:
+    def _finish(self, line: str, text: str, keep: bool) -> None:
         if text:
-            self.add_message("error" if text.startswith("Error") else "result", text)
+            kind = "error" if text.startswith(("Error", "Validation failed")) else (
+                "info" if line.startswith(("/help", "/new", "/resume")) else "result"
+            )
+            self.add_message(kind, text)
         self.running = False
+        self.query_one("#prompt", Input).disabled = False
+        self.query_one("#prompt", Input).focus()
         self._refresh_status()
         if not keep:
             self.exit()

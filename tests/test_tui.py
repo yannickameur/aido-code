@@ -6,6 +6,7 @@ import asyncio
 import io
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -119,6 +120,64 @@ def test_exit_command_and_ctrl_d(tmp_path):
             await pilot.pause()
             return app._exit
     assert asyncio.run(go("exit")) and asyncio.run(go("ctrl+d"))
+
+
+def test_resume_selection_uses_dispatcher_and_updates_status(tmp_path):
+    store = SessionStore(tmp_path / "sessions")
+    first = store.create(None)
+    second = store.create(None)
+
+    async def go():
+        app = AidoApp(ReplState(session=second, store=store), "en")
+        async with app.run_test() as pilot:
+            await _submit(pilot, "/resume")
+            assert first.session_id in "\n".join(_texts(app))
+            await _submit(pilot, "2")
+            assert app.state.session.session_id == first.session_id
+            assert first.session_id in str(app.query_one("#status").render())
+    asyncio.run(go())
+
+
+def test_exit_during_resume_selection(tmp_path):
+    store = SessionStore(tmp_path / "sessions")
+    store.create(None)
+
+    async def go():
+        app = AidoApp(ReplState(store=store), "en")
+        async with app.run_test() as pilot:
+            await _submit(pilot, "/resume")
+            await _submit(pilot, "/exit")
+            assert app._exit
+    asyncio.run(go())
+
+
+def test_ctrl_d_does_not_quit_while_command_runs(tmp_path, monkeypatch):
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow_dispatch(*args, **kwargs):
+        started.set()
+        release.wait(timeout=5)
+        return True
+
+    monkeypatch.setattr("aido_code.tui.dispatch_line", slow_dispatch)
+
+    async def go():
+        app = _app(tmp_path)
+        async with app.run_test() as pilot:
+            await pilot.press("slash", "h", "e", "l", "p", "enter")
+            await pilot.pause()
+            assert started.is_set() and app.running
+            await pilot.press("ctrl+d")
+            assert not app._exit
+            release.set()
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+            assert not app.running
+    try:
+        asyncio.run(go())
+    finally:
+        release.set()
 
 
 def test_non_tty_runs_classic_loop_without_textual(tmp_path):

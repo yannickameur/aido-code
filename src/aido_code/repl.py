@@ -649,9 +649,9 @@ def dispatch_line(
     if name == "/help" and not flags:
         output_stream.write(format_help(lang) + "\n")
         return True
-    if command == "/resume":
+    if name == "/resume" and len(flags) <= 1:
         try:
-            session_id = pick_session(state.store, input_stream, output_stream, lang=lang)
+            session_id = flags[0] if flags else pick_session(state.store, input_stream, output_stream, lang=lang)
             if session_id is not None:
                 state.session = resume_selected(state.store, session_id)
                 output_stream.write(t("session.resumed", lang, session_id=state.session.session_id) + "\n")
