@@ -48,10 +48,10 @@ def _window_label(window_type: str, lang: str) -> str:
     return window_type
 
 
-def _local_reset(reset_at: str | None, lang: str) -> str | None:
-    """Local-time reset text, or None when the provider reported none."""
+def _local_reset(reset_at: str | None, lang: str) -> str:
+    """Local-time reset text, or an explicit unknown value."""
     if reset_at is None:
-        return None
+        return t("quota.reset", lang, when=t("quota.unknown", lang))
     try:
         moment = datetime.fromisoformat(reset_at.replace("Z", "+00:00"))
         when = moment.astimezone().strftime("%d/%m %H:%M")
@@ -73,9 +73,7 @@ def format_quota_line(snapshot: object, lang: str) -> str:
         remaining = window.remaining
         value = f"{round(remaining * 100)} %" if remaining is not None else t("quota.unknown", lang)
         part = f"{_window_label(str(window.window_type), lang)} {value}"
-        reset = _local_reset(window.reset_at, lang)
-        if reset is not None:
-            part += f" ({reset})"
+        part += f" ({_local_reset(window.reset_at, lang)})"
         parts.append(part)
     return f"{label}: " + " · ".join(parts)
 
@@ -135,7 +133,7 @@ class AidoApp(App[None]):
         Binding("ctrl+c", "interrupt", "Interrupt", priority=True),
         Binding("ctrl+d", "quit_idle", "Quit", priority=True),
         Binding("ctrl+o", "toggle_view", "Toggle view", priority=True),
-        Binding("ctrl+r", "refresh_quota", "Refresh quotas", priority=True),
+        Binding("ctrl+r", "refresh_quota", "", show=False, priority=True),
         Binding("pageup", "scroll_log(-1)", show=False),
         Binding("pagedown", "scroll_log(1)", show=False),
     ]

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
-import time
+from datetime import datetime
 
 import pytest
 from orchestrator.engine import ProviderSnapshot, QuotaWindowSnapshot
@@ -88,11 +88,15 @@ def test_probe_on_mount_fr_windows(tmp_path, monkeypatch):
         async with app.run_test() as pilot:
             await _settle(pilot)
             text = _quota(app)
-            assert "Claude: 5 h 72 %" in text and "7 j inconnu" in text
+            assert "Claude: 5 h 72 %" in text
+            assert "7 j inconnu (réinitialisation : inconnu)" in text
             assert "Codex: 5 h 50 % (réinitialisation" in text and "7 j 25 %" in text
             assert "Gravity: Gemini Pro 90 %" in text
             assert "Mistral: Non communiqué" in text
             assert "acme: Non disponible" in text
+            local_reset = datetime.fromisoformat("2030-01-02T03:04:00+00:00").astimezone().strftime("%d/%m %H:%M")
+            assert f"réinitialisation : {local_reset}" in text
+            assert len(text.splitlines()) == len(PROVIDERS)
             assert owner.calls == 1
             assert app.query_one("#quota").region.y == 1
     asyncio.run(go())
@@ -106,7 +110,8 @@ def test_english_labels(tmp_path, monkeypatch):
         async with app.run_test() as pilot:
             await _settle(pilot)
             text = _quota(app)
-            assert "7 d unknown" in text and "Mistral: Not reported" in text
+            assert "7 d unknown (resets: unknown)" in text
+            assert "Mistral: Not reported" in text
             assert "acme: Not available" in text and "resets" in text
     asyncio.run(go())
 
