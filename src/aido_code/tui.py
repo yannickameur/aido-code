@@ -507,9 +507,13 @@ class AidoApp(App[None]):
 class _TerminalGuard:
     """Owns the real terminal while the app runs; restores it exactly once."""
 
-    def __init__(self, private_fd: int, saved: list | None) -> None:
+    def __init__(self, private_fd: int, saved: list | None, devnull: int,
+                 reader: io.TextIOWrapper, previous: tuple[object, object]) -> None:
         self.private_fd = private_fd
         self.saved = saved
+        self.devnull = devnull
+        self.reader = reader
+        self.previous = previous
         self.restored = False
 
     def restore(self) -> None:
@@ -526,6 +530,13 @@ class _TerminalGuard:
                 break
             except (AttributeError, OSError, ValueError):
                 continue
+        try:
+            os.dup2(self.private_fd, 0)
+        finally:
+            sys.__stdin__, sys.stdin = self.previous
+            self.reader.close()
+            os.close(self.devnull)
+            os.close(self.private_fd)
 
 
 @contextlib.contextmanager
@@ -537,11 +548,11 @@ def isolated_terminal() -> Iterator[None]:
         saved = termios.tcgetattr(private_fd)
     except (termios.error, OSError):
         saved = None
-    guard = _TerminalGuard(private_fd, saved)
     reader = os.fdopen(private_fd, "r", closefd=False)
     previous = sys.__stdin__, sys.stdin
-    atexit.register(guard.restore)
     devnull = os.open(os.devnull, os.O_RDONLY)
+    guard = _TerminalGuard(private_fd, saved, devnull, reader, previous)
+    atexit.register(guard.restore)
     try:
         os.dup2(devnull, 0)
         sys.__stdin__ = sys.stdin = reader
@@ -549,12 +560,7 @@ def isolated_terminal() -> Iterator[None]:
     finally:
         try:
             guard.restore()
-            os.dup2(private_fd, 0)
         finally:
-            sys.__stdin__, sys.stdin = previous
-            os.close(devnull)
-            reader.close()
-            os.close(private_fd)
             atexit.unregister(guard.restore)
 
 

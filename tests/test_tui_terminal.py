@@ -83,6 +83,38 @@ def test_child_sees_dev_null_while_private_fd_keeps_terminal():
         os.close(slave)
 
 
+@posix_pty
+def test_atexit_restores_fd0_stdin_and_terminal_once(monkeypatch):
+    callbacks = []
+    monkeypatch.setattr(tui.atexit, "register", callbacks.append)
+    monkeypatch.setattr(tui.atexit, "unregister", callbacks.remove)
+    master, slave = _pty_pair()
+    saved_fd0 = os.dup(0)
+    saved_stdin = sys.__stdin__, sys.stdin
+    os.dup2(slave, 0)
+    before = termios.tcgetattr(0)
+    try:
+        with isolated_terminal():
+            private = sys.__stdin__.fileno()
+            attrs = termios.tcgetattr(private)
+            attrs[3] &= ~termios.ECHO
+            termios.tcsetattr(private, termios.TCSANOW, attrs)
+            callbacks[0]()  # Simulate process exit before context cleanup.
+            assert os.path.samestat(os.fstat(0), os.fstat(slave))
+            assert (sys.__stdin__, sys.stdin) == saved_stdin
+            assert termios.tcgetattr(0) == before
+            with pytest.raises(OSError):
+                os.fstat(private)
+        assert not callbacks
+        assert os.path.samestat(os.fstat(0), os.fstat(slave))
+        assert termios.tcgetattr(0) == before
+    finally:
+        os.dup2(saved_fd0, 0)
+        os.close(saved_fd0)
+        os.close(master)
+        os.close(slave)
+
+
 # -- reliable exits (pilot) -------------------------------------------------
 
 def test_idle_ctrl_c_double_press_quits(tmp_path, monkeypatch):
