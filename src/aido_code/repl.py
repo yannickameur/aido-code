@@ -49,7 +49,7 @@ from aido_code.engine_client import (
     WorkerSnapshot,
 )
 from aido_code.engine_plan import EnginePlanError, build_engine_plan
-from aido_code.i18n import t
+from aido_code.i18n import event_label, interactive_lang, t
 from aido_code.intent import Intent, interpret
 from aido_code.project_command import ProjectCommandContext, load_project_command_context
 from aido_code.project_manifest import ProjectManifestError
@@ -197,18 +197,23 @@ def format_status(milestone: CurrentMilestone, snapshot: ProjectStatusSnapshot) 
     return "\n".join(lines)
 
 
-def format_run(result: RunResult, *, include_events: bool = True) -> str:
+def format_run(result: RunResult, *, include_events: bool = True, lang: str = "en") -> str:
     """``include_events=False`` omits the ``events:`` section, for callers
     that already streamed those events live."""
+    def metric_label(name: str) -> str:
+        return f"{name} ({t('run.' + name, lang)})" if lang != "en" else name
+
     lines = [
-        f"cycles_run: {sanitize_for_terminal(result.cycles_run)}",
-        f"all_terminal: {sanitize_for_terminal(result.all_terminal)}",
-        f"reached_max_cycles: {sanitize_for_terminal(result.reached_max_cycles)}",
+        f"{metric_label('cycles_run')}: {sanitize_for_terminal(result.cycles_run)}",
+        f"{metric_label('all_terminal')}: {sanitize_for_terminal(result.all_terminal)}",
+        f"{metric_label('reached_max_cycles')}: {sanitize_for_terminal(result.reached_max_cycles)}",
     ]
+    if lang != "en":
+        lines.insert(0, t("run.summary", lang))
 
     if result.work_items:
         lines.append("")
-        lines.append("work items:")
+        lines.append(t("run.work_items", lang))
         for work_item in result.work_items:
             line = (
                 f"  {sanitize_for_terminal(work_item.work_item_id)}: "
@@ -220,16 +225,18 @@ def format_run(result: RunResult, *, include_events: bool = True) -> str:
 
     if include_events and result.events:
         lines.append("")
-        lines.append("events:")
+        lines.append(t("run.events", lang))
         for event in result.events:
+            label = event_label(event.kind, lang) if lang == "fr" else None
+            kind = sanitize_for_terminal(event.kind)
             lines.append(
-                f"  {sanitize_for_terminal(event.kind)}: "
+                f"  {kind}{f' ({label})' if label else ''}: "
                 f"work_item={sanitize_for_terminal(event.work_item_id)}"
             )
 
     from aido_code.live_run import format_diagnostics
 
-    diagnostics = format_diagnostics(getattr(result, "diagnostics", ()))
+    diagnostics = format_diagnostics(getattr(result, "diagnostics", ()), lang=lang)
     if diagnostics:
         lines.append("")
         lines.append(diagnostics)
@@ -442,12 +449,12 @@ def _interrupt_helpers() -> tuple[object, str]:
     return run_interruptibly, INTERRUPTED_NOTICE
 
 
-def _live_sink(output_stream: TextIO | None) -> object | None:
+def _live_sink(output_stream: TextIO | None, lang: str = "en") -> object | None:
     if output_stream is None:
         return None
     from aido_code.live_run import LiveRunRenderer
 
-    return LiveRunRenderer(output_stream)
+    return LiveRunRenderer(output_stream, lang=lang)
 
 
 def _run_validate(config_path: str) -> str:
@@ -465,18 +472,19 @@ def _run_run(
     output_stream: TextIO | None = None,
     provider_adapters: dict[str, object] | None = None,
     subprocess_runner: object | None = None,
+    lang: str = "en",
 ) -> str:
     try:
         with EngineClient.open(
             config_path, provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
         ) as client:
             run_interruptibly, notice = _interrupt_helpers()
-            result = run_interruptibly(client, _live_sink(output_stream))
+            result = run_interruptibly(client, _live_sink(output_stream, lang))
     except EngineError as exc:
         return f"Error: {exc}"
     if result is None:
-        return notice
-    return format_run(result, include_events=output_stream is None)
+        return t("interrupted", lang) if lang != "en" else notice
+    return format_run(result, include_events=output_stream is None, lang=lang)
 
 
 def _run_session_validate(config_path: str) -> str:
@@ -493,6 +501,7 @@ def _run_session_project(
     output_stream: TextIO | None = None,
     provider_adapters: dict[str, object] | None = None,
     subprocess_runner: object | None = None,
+    lang: str = "en",
 ) -> str:
     try:
         context = load_project_command_context(config_path)
@@ -504,10 +513,10 @@ def _run_session_project(
             provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
         ) as client:
             run_interruptibly, notice = _interrupt_helpers()
-            result = run_interruptibly(client, _live_sink(output_stream))
+            result = run_interruptibly(client, _live_sink(output_stream, lang))
             if result is None:
-                return notice
-            return format_run(result, include_events=output_stream is None)
+                return t("interrupted", lang) if lang != "en" else notice
+            return format_run(result, include_events=output_stream is None, lang=lang)
     except _PROJECT_COMMAND_ERRORS as exc:
         return f"Error: {exc}"
 
@@ -697,12 +706,15 @@ def dispatch_line(
             (_run_session_validate(config_path) if state.session is not None else _run_validate(config_path)) + "\n"
         )
     elif command == "/run":
+        if lang != "en":
+            output_stream.write(t("run.start", lang) + "\n")
         output_stream.write(
             (_run_session_project if state.session is not None else _run_run)(
                 config_path,
                 output_stream=output_stream,
                 provider_adapters=provider_adapters,
                 subprocess_runner=subprocess_runner,
+                lang=lang,
             )
             + "\n"
         )
@@ -746,5 +758,6 @@ def run(
         if not dispatch_line(
             line, state, input_stream, output_stream,
             provider_adapters=provider_adapters, subprocess_runner=subprocess_runner,
+            lang=interactive_lang(),
         ):
             return

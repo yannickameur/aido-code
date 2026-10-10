@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from typing import Any, TextIO
 
+from aido_code.i18n import event_label, t
 from aido_code.repl import sanitize_for_terminal as _clean
 
 _METADATA_FIELDS = (
@@ -59,7 +60,7 @@ def _output_line(event: object) -> str:
     return f"    [{label}] {_clean(text)}"
 
 
-def render_event(event: object) -> str:
+def render_event(event: object, *, lang: str = "en") -> str:
     """One display block for one ``EngineEvent``; never raises for a
     well-formed event and tolerates missing/odd fields on a future one."""
     kind = _get(event, "kind")
@@ -70,16 +71,19 @@ def render_event(event: object) -> str:
         payload = _get(event, "payload")
         elapsed = payload.get("elapsed_seconds") if isinstance(payload, dict) else None
         suffix = f" (elapsed {_clean(elapsed)}s)" if elapsed is not None else ""
-        return f"    still running{suffix}"
+        return f"    {t('event.execution.heartbeat', lang).lower() if lang != 'en' else 'still running'}{suffix}"
     if kind == "execution.output_truncated":
         payload = _get(event, "payload")
         payload = payload if isinstance(payload, dict) else {}
         return (
-            f"    output truncated: reason={_clean(payload.get('reason'))} "
+            f"    {t('event.execution.output_truncated', lang).lower() if lang != 'en' else 'output truncated'}: reason={_clean(payload.get('reason'))} "
             f"delivered_events={_clean(payload.get('delivered_events'))} "
             f"delivered_chars={_clean(payload.get('delivered_chars'))}"
         )
     head = f"[{_clean(kind)}]"
+    label = event_label(kind, lang) if lang != "en" else None
+    if label is not None:
+        head += f" {label}"
     if work_item is not None:
         head += f" {_clean(work_item)}"
     tail = " ".join(part for part in (_metadata(event), _payload_items(event)) if part)
@@ -92,13 +96,14 @@ class LiveRunRenderer:
     A presentation failure is swallowed (after one plain-text fallback
     attempt) so it can never abort a governed run."""
 
-    def __init__(self, stream: TextIO) -> None:
+    def __init__(self, stream: TextIO, *, lang: str = "en") -> None:
         self._stream = stream
+        self._lang = lang
         self.render_errors = 0
 
     def __call__(self, event: object) -> None:
         try:
-            text = render_event(event)
+            text = render_event(event, lang=self._lang)
         except Exception:
             self.render_errors += 1
             text = f"[unrenderable event: {_clean(type(event).__name__)}]"
@@ -128,21 +133,21 @@ def run_interruptibly(client: Any, sink: object | None) -> Any | None:
         return None
 
 
-def format_diagnostics(diagnostics: object) -> str:
+def format_diagnostics(diagnostics: object, *, lang: str = "en") -> str:
     """Render every ``FailureDiagnostic``; ``""`` when there are none."""
     entries = list(diagnostics or ())
     if not entries:
         return ""
-    lines = ["diagnostics:"]
+    lines = [t("diag.title", lang)]
     for diag in entries:
         try:
-            lines.extend(_format_diagnostic(diag))
+            lines.extend(_format_diagnostic(diag, lang=lang))
         except Exception:
-            lines.append(f"  {_clean(_get(diag, 'work_item_id'))}: (diagnostic could not be rendered)")
+            lines.append(f"  {_clean(_get(diag, 'work_item_id'))}: {t('diag.unrenderable', lang)}")
     return "\n".join(lines)
 
 
-def _format_diagnostic(diag: object) -> list[str]:
+def _format_diagnostic(diag: object, *, lang: str = "en") -> list[str]:
     def opt(label: str, attr: str) -> str:
         value = _get(diag, attr)
         return f"{label}={_clean(value)}" if value is not None else ""
@@ -151,7 +156,7 @@ def _format_diagnostic(diag: object) -> list[str]:
         return "    " + " ".join(part for part in parts if part)
 
     lines = [
-        f"  {_clean(_get(diag, 'work_item_id'))}: failed in {_clean(_get(diag, 'phase'))}",
+        f"  {_clean(_get(diag, 'work_item_id'))}: {t('diag.failed_in', lang)} {_clean(_get(diag, 'phase'))}",
         row(opt("worker", "worker_display_name"), opt("worker_id", "worker_id"), opt("provider", "provider"),
             opt("backend", "backend"), opt("profile", "profile_id"), opt("model", "model")),
         row(opt("execution_status", "execution_status"),
@@ -165,13 +170,13 @@ def _format_diagnostic(diag: object) -> list[str]:
     if last_output:
         stream = _get(diag, "last_output_stream")
         label = _clean(stream) if stream is not None else "output"
-        lines.append(f"    last output [{label}]: {_clean(last_output)}")
-    lines.append(f"    summary: {_clean(_get(diag, 'summary'))}")
-    lines.append(f"    next action: {_clean(_get(diag, 'next_action'))}")
+        lines.append(f"    {t('diag.last_output', lang)} [{label}]: {_clean(last_output)}")
+    lines.append(f"    {t('diag.summary', lang)}: {_clean(_get(diag, 'summary'))}")
+    lines.append(f"    {t('diag.next_action', lang)}: {_clean(_get(diag, 'next_action'))}")
     failures = _get(diag, "output_delivery_failures")
     if failures:
         lines.append(
-            f"    output display failures: {_clean(failures)} "
+            f"    {t('diag.output_display_failures', lang)}: {_clean(failures)} "
             f"(last: {_clean(_get(diag, 'last_output_delivery_error'))})"
         )
     return [line for line in lines if line.strip()]

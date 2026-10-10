@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
+from contextvars import ContextVar, Token
 
 LANGUAGES = ("fr", "en")
 DEFAULT_LANG = "fr"
@@ -69,6 +70,21 @@ EN: dict[str, str] = {
     "event.work_item.failed": "Work item failed",
     "event.work_item.waiting": "Waiting for an available AI",
     "event.work_item.recovery_required": "Work item needs recovery",
+    "event.dev_a.selected": "Developer A selected",
+    "event.dev_a.started": "Developer A started",
+    "event.dev_a.completed": "Developer A completed",
+    "event.dev_a.failed": "Developer A failed",
+    "event.dev_a.interrupted": "Developer A interrupted",
+    "event.dev_b.selected": "Developer B selected",
+    "event.dev_b.started": "Developer B started",
+    "event.dev_b.completed": "Developer B completed",
+    "event.dev_b.failed": "Developer B failed",
+    "event.dev_b.interrupted": "Developer B interrupted",
+    "event.dev_fix.selected": "Developer fix selected",
+    "event.dev_fix.started": "Developer fix started",
+    "event.dev_fix.completed": "Developer fix completed",
+    "event.dev_fix.failed": "Developer fix failed",
+    "event.dev_fix.interrupted": "Developer fix interrupted",
     "event.qa.started": "Tests started",
     "event.qa.pass": "Tests passed",
     "event.qa.fail": "Tests failed",
@@ -137,6 +153,21 @@ FR: dict[str, str] = {
     "event.work_item.failed": "Tâche en échec",
     "event.work_item.waiting": "En attente d'une IA disponible",
     "event.work_item.recovery_required": "Tâche à récupérer",
+    "event.dev_a.selected": "Développeur A sélectionné",
+    "event.dev_a.started": "Développeur A démarré",
+    "event.dev_a.completed": "Développeur A terminé",
+    "event.dev_a.failed": "Développeur A en échec",
+    "event.dev_a.interrupted": "Développeur A interrompu",
+    "event.dev_b.selected": "Développeur B sélectionné",
+    "event.dev_b.started": "Développeur B démarré",
+    "event.dev_b.completed": "Développeur B terminé",
+    "event.dev_b.failed": "Développeur B en échec",
+    "event.dev_b.interrupted": "Développeur B interrompu",
+    "event.dev_fix.selected": "Correction sélectionnée",
+    "event.dev_fix.started": "Correction démarrée",
+    "event.dev_fix.completed": "Correction terminée",
+    "event.dev_fix.failed": "Correction en échec",
+    "event.dev_fix.interrupted": "Correction interrompue",
     "event.qa.started": "Tests démarrés",
     "event.qa.pass": "Tests validés",
     "event.qa.fail": "Tests en échec",
@@ -152,6 +183,22 @@ FR: dict[str, str] = {
 }
 
 CATALOGS: dict[str, dict[str, str]] = {"en": EN, "fr": FR}
+
+# Direct library calls retain their established English output. The CLI sets
+# this for its interactive session and resets it before returning.
+_interactive_lang: ContextVar[str] = ContextVar("aido_interactive_lang", default="en")
+
+
+def interactive_lang() -> str:
+    return _interactive_lang.get()
+
+
+def set_interactive_lang(lang: str) -> Token[str]:
+    return _interactive_lang.set(lang)
+
+
+def reset_interactive_lang(token: Token[str]) -> None:
+    _interactive_lang.reset(token)
 
 
 class LanguageError(ValueError):
@@ -172,7 +219,7 @@ def resolve_lang(cli_value: str | None = None, environ: Mapping[str, str] | None
         return validate_lang(cli_value)
     env = os.environ if environ is None else environ
     value = env.get(ENV_VAR)
-    if value is not None and value != "":
+    if value is not None:
         return validate_lang(value)
     return DEFAULT_LANG
 

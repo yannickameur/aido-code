@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import os
 from pathlib import Path
 
 from aido_code.engine_client import EngineClient, EngineError
@@ -12,7 +13,7 @@ from aido_code.project_init import run_init
 from aido_code.project_manifest import ProjectManifestError
 from aido_code.project_resources import ProjectResourcesError
 from aido_code.roadmap import RoadmapError
-from aido_code.i18n import LanguageError, resolve_lang
+from aido_code.i18n import LanguageError, reset_interactive_lang, resolve_lang, set_interactive_lang, t
 from aido_code.live_run import INTERRUPTED_NOTICE, LiveRunRenderer, run_interruptibly
 from aido_code.repl import build_status_output, format_run, run
 from aido_code.session import SessionError, SessionStore
@@ -88,7 +89,10 @@ def main(argv: list[str] | None = None) -> int:
 
     argv, lang_arg = _extract_lang(list(argv))
     try:
-        resolve_lang(lang_arg)
+        # An unqualified CLI invocation keeps its established English output.
+        # Catalog lookup itself defaults to French; explicit CLI/environment
+        # selection controls the interactive language.
+        lang = resolve_lang(lang_arg, {"AIDO_LANG": os.environ.get("AIDO_LANG", "en")})
     except LanguageError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
@@ -127,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
         store = SessionStore()
         try:
             if argv[0] == "resume":
-                session_id = argv[1] if len(argv) == 2 else pick_session(store, sys.stdin, sys.stdout)
+                session_id = argv[1] if len(argv) == 2 else pick_session(store, sys.stdin, sys.stdout, lang=lang)
                 if session_id is None:
                     return 0
             else:
@@ -140,8 +144,12 @@ def main(argv: list[str] | None = None) -> int:
         except (SessionError, OSError, ValueError) as exc:
             print(f"Error: {exc}", file=sys.stderr)
             return 1
-        print(f"Resumed session {session.session_id}")
-        run(sys.stdin, sys.stdout, session=session, session_store=store)
+        print(t("session.resumed", lang, session_id=session.session_id))
+        token = set_interactive_lang(lang)
+        try:
+            run(sys.stdin, sys.stdout, session=session, session_store=store)
+        finally:
+            reset_interactive_lang(token)
         return 0
 
     if argv:
@@ -170,7 +178,11 @@ def main(argv: list[str] | None = None) -> int:
     except (SessionError, OSError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
-    run(sys.stdin, sys.stdout, session=session, session_store=store)
+    token = set_interactive_lang(lang)
+    try:
+        run(sys.stdin, sys.stdout, session=session, session_store=store)
+    finally:
+        reset_interactive_lang(token)
     return 0
 
 
