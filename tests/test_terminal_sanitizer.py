@@ -6,7 +6,7 @@ control sequence into the REPL's output. Offline only; see
 tests/conftest.py and CONTRIBUTING.md.
 
 Deliberately a separate file from tests/test_repl.py (a qa_protected_paths
-entry, see aido.m1_3.example.yaml) so this new coverage never touches a
+entry in M1.3) so this new coverage never touches a
 protected file's content.
 """
 

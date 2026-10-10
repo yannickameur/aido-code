@@ -1,4 +1,4 @@
-"""Structural proof for the MVP_SPEC.yaml acceptance criterion that no
+"""Structural proof for the M1 acceptance criterion that no
 command in this MVP ever constructs ``MVPManager``, ``WorkerSelector``,
 ``QuotaManager``, a ``ProviderAdapter``, or reads a Store/SQLite file
 directly (analogous to ai-dev-orchestrator's own

@@ -8,8 +8,8 @@ governed WorkItem Flow, never directly by a human or an assistant — see
 from the real runs' own persisted execution records — nothing here is
 inferred or aspirational. One exception: WI-M1.1-01's implementation
 commit landed under the maintainer's own Git identity due to a real
-engine defect, not maintainer authorship; see
-`docs/M1_1_REFERENCE_RUN.md`.
+engine defect, not maintainer authorship (M1.1 reference run, Git
+history).
 
 ## Yannick Ameur
 
@@ -29,13 +29,11 @@ engine defect, not maintainer authorship; see
   test change caught by `ai-dev-orchestrator`'s AUD-1 remediation) — see
   `ROADMAP.md`, M1.3, "Real run".
 - Also performed the DEV FIX execution for WI-02 (M1), which changed
-  the execution environment without producing a Git commit; see
-  `docs/M1_REFERENCE_RUN.md`.
+  the execution environment without producing a Git commit (M1 reference run, Git history).
 - WI-M1.1-01's actual implementation commit is Alice's real, governed
   work (confirmed by `executions.sqlite3`), but landed under the
   maintainer's ambient Git identity due to a real engine defect in
-  identity inheritance for this specific commit; see
-  `docs/M1_1_REFERENCE_RUN.md`.
+  identity inheritance for this specific commit.
 
 ## Victor
 
