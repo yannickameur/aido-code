@@ -11,9 +11,8 @@ there. This roadmap starts at M1.
 
 ## Where we stand
 
-DONE: M1, M1.1, M1.2, M1.3, M1.4, M8, M2, M2.1, M2.2, M2.3
+DONE: M1, M1.1, M1.2, M1.3, M1.4, M8, M2, M2.1, M2.2, M2.3, M3.1
 PARTIAL: M3 — governed run closed with terminal failures/blockages
-CURRENT: M3.1 — APPROVED
 FUTURE: M4-M6, M9+
 
 M8 completed **out of numeric order**, right after M1.4: M1.4 itself
@@ -62,7 +61,7 @@ record. M3 subsequently ran; its partial outcome is recorded below.
 | M2.2 — CLI-level `aido status` parity fix | `DONE` (real governed run: 1/1 WorkItem `completed`; see M2.2 below) |
 | M2.3 — Align AIDO worker pool with validated providers | `DONE` (real governed run: 1/1 WorkItem `completed`; see M2.3 below) |
 | M3 — Conversational piloting and live execution | `PARTIAL` (governed run 2026-10-06: WI-M3-03 completed; WI-M3-01 failed; WI-M3-02/04 blocked; original contract retained below) |
-| M3.1 — Live operational UX and conversational completion | `APPROVED` — 3/3 WorkItems completed; live acceptance remains open (private-reasoning display defect) |
+| M3.1 — Live operational UX and conversational completion | `DONE` (governed acceptance 2026-10-10, see M3.1 below) |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
 | M6 — Doctor/diagnostics | `À VOTER` |
@@ -1481,6 +1480,14 @@ no functional workaround or provider-specific parser was added by the
 controller. Raw backend output must not be equated with safely classified
 operational activity. Gravity was not selected in this run; its previously
 recorded P21 observability limitation remains unchanged.
+
+**Acceptance conclusion (2026-10-10): M3.1 is `DONE`.** Engine P21.1
+closed the defect above: `wi-acc-01` `COMPLETED`; governed QA PASS on
+engine `f1e28f8d`; 1441 engine and 311 AIDO Code tests PASS; governed
+merge and tag; real Ctrl+C and resume PASS on `p211-live7`; public output
+safety validated (no non-empty real `thinking` text was observed).
+Original M3 stays `PARTIAL`. M4 is not started. The `## Current milestone`
+block below keeps M3.1's contract only because the parser requires one.
 
 ## Current milestone
 
