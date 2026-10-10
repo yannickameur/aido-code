@@ -7,9 +7,16 @@ markup) after passing through ``sanitize_for_terminal``."""
 
 from __future__ import annotations
 
+import atexit
+import contextlib
 import io
+import os
 import re
+import sys
+import termios
 import threading
+import time
+from collections.abc import Iterator
 from datetime import datetime
 from collections import deque
 from dataclasses import dataclass
@@ -38,6 +45,8 @@ _EVENT_HISTORY_LIMIT = 2000
 _PROVIDER_LABELS = {"anthropic": "Claude", "openai": "Codex", "mistral": "Mistral", "gravity": "Gravity"}
 _FIVE_HOUR = ("five_hour", "primary_5h")
 _SEVEN_DAY = ("seven_day", "secondary_7d")
+_DOUBLE_CTRL_C_SECONDS = 2.0
+_TERMINAL_RESET = "\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?1015l\x1b[?2004l\x1b[?25h"
 
 
 def _window_label(window_type: str, lang: str) -> str:
@@ -175,6 +184,7 @@ class AidoApp(App[None]):
     BINDINGS = [
         Binding("ctrl+c", "interrupt", "Interrupt", priority=True),
         Binding("ctrl+d", "quit_idle", "Quit", priority=True),
+        Binding("f10", "quit_idle", "Quit", priority=True),
         Binding("ctrl+o", "toggle_view", "Toggle view", priority=True),
         Binding("ctrl+r", "refresh_quota", "", show=False, priority=True),
         Binding("pageup", "scroll_log(-1)", show=False),
@@ -200,6 +210,7 @@ class AidoApp(App[None]):
         self._cursor = 0
         self._resume_choices: list[str] | None = None
         self._quota_in_flight = False
+        self._last_idle_ctrl_c = float('-inf')
 
     def compose(self) -> ComposeResult:
         with Vertical(id="header"):
@@ -345,8 +356,17 @@ class AidoApp(App[None]):
         if self._interrupt is not None:
             self._request_interrupt()
         elif not self.running:
-            self.query_one("#prompt", Input).value = ""
-            self.add_message("info", t("run.idle_ctrl_c", self.lang))
+            prompt = self.query_one("#prompt", Input)
+            now = time.monotonic()
+            if prompt.value:
+                prompt.value = ""
+                self._last_idle_ctrl_c = float("-inf")
+                self.add_message("info", t("run.idle_ctrl_c", self.lang))
+            elif now - self._last_idle_ctrl_c <= _DOUBLE_CTRL_C_SECONDS:
+                self.exit()
+            else:
+                self._last_idle_ctrl_c = now
+                self.add_message("info", t("run.ctrl_c_again", self.lang))
 
     def action_quit_idle(self) -> None:
         if not self.running:
@@ -374,6 +394,8 @@ class AidoApp(App[None]):
         if not line.strip():
             return
         event.input.value = ""
+        if line.strip() == "/quit":
+            line = "/exit"
         if self.running:
             if line.strip() == "/exit" and self._interrupt is not None:
                 self._quit_after = True
@@ -456,6 +478,9 @@ class AidoApp(App[None]):
         if line.strip() == "/help":
             text += f"\n  Ctrl+O - {t('help.toggle_view', self.lang)}"
             text += f"\n  Ctrl+R - {t('help.refresh_quota', self.lang)}"
+            text += f"\n  /quit - {t('help.cmd./quit', self.lang)}"
+            text += f"\n  Ctrl+D, F10 - {t('help.quit_keys', self.lang)}"
+            text += f"\n  Ctrl+C - {t('help.ctrl_c', self.lang)}"
         if text:
             kind = "error" if text.startswith(("Error", "Validation failed")) else (
                 "info" if line.startswith(("/help", "/new", "/resume")) else "result"
@@ -479,5 +504,60 @@ class AidoApp(App[None]):
             self.exit()
 
 
+class _TerminalGuard:
+    """Owns the real terminal while the app runs; restores it exactly once."""
+
+    def __init__(self, private_fd: int, saved: list | None) -> None:
+        self.private_fd = private_fd
+        self.saved = saved
+        self.restored = False
+
+    def restore(self) -> None:
+        if self.restored:
+            return
+        self.restored = True
+        if self.saved is not None:
+            with contextlib.suppress(termios.error, OSError, ValueError):
+                termios.tcsetattr(self.private_fd, termios.TCSANOW, self.saved)
+        for stream in (sys.__stdout__, sys.__stderr__):
+            try:
+                stream.write(_TERMINAL_RESET)
+                stream.flush()
+                break
+            except (AttributeError, OSError, ValueError):
+                continue
+
+
+@contextlib.contextmanager
+def isolated_terminal() -> Iterator[None]:
+    """Give Textual a private copy of the terminal and point fd 0 to /dev/null,
+    so worker processes inheriting stdin can never alter the terminal modes."""
+    private_fd = os.dup(0)  # non-inheritable
+    try:
+        saved = termios.tcgetattr(private_fd)
+    except (termios.error, OSError):
+        saved = None
+    guard = _TerminalGuard(private_fd, saved)
+    reader = os.fdopen(private_fd, "r", closefd=False)
+    previous = sys.__stdin__, sys.stdin
+    atexit.register(guard.restore)
+    devnull = os.open(os.devnull, os.O_RDONLY)
+    try:
+        os.dup2(devnull, 0)
+        sys.__stdin__ = sys.stdin = reader
+        yield
+    finally:
+        try:
+            guard.restore()
+            os.dup2(private_fd, 0)
+        finally:
+            sys.__stdin__, sys.stdin = previous
+            os.close(devnull)
+            reader.close()
+            os.close(private_fd)
+            atexit.unregister(guard.restore)
+
+
 def run_tui(state: ReplState, lang: str, **dispatch_kwargs: object) -> None:
-    AidoApp(state, lang, **dispatch_kwargs).run()
+    with isolated_terminal():
+        AidoApp(state, lang, **dispatch_kwargs).run()
