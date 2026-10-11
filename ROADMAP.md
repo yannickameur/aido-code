@@ -89,6 +89,66 @@ terminal-output parser.
 observable quota, QA, permissions; read-only wherever the underlying
 fact genuinely is.
 
+### Optional project skill — UI UX Pro Max (`À VOTER`)
+
+**Objective / value.** Let a project's prompt explicitly request
+[UI UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill)
+(NextLevelBuilder, open-source MIT) for user journeys, visual direction,
+design systems, typography/colors/spacing, accessibility, platform-specific
+UI design and review of implemented interfaces. Support any relevant web,
+mobile or business application; do not specialize for the Morpion project.
+
+**Functional scope.**
+
+- Activate only when the user explicitly asks for **UI UX Pro Max** in
+  that project's prompt, and only for relevant UX/UI tasks. A generic
+  UI request alone must not activate it. Other projects remain unchanged.
+- Verify real availability, an approved pinned version and compatibility
+  with the selected provider before use. Missing/unsupported means a
+  clear limitation, not simulated skill execution.
+- Preserve useful design artifacts in the project, available to the
+  development agents and an actual UX/UI review of implemented screens.
+  Keep existing independent DEV B, deterministic QA, Git governance and
+  permissions intact.
+
+**Integration study required before a separate implementation GO.**
+
+- Review existing `aido.yaml` `initial_prompt`, `ROADMAP.md` and
+  `resources/` (`docs/PROJECT_CONTRACT.md`), agent selection and
+  public engine boundary (`ARCHITECTURE.md`, `docs/ENGINE_CONTRACT.md`).
+  REUSE FIRST, KISS, YAGNI: no new generic skills framework or second
+  orchestrator unless an evidenced gap warrants it.
+- Check native project-scoped Claude Code and Codex skill mechanisms.
+  Upstream documents both and provides `uipro init --ai claude` and
+  `--ai codex`, but this is evidence to study, **not** an instruction
+  to install now. Its default auto-activation for generic UI/UX prompts
+  must not violate AIDO's stricter explicit opt-in policy.
+- Upstream MIT license verified. Its search scripts require Python 3
+  (standard library); its optional installer is a Node/npm CLI. Audit
+  source, third-party instructions, scripts, dependencies, side effects
+  and permissions. Pin the verified release/commit and record actual
+  origin/version for each activation; skill and CLI versions may differ.
+- Prefer native providers and existing project/task configuration over
+  installing globally or fetching floating latest assets. Never copy
+  the skill logic into AIDO. No required Figma, Mobbin or paid service.
+
+**Acceptance criteria (future, not yet approved for execution).**
+
+- Explicit opt-in demonstrated with at least one supported LLM provider;
+  no implicit activation, even on UI/UX work, without opt-in.
+- Scoped activation, reproducible version and traceable origin; honest
+  errors for missing/incompatible skills or providers.
+- Useful UX/UI design artifacts consumed by developers and independent
+  review of actually implemented screens.
+- Tests prove both opt-in and opt-out, safety boundaries and no
+  regression for ordinary projects.
+
+**Suggested future slices, subject to validation:** (1) scoped ecosystem,
+security and integration study; (2) minimal optional provider handoff;
+(3) design artifact/review flow and regression/acceptance tests. Keep this
+proposal `À VOTER`; do not install the skill, change production code,
+create a new agent, launch a development cycle, or reorder M4-M6 now.
+
 ### Known constraints
 
 - The engine is published as GitHub Release v0.2.0 and AIDO Code as
