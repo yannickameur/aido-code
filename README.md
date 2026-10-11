@@ -93,8 +93,8 @@ Install both wheels in a fresh environment:
 python3 -m venv .venv
 . .venv/bin/activate
 pip install \
-  https://github.com/yannickameur/ai-dev-orchestrator/releases/download/v0.2.0/ai_dev_orchestrator-0.2.0-py3-none-any.whl \
-  https://github.com/yannickameur/aido-code/releases/download/v0.2.1/aido_code-0.2.1-py3-none-any.whl
+  https://github.com/yannickameur/ai-dev-orchestrator/releases/download/v0.2.1/ai_dev_orchestrator-0.2.1-py3-none-any.whl \
+  https://github.com/yannickameur/aido-code/releases/download/v0.2.2/aido_code-0.2.2-py3-none-any.whl
 ```
 
 AIDO Code requires `ai-dev-orchestrator>=0.2.0,<0.3`. No sibling checkout
