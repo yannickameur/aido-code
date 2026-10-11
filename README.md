@@ -105,6 +105,16 @@ repository and install it editable next to an engine checkout
 
 ### Command names
 
+Check the versions actually installed in AIDO’s Python environment, without opening a project or probing providers:
+
+```bash
+aido version   # full command
+aido v         # short alias
+```
+
+Inside the interactive interface, use `/version` or `/v` for the same information (AIDO Code, engine and Python).
+
+
 `aido` is the real command (M8, `DONE`). `aido-code`/`python -m
 aido_code` remain a compatibility alias, kept indefinitely — both
 resolve to the exact same entry point, never a duplicated
