@@ -55,6 +55,7 @@ decision belongs to the engine.
 | Release v0.2.0 (GitHub Release, engine v0.2.0) | `DONE` (2026-10-10) |
 | M3.5 — Terminal reliability fix (workers isolated from the terminal, reliable exits, /export) | `DONE` (2026-10-10) |
 | Release v0.2.1 (corrective, M3.5 only; engine stays v0.2.0) | `DONE` (2026-10-10) |
+| Release v0.2.2 (`aido version` / `aido v`, `/version` / `/v`; engine v0.2.1) | `DONE` (2026-10-11) |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
 | M6 — Doctor/diagnostics | `À VOTER` |
@@ -152,8 +153,8 @@ create a new agent, launch a development cycle, or reorder M4-M6 now.
 
 ### Known constraints
 
-- The engine is published as GitHub Release v0.2.0 and AIDO Code as
-  v0.2.1 (wheel and sdist); AIDO Code requires `ai-dev-orchestrator>=0.2.0,<0.3`. PyPI
+- The engine is published as GitHub Release v0.2.1 and AIDO Code as
+  v0.2.2 (wheel and sdist); AIDO Code requires `ai-dev-orchestrator>=0.2.0,<0.3`. PyPI
   publication is a separate, undecided step. Development still uses two
   sibling checkouts with `pip install -e ../ai-dev-orchestrator`.
 
