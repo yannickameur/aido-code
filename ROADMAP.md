@@ -45,6 +45,7 @@ decision belongs to the engine.
 | M2 — Sessions and resume | `DONE` |
 | M2.1 — Graceful interactive interruption | `DONE` |
 | M2.2 — CLI-level `aido status` parity | `DONE` |
+| Read-only `aido version` / `aido v` and `/version` / `/v` | `DONE` (unreleased) |
 | M2.3 — Worker pool aligned with validated providers | `DONE` |
 | M3 — Conversational piloting and live execution | `PARTIAL` (historical outcome, see below) |
 | M3.1 — Live operational UX and conversational completion | `DONE` (governed acceptance 2026-10-10) |

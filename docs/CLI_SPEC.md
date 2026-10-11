@@ -23,8 +23,10 @@ P13.6).
 | `validate` | `M1.4` (CLI-level; also `/validate` in the REPL) | Manifest + roadmap + resources + AIDO registry validation | No |
 | `run` | `M1.4` (CLI-level; also `/run` in the REPL) | Start or resume project execution, requires `Status: APPROVED` | Potentially |
 | `status` | `M2.2` (CLI-level; also `/status` in the REPL) | Same rendering as `/status` below, one shared implementation | No |
+| `version`, `v` | `IMPLEMENTED` | Read installed AIDO Code, engine and Python versions; no project required | No |
 | `status --probe` | `M2.2` (CLI-level; also `/status --probe` in the REPL) | Same rendering as `/status --probe` below, one shared implementation | Yes |
 | `/help` | `IMPLEMENTED` | List available commands | No |
+| `/version`, `/v` | `IMPLEMENTED` | Same installed-version output as CLI, shared renderer, no project required | No |
 | `/status` | `IMPLEMENTED`, extended `M1.4` | Roadmap milestone facts + project + MVP + work items + all AIDO-configured workers | No |
 | `/status --probe` | `IMPLEMENTED` | Same, plus one real `probe_workers()` call | Yes |
 | `/workers` | `IMPLEMENTED` | AIDO's own configured workers (static view, `M1.4`: sourced from AIDO's global config, never a project's) | No |
@@ -52,6 +54,8 @@ Each command maps directly to one `OrchestratorEngine` call (see
 `.validate()`'s `ProjectSnapshot`, never a raw file dump. `run`/`/run`
 is also how a project resumes; see "Session resume vs. project run" in
 `ARCHITECTURE.md`.
+
+`aido version` and `aido v` (also `aido-code` or `python -m aido_code`) display the actual installed package versions and active Python interpreter version. `/version` and `/v` do the same inside the REPL/Textual interface. This read-only query requires no `aido.yaml`, session, worker selection, quota probe or external CLI call. It never guesses a missing package version: `not installed` is shown instead. Ralph CLI diagnostics remain part of future `doctor` scope.
 
 ## M1.4 — Autonomous AIDO project contract
 

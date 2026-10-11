@@ -57,10 +57,13 @@ from aido_code.project_resources import ProjectResourcesError
 from aido_code.roadmap import CurrentMilestone, RoadmapError
 from aido_code.session import Session, SessionError, SessionProjectError, SessionStore, project_manifest_path
 from aido_code.session_commands import pick_session, resume_selected
+from aido_code.version_info import format_versions
 from orchestrator.worker_registry import WorkerRegistryError
 
 COMMANDS: dict[str, str] = {
     "/help": "List available commands.",
+    "/version": "Show installed AIDO Code, engine and Python versions.",
+    "/v": "Alias for /version.",
     "/status": "Show the project's real, persisted status, plus the full worker list.",
     "/status --probe": "Same as /status, plus one real provider probe of each worker's state.",
     "/workers": "List configured workers (enabled and disabled), no provider probe.",
@@ -657,6 +660,9 @@ def dispatch_line(
         return False
     if name == "/help" and not flags:
         output_stream.write(format_help(lang) + "\n")
+        return True
+    if name in ("/version", "/v") and not flags:
+        output_stream.write(format_versions() + "\n")
         return True
     if name == "/resume" and len(flags) <= 1:
         try:
