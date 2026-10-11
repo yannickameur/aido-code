@@ -18,6 +18,7 @@ from aido_code.live_run import INTERRUPTED_NOTICE, LiveRunRenderer, run_interrup
 from aido_code.repl import build_status_output, format_run, run
 from aido_code.session import SessionError, SessionStore
 from aido_code.session_commands import pick_session, resume_selected
+from aido_code.version_info import format_versions
 from orchestrator.worker_registry import WorkerRegistryError
 
 
@@ -119,6 +120,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
 
+    if argv and argv[0] in ("version", "v"):
+        if len(argv) != 1:
+            print(f"Error: usage: {prog} {argv[0]}", file=sys.stderr)
+            return 2
+        print(format_versions())
+        return 0
+
     if argv and argv[0] == "init":
         if len(argv) != 3:
             print(
@@ -175,7 +183,7 @@ def main(argv: list[str] | None = None) -> int:
             "Error: unrecognized argument(s): "
             f"{' '.join(argv)}. {prog} only accepts "
             "'init <parent-path> <project-name>', 'validate', 'run', 'status [--probe]', "
-            "'resume', or '--continue'; "
+            "'resume', 'version', 'v', or '--continue'; "
             "run it with none to start the REPL.",
             file=sys.stderr,
         )
