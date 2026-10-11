@@ -27,5 +27,9 @@ jobs:
         run: pip install https://github.com/yannickameur/ai-dev-orchestrator/releases/download/v0.2.1/ai_dev_orchestrator-0.2.1-py3-none-any.whl
       - name: Install AIDO Code and test dependencies
         run: pip install -e ".[test]"
+      - name: Configure Git identity for disposable test repos
+        run: |
+          git config --global user.name "AIDO CI"
+          git config --global user.email "aido-ci@example.invalid"
       - name: Run offline tests
         run: python -m pytest -q
