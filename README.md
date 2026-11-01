@@ -87,17 +87,20 @@ becomes its own product, here.
 ## Quick start
 
 AIDO Code and its engine are published as GitHub Releases, not on PyPI.
-Install both wheels in a fresh environment:
+After the v0.2.3 release is published, install both wheels in a fresh environment:
 
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
 pip install \
-  https://github.com/yannickameur/ai-dev-orchestrator/releases/download/v0.2.1/ai_dev_orchestrator-0.2.1-py3-none-any.whl \
-  https://github.com/yannickameur/aido-code/releases/download/v0.2.2/aido_code-0.2.2-py3-none-any.whl
+  https://github.com/yannickameur/ai-dev-orchestrator/releases/download/v0.2.2/ai_dev_orchestrator-0.2.2-py3-none-any.whl \
+  https://github.com/yannickameur/aido-code/releases/download/v0.2.3/aido_code-0.2.3-py3-none-any.whl
 ```
 
-AIDO Code requires `ai-dev-orchestrator>=0.2.0,<0.3`. No sibling checkout
+For rollback, keep the previous v0.2.2 AIDO environment and switch the
+launcher back to it; do not downgrade packages in the new environment.
+
+AIDO Code requires `ai-dev-orchestrator>=0.2.2,<0.3`. No sibling checkout
 and no manual worker configuration are needed: AIDO Code resolves its own
 global worker pool (see "Workers" below). For development, clone this
 repository and install it editable next to an engine checkout

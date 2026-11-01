@@ -18,11 +18,11 @@ from aido_code.tui import AidoApp, Message
 
 @pytest.fixture
 def expected_versions(monkeypatch):
-    versions = {"aido-code": "0.2.1", "ai-dev-orchestrator": "0.2.1"}
+    versions = {"aido-code": "0.2.3", "ai-dev-orchestrator": "0.2.2"}
     monkeypatch.setattr(version_info, "version", lambda name: versions[name])
     return (
-        "AIDO Code           : 0.2.1\n"
-        "AI Dev Orchestrator : 0.2.1\n"
+        "AIDO Code           : 0.2.3\n"
+        "AI Dev Orchestrator : 0.2.2\n"
         f"Python              : {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     )
 
@@ -81,6 +81,6 @@ def test_tui_v_command_displays_same_versions(tmp_path, expected_versions):
             await app.workers.wait_for_complete()
             await pilot.pause()
             rendered = "\n".join(str(m.render()) for m in app.query(Message))
-            assert "AIDO Code           : 0.2.1" in rendered
-            assert "AI Dev Orchestrator : 0.2.1" in rendered
+            assert "AIDO Code           : 0.2.3" in rendered
+            assert "AI Dev Orchestrator : 0.2.2" in rendered
     asyncio.run(run_tui_test())

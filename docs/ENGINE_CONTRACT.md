@@ -244,8 +244,9 @@ terminal. The no-chain-of-thought requirement remains unmet; see
 alone proves output is safe operational text.
 
 **Packaging**: AIDO Code depends on the published engine release
-`ai-dev-orchestrator>=0.2.0,<0.3` (GitHub Release v0.2.0), which contains
-P21/P21.1, `run(interrupt=...)` and `execution_times()`.
+`ai-dev-orchestrator>=0.2.2,<0.3` (GitHub Release v0.2.2), which contains
+P21/P21.1, `run(interrupt=...)`, `execution_times()` and the M3.6
+local-first selection policy.
 
 ## What this contract does not give AIDO Code (yet)
 
