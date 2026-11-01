@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install released engine dependency
-        run: pip install https://github.com/yannickameur/ai-dev-orchestrator/releases/download/v0.2.1/ai_dev_orchestrator-0.2.1-py3-none-any.whl
+        run: pip install https://github.com/yannickameur/ai-dev-orchestrator/releases/download/v0.2.2/ai_dev_orchestrator-0.2.2-py3-none-any.whl
       - name: Install AIDO Code and test dependencies
         run: pip install -e ".[test]"
       - name: Configure Git identity for disposable test repos
