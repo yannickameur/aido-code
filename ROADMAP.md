@@ -189,14 +189,17 @@ create a new agent, launch a development cycle, or reorder M4-M6 now.
 
 ### Known constraints
 
-- The engine is published as GitHub Release v0.2.1 and AIDO Code as
-  v0.2.2 (wheel and sdist); AIDO Code requires `ai-dev-orchestrator>=0.2.0,<0.3`. PyPI
-  publication is a separate, undecided step. Development still uses two
-  sibling checkouts with `pip install -e ../ai-dev-orchestrator`.
+- The engine is published as GitHub Release v0.2.2; AIDO Code v0.2.3 is
+  prepared but unreleased and requires `ai-dev-orchestrator>=0.2.2,<0.3`.
+  AIDO Code v0.2.2 remains the latest published release. PyPI publication
+  is a separate, undecided step.
 
 ## Next milestone to discuss
 
-M3.5 and release v0.2.2 are DONE. M3.6 (two local Qwen priority workers) is the approved next scope, dependent on engine P2. The current milestone below remains historical M3.5 until the local BMAX runtime/persisted state is inspected and the next governed milestone can be switched without conflict; M4 remains deferred.
+M3.5 and release v0.2.2 are DONE. M3.6 (two local Qwen priority workers) is
+the approved current milestone, dependent on engine P2. Live BMAX acceptance
+and publication remain operator steps after governed implementation and QA;
+M4 remains deferred.
 
 The interruption defect found during the M3.3 real acceptance (a surviving
 `ralph` kept working and committing after Ctrl+C) is fixed in
