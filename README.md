@@ -205,6 +205,28 @@ All eight workers are enabled, from four providers. See
 [`CONTRIBUTORS.md`](CONTRIBUTORS.md) for who actually built AIDO Code
 so far.
 
+### BMAX local Qwen opt-in
+
+On BMAX, copy [`examples/bmax-workers.yaml`](examples/bmax-workers.yaml) to
+`$XDG_CONFIG_HOME/aido/workers.yaml`, or to `~/.config/aido/workers.yaml`
+when `XDG_CONFIG_HOME` is unset. The example keeps the eight cloud workers
+and enables `qwen_developer` and `qwen_reviewer`, both using Ollama's
+`qwen3.5:9b` through the Codex backend. Its global
+`selection.preferred_provider: ollama` makes eligible local workers first
+for both development roles; the engine still enforces distinct worker IDs
+and falls back to available cloud workers when local workers are unavailable
+or ineligible. The packaged default above has no Ollama workers or local
+preference, so other installations retain their current routing.
+
+Set `CODEX_OSS_BASE_URL` in the AIDO/Ralph environment to the reachable
+Ollama `/v1` endpoint (for example `http://127.0.0.1:11434/v1` after
+checking that address on BMAX), and confirm `qwen3.5:9b` appears in
+Ollama's model list. Run `aido validate` in a project, then inspect
+`/workers` and `/status --probe`. No Ollama address or worker setting
+belongs in project `aido.yaml`. To restore the packaged behavior, remove
+the global override; to keep custom cloud settings, remove the two Qwen
+entries and `selection.preferred_provider` from the override.
+
 ## Documentation
 
 | Document | Purpose |

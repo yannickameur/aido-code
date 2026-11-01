@@ -312,6 +312,15 @@ fresh install works immediately either way.
 by `aido-code`'s modern command path. Credentials stay exactly where
 they already are — provider CLIs/environment, never this file.
 
+For an explicit BMAX local-first setup, copy the complete
+[`examples/bmax-workers.yaml`](../examples/bmax-workers.yaml) registry to
+the global override path above. It keeps the cloud fallback pool and
+declares two enabled Ollama/Codex Qwen workers with distinct `worker_id`
+values. Its `selection.preferred_provider: ollama` is parsed by the same
+`WorkerRegistry.load` path and passed to the engine's `WorkerSelector`;
+availability, capability, and author/reviewer exclusion still govern
+selection. The packaged default has no local preference or Ollama workers.
+
 ## 5. Resources and `initial_prompt`
 
 - `resources` (from the manifest, §2) is resolved once, confined inside

@@ -7,11 +7,18 @@ packaged default — never a network/provider call.
 
 from __future__ import annotations
 
+import asyncio
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from textwrap import dedent
 
 import pytest
+import yaml
+from orchestrator.providers.adapter import ProviderAdapter
+from orchestrator.providers.contracts import ProviderAvailability, ProviderState, UnavailabilityReason
+from orchestrator.quota_manager import QuotaManager, QuotaPolicy
 from orchestrator.worker_registry import WorkerRegistryError
+from orchestrator.worker_selector import WorkerSelectionRequest, WorkerSelector
 
 from aido_code.worker_config import load_worker_registry, resolve_workers_override_path
 
@@ -243,3 +250,132 @@ def test_clean_install_never_reads_project_or_sibling_checkout_worker_paths(
     worker_ids = {w.worker_id for w in registry.all_workers()}
     assert worker_ids != {"override-worker"}
     assert "alice" in worker_ids
+
+
+_BMAX_EXAMPLE = Path(__file__).resolve().parent.parent / "examples" / "bmax-workers.yaml"
+_NOW = datetime(2026, 11, 1, tzinfo=timezone.utc)
+
+
+class _OfflineAdapter(ProviderAdapter):
+    def __init__(self, provider: str, *, available: bool = True) -> None:
+        self.provider = provider
+        self.available = available
+
+    async def probe(self) -> ProviderState:
+        return ProviderState(
+            provider=self.provider,
+            availability=ProviderAvailability(
+                available=self.available, observed_at=_NOW,
+                reason=None if self.available else UnavailabilityReason.UNKNOWN,
+            ),
+            observed_at=_NOW,
+        )
+
+
+def _select_development_pair(registry, *, ollama_available: bool = True) -> tuple[str, str]:
+    adapters = {
+        provider: _OfflineAdapter(provider, available=provider != "ollama" or ollama_available)
+        for provider in {worker.provider for worker in registry.enabled_workers()}
+    }
+    quota = QuotaManager(adapters, QuotaPolicy(state_ttl=timedelta(hours=1)), clock=lambda: _NOW)
+    selector = WorkerSelector(registry.enabled_workers(), quota, registry.selection_policy)
+
+    async def choose() -> tuple[str, str]:
+        author = await selector.select(
+            WorkerSelectionRequest(required_capabilities=frozenset({"development"}))
+        )
+        reviewer = await selector.select(
+            WorkerSelectionRequest(
+                required_capabilities=frozenset({"development"}),
+                author_worker_id=author.worker_id,
+            )
+        )
+        return author.worker_id, reviewer.worker_id
+
+    return asyncio.run(choose())
+
+
+def test_bmax_example_loads_through_global_override_with_cloud_fallback(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "empty"))
+    default = load_worker_registry()
+    override = tmp_path / "xdg" / "aido" / "workers.yaml"
+    override.parent.mkdir(parents=True)
+    override.write_text(_BMAX_EXAMPLE.read_text())
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(override.parent.parent))
+
+    registry = load_worker_registry()
+    by_id = {worker.worker_id: worker for worker in registry.all_workers()}
+    assert registry.selection_policy.preferred_provider == "ollama"
+    assert len(by_id) == len(default.all_workers()) + 2
+    for cloud in default.all_workers():
+        assert by_id[cloud.worker_id] == cloud
+    assert {worker.worker_id for worker in registry.enabled_workers() if worker.provider == "ollama"} == {
+        "qwen_developer", "qwen_reviewer",
+    }
+    assert by_id["qwen_developer"].priority > max(w.priority for w in default.all_workers())
+    assert by_id["qwen_reviewer"].priority > max(w.priority for w in default.all_workers())
+    for worker_id in ("qwen_developer", "qwen_reviewer"):
+        worker = by_id[worker_id]
+        assert worker.enabled and worker.backend == "codex"
+        assert worker.capabilities == frozenset({"development"})
+        assert worker.profile().model == "qwen3.5:9b"
+        assert worker.profile().reasoning_effort is None
+
+
+def test_bmax_preference_selects_distinct_qwen_workers_before_available_cloud() -> None:
+    from orchestrator.worker_registry import WorkerRegistry
+
+    registry = WorkerRegistry.load(_BMAX_EXAMPLE)
+    assert _select_development_pair(registry) == ("qwen_developer", "qwen_reviewer")
+
+
+def test_bmax_unavailable_ollama_falls_back_to_cloud() -> None:
+    from orchestrator.worker_registry import WorkerRegistry
+
+    registry = WorkerRegistry.load(_BMAX_EXAMPLE)
+    selected = _select_development_pair(registry, ollama_available=False)
+    assert selected[0] != selected[1]
+    assert {registry.get(worker_id).provider for worker_id in selected} <= {
+        "anthropic", "openai", "mistral", "gravity",
+    }
+
+
+def test_bmax_single_eligible_local_worker_uses_cloud_for_review(tmp_path: Path) -> None:
+    from orchestrator.worker_registry import WorkerRegistry
+
+    document = yaml.safe_load(_BMAX_EXAMPLE.read_text())
+    next(worker for worker in document["workers"] if worker["worker_id"] == "qwen_reviewer")["enabled"] = False
+    path = tmp_path / "workers.yaml"
+    path.write_text(yaml.safe_dump(document))
+    registry = WorkerRegistry.load(path)
+
+    author, reviewer = _select_development_pair(registry)
+    assert author == "qwen_developer"
+    assert registry.get(reviewer).provider != "ollama"
+
+
+def test_non_opt_in_default_retains_cloud_routing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "empty"))
+    registry = load_worker_registry()
+    assert registry.selection_policy.preferred_provider is None
+    assert all(worker.provider != "ollama" for worker in registry.all_workers())
+    author, reviewer = _select_development_pair(registry)
+    assert author != reviewer
+    assert registry.get(author).provider != "ollama"
+    assert registry.get(reviewer).provider != "ollama"
+
+
+def test_bmax_override_invalid_policy_fails_validation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    document = yaml.safe_load(_BMAX_EXAMPLE.read_text())
+    document["selection"]["preferred_provider"] = ""
+    override = tmp_path / "xdg" / "aido" / "workers.yaml"
+    override.parent.mkdir(parents=True)
+    override.write_text(yaml.safe_dump(document))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(override.parent.parent))
+
+    with pytest.raises(WorkerRegistryError, match="selection.preferred_provider"):
+        load_worker_registry()
