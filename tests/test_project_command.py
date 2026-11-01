@@ -119,6 +119,27 @@ class TestLoadProjectCommandContext:
 
 
 class TestValidateCommand:
+    def test_bmax_global_override_validates_without_provider_probe(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        target = _init(tmp_path)
+        override = tmp_path / "xdg" / "aido" / "workers.yaml"
+        override.parent.mkdir(parents=True)
+        example = Path(__file__).resolve().parent.parent / "examples" / "bmax-workers.yaml"
+        override.write_text(example.read_text())
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(override.parent.parent))
+        monkeypatch.chdir(target)
+        capsys.readouterr()
+
+        assert entrypoint.main(["validate"]) == 0
+        assert capsys.readouterr().out == "VALID\nCurrent milestone: DRAFT\nNot executable.\n"
+        context = load_project_command_context(target / "aido.yaml")
+        assert context.worker_registry.selection_policy.preferred_provider == "ollama"
+        assert {w.worker_id for w in context.worker_registry.enabled_workers() if w.provider == "ollama"} == {
+            "qwen_developer", "qwen_reviewer",
+        }
+
     def test_draft_reports_not_executable(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
     ) -> None:

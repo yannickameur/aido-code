@@ -1,0 +1,302 @@
+# BMAX opt-in global worker registry example (WI-M3.6-01).
+# Copy to $XDG_CONFIG_HOME/aido/workers.yaml (or ~/.config/aido/workers.yaml).
+# This retains AIDO's packaged cloud pool for fallback and adds two local
+# Qwen identities. Edit this copy if the local model differs.
+#
+# The project's aido.yaml never contains workers or selection policy.
+#
+# No secrets here: cloud authentication stays with provider CLIs.
+#
+# quality_tier: one of SIMPLE, STANDARD, COMPLEX, CRITICAL (see
+# orchestrator.worker_selector.QualityTier) — the minimum capability
+# level a profile satisfies.
+#
+# cost_rank: a configured, relative economic preference (lower = prefer
+# this profile) — never a real provider price.
+
+selection:
+  preferred_provider: ollama
+
+workers:
+  - worker_id: alice
+    display_name: Alice
+    enabled: true
+    provider: anthropic
+    backend: claude_code
+    priority: 100
+
+    capabilities:
+      - development
+      - release_planning
+      - roadmap_synthesis
+      - complexity_estimation
+      - qa_testing
+
+    default_profile_id: standard
+    estimator_profile_id: economy
+
+    profiles:
+      economy:
+        quality_tier: SIMPLE
+        model: haiku
+        cost_rank: 10
+
+      standard:
+        quality_tier: STANDARD
+        model: sonnet
+        cost_rank: 20
+
+      deep:
+        quality_tier: COMPLEX
+        model: sonnet
+        cost_rank: 30
+
+  # Worker pool fallback: a second, independent worker per participating
+  # provider. Same capabilities/profiles as the provider's primary
+  # worker — no artificial functional difference. priority=90 (< the
+  # primary's 100) so a fresh selection with no author still naturally
+  # prefers the primary worker.
+  - worker_id: bob
+    display_name: Lydie
+    enabled: true
+    provider: anthropic
+    backend: claude_code
+    priority: 90
+
+    capabilities:
+      - development
+      - release_planning
+      - roadmap_synthesis
+      - complexity_estimation
+      - qa_testing
+
+    default_profile_id: standard
+    estimator_profile_id: economy
+
+    profiles:
+      economy:
+        quality_tier: SIMPLE
+        model: haiku
+        cost_rank: 10
+
+      standard:
+        quality_tier: STANDARD
+        model: sonnet
+        cost_rank: 20
+
+      deep:
+        quality_tier: COMPLEX
+        model: sonnet
+        cost_rank: 30
+
+  - worker_id: victor
+    display_name: Victor
+    enabled: true
+    provider: openai
+    backend: codex
+    priority: 100
+
+    capabilities:
+      - development
+      - release_planning
+      - roadmap_synthesis
+      - complexity_estimation
+      - qa_testing
+
+    default_profile_id: standard
+    estimator_profile_id: economy
+
+    profiles:
+      economy:
+        quality_tier: SIMPLE
+        model: gpt-6-luna
+        reasoning_effort: low
+        cost_rank: 10
+
+      standard:
+        quality_tier: STANDARD
+        model: gpt-6-sol
+        reasoning_effort: medium
+        cost_rank: 20
+
+      deep:
+        quality_tier: COMPLEX
+        model: gpt-6-astra
+        reasoning_effort: high
+        cost_rank: 30
+
+  - worker_id: oscar
+    display_name: Yannick
+    enabled: true
+    provider: openai
+    backend: codex
+    priority: 90
+
+    capabilities:
+      - development
+      - release_planning
+      - roadmap_synthesis
+      - complexity_estimation
+      - qa_testing
+
+    default_profile_id: standard
+    estimator_profile_id: economy
+
+    profiles:
+      economy:
+        quality_tier: SIMPLE
+        model: gpt-6-luna
+        reasoning_effort: low
+        cost_rank: 10
+
+      standard:
+        quality_tier: STANDARD
+        model: gpt-6-sol
+        reasoning_effort: medium
+        cost_rank: 20
+
+      deep:
+        quality_tier: COMPLEX
+        model: gpt-6-astra
+        reasoning_effort: high
+        cost_rank: 30
+
+  # Mistral (Vibe). Priority deliberately below the validated Anthropic/
+  # OpenAI pool (100/90): this adds capacity/provider diversity, it
+  # never silently displaces an already-validated primary. Only
+  # `development` is granted — only development-shaped execution
+  # evidence exists for this provider.
+  - worker_id: milo
+    display_name: Nathaniel
+    enabled: true
+    provider: mistral
+    backend: vibe
+    priority: 60
+
+    capabilities:
+      - development
+
+    default_profile_id: standard
+    estimator_profile_id: standard
+
+    profiles:
+      standard:
+        quality_tier: STANDARD
+        model: vibe-default
+        cost_rank: 20
+
+  - worker_id: juno
+    display_name: Juno
+    enabled: true
+    provider: mistral
+    backend: vibe
+    priority: 60
+
+    capabilities:
+      - development
+
+    default_profile_id: standard
+    estimator_profile_id: standard
+
+    profiles:
+      standard:
+        quality_tier: STANDARD
+        model: vibe-default
+        cost_rank: 20
+
+  # Gravity (P19/P20, ROADMAP.md §13) — `agy` CLI, reusing the exact
+  # custom-backend mechanism already proven by Vibe
+  # (`gravity_ralph_bridge.py`). Real, verified (P19 Phase A + P20): `agy`
+  # 1.2.12, `--mode=accept-edits` alone (no bypass) genuinely
+  # non-interactive, `claude-sonnet-4-6` a real, selectable model id
+  # (`agy models`) — never a sentinel. No reasoning_effort: `--effort`
+  # exists but `agy` itself rejects it for this model. Real quota
+  # telemetry via `agy -p "/usage" --output-format json`
+  # (`GravityAdapter`) — no longer EXECUTION_PROBE_ONLY (P20 upgraded
+  # this once `/usage` was verified real and free of any model turn).
+  # `gravity` is the provider/backend identifier, never a worker
+  # display_name (P20 product decision) — exactly two human worker
+  # identities below, same convention as every other provider
+  # (primary=101/secondary=91, mirroring the 100/90 split used
+  # elsewhere): Arthur (primary, DEV A-eligible) and Nora (secondary,
+  # independent reviewer/fallback). Both share the exact same
+  # `GravityAdapter`-probed `ProviderState` — one shared account quota,
+  # never a second, independent one per worker.
+  - worker_id: gravity_primary
+    display_name: Arthur
+    enabled: true
+    provider: gravity
+    backend: gravity
+    priority: 101
+
+    capabilities:
+      - development
+
+    default_profile_id: standard
+    estimator_profile_id: standard
+
+    profiles:
+      standard:
+        quality_tier: STANDARD
+        model: claude-sonnet-4-6
+        cost_rank: 20
+
+  - worker_id: gravity_secondary
+    display_name: Nora
+    enabled: true
+    provider: gravity
+    backend: gravity
+    priority: 91
+
+    capabilities:
+      - development
+
+    default_profile_id: standard
+    estimator_profile_id: standard
+
+    profiles:
+      standard:
+        quality_tier: STANDARD
+        model: claude-sonnet-4-6
+        cost_rank: 20
+
+  # Separate governance identities and Ralph sessions. The same provider
+  # and model are declared honestly; this is worker independence, not
+  # provider or model diversity. The engine enforces author != reviewer.
+  - worker_id: qwen_developer
+    display_name: Qwen Developer
+    enabled: true
+    provider: ollama
+    backend: codex
+    priority: 110
+
+    capabilities:
+      - development
+
+    default_profile_id: standard
+    estimator_profile_id: standard
+
+    profiles:
+      standard:
+        quality_tier: STANDARD
+        model: qwen3.5:9b
+        cost_rank: 0
+
+  - worker_id: qwen_reviewer
+    display_name: Qwen Reviewer
+    enabled: true
+    provider: ollama
+    backend: codex
+    priority: 109
+
+    capabilities:
+      - development
+
+    default_profile_id: standard
+    estimator_profile_id: standard
+
+    profiles:
+      standard:
+        quality_tier: STANDARD
+        model: qwen3.5:9b
+        cost_rank: 0
