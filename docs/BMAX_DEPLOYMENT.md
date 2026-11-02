@@ -27,6 +27,11 @@ executed: original launchers/registry restored byte-for-byte, old versions
 0.2.2/0.2.1 observed, dedicated service stopped. Reactivation then passed.
 Structured evidence: [M36_ACCEPTANCE.json](M36_ACCEPTANCE.json).
 
+The runtime still reports the aggregate MVP status as `running` and retains
+a historical wait record for WI-M3.6-02, while both WorkItems are `completed`
+and no worker is active. These stored historical fields were not rewritten
+to manufacture a terminal milestone status.
+
 ## Local configuration
 
 Use the global [BMAX registry example](../examples/bmax-workers.yaml).
