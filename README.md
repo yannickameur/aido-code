@@ -87,7 +87,7 @@ becomes its own product, here.
 ## Quick start
 
 AIDO Code and its engine are published as GitHub Releases, not on PyPI.
-After the v0.2.3 release is published, install both wheels in a fresh environment:
+Install the released v0.2.3 frontend and v0.2.2 engine in a fresh environment:
 
 ```bash
 python3 -m venv .venv
@@ -97,8 +97,9 @@ pip install \
   https://github.com/yannickameur/aido-code/releases/download/v0.2.3/aido_code-0.2.3-py3-none-any.whl
 ```
 
-For rollback, keep the previous v0.2.2 AIDO environment and switch the
-launcher back to it; do not downgrade packages in the new environment.
+For rollback, keep the previous v0.2.2 AIDO environment and restore its
+launcher and compatible global worker registry together; do not downgrade
+packages in the new environment. See [BMAX deployment and rollback](docs/BMAX_DEPLOYMENT.md).
 
 AIDO Code requires `ai-dev-orchestrator>=0.2.2,<0.3`. No sibling checkout
 and no manual worker configuration are needed: AIDO Code resolves its own

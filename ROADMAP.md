@@ -56,7 +56,8 @@ decision belongs to the engine.
 | M3.5 — Terminal reliability fix (workers isolated from the terminal, reliable exits, /export) | `DONE` (2026-10-10) |
 | Release v0.2.1 (corrective, M3.5 only; engine stays v0.2.0) | `DONE` (2026-10-10) |
 | Release v0.2.2 (`aido version` / `aido v`, `/version` / `/v`; engine v0.2.1) | `DONE` (2026-10-11) |
-| M3.6 — Two priority local Qwen workers (BMAX / Ollama / Ralph) | `APPROVED FOR GOVERNED IMPLEMENTATION` (2026-10-31), depends on engine P2; not yet run |
+| M3.6 — Two priority local Qwen workers (BMAX / Ollama / Ralph) | `DONE` (2026-11-02) — WI-M3.6-01/02 completed; 461 tests, real Qwen acceptance, CI and deployment PASS |
+| Release v0.2.3 (engine v0.2.2, BMAX deployment and tested rollback) | `DONE` (2026-11-02) |
 | M4 — Non-interactive mode | `À VOTER` |
 | M5 — Structured output | `À VOTER` |
 | M6 — Doctor/diagnostics | `À VOTER` |
@@ -76,7 +77,7 @@ observed; suppression is proven by deterministic synthetic tests.
 
 ## Future work
 
-### M3.6 — Two priority local Qwen workers (approved, not yet executed)
+### M3.6 — Two priority local Qwen workers (governed implementation completed)
 
 **2026-10-31 decision:** prioritize this over M4-M6. Track through [AIDO Code issue #17](https://github.com/yannickameur/aido-code/issues/17) and [engine P2 issue #63](https://github.com/yannickameur/ai-dev-orchestrator/issues/63). Run locally on **BMAX Ubuntu** against GitHub repositories, not GitLab or Mac; no iOS/SwiftUI, new UI, or unrelated scope.
 
@@ -109,7 +110,7 @@ Acceptance criteria:
 - Run real BMAX AIDO→Ralph→Qwen DEV A→different Qwen DEV B→deterministic QA PASS→governed Git merge on a disposable Git project. Verify BMAX/Ollama is the actual inference source; no false success.
 - Publish only with passing tests, governed acceptance and documented rollback. Indicative target `v0.2.3` after engine v0.2.2 (confirm actual tags); GitHub wheel, sdist, checksums; no PyPI.
 
-**State gate:** the `## Current milestone` block below still describes historical M3.5, although M3.5 is DONE. Do not replace it or edit persisted SQLite merely to start M3.6. First check local AIDO state on BMAX, prepare the compatible new current milestone in the required `docs/PROJECT_CONTRACT.md` grammar, run `aido validate`, then explicitly approve/start its governed run. This roadmap preparation alone does not attest a running engine or completed QA.
+**State gate verified:** local persisted state was inspected before switching the current milestone to M3.6. WI-M3.6-01 and WI-M3.6-02 completed through the installed stable AIDO controller, distinct DEV phases, deterministic QA and governed merge. The final QA passed 461 tests on `904195e`; PR #19 merged the identical source tree at `be76fc6` with Python 3.10/3.12 CI green. The current milestone contract below remains unchanged for persisted-state compatibility. Final release/deployment evidence is recorded separately in [BMAX deployment](docs/BMAX_DEPLOYMENT.md).
 
 ### M4 — Non-interactive mode
 
@@ -189,17 +190,19 @@ create a new agent, launch a development cycle, or reorder M4-M6 now.
 
 ### Known constraints
 
-- The engine is published as GitHub Release v0.2.2; AIDO Code v0.2.3 is
-  prepared but unreleased and requires `ai-dev-orchestrator>=0.2.2,<0.3`.
-  AIDO Code v0.2.2 remains the latest published release. PyPI publication
-  is a separate, undecided step.
+- Engine v0.2.2 and AIDO Code v0.2.3 are published as GitHub Releases
+  with wheel, sdist and verified checksums. AIDO Code requires
+  `ai-dev-orchestrator>=0.2.2,<0.3`. BMAX activation and actual rollback
+  are verified in [deployment evidence](docs/M36_ACCEPTANCE.json).
+  PyPI publication remains a separate, undecided step.
 
 ## Next milestone to discuss
 
-M3.5 and release v0.2.2 are DONE. M3.6 (two local Qwen priority workers) is
-the approved current milestone, dependent on engine P2. Live BMAX acceptance
-and publication remain operator steps after governed implementation and QA;
-M4 remains deferred.
+M3.6, engine v0.2.2 and AIDO Code v0.2.3 are DONE: governed implementation,
+full offline suites, green CI, two real sequential Qwen sessions, deterministic
+QA, governed merge, published artifacts, deployment and exercised rollback.
+The current milestone contract below is preserved to match persisted state.
+M4 remains deferred pending a separate vote.
 
 The interruption defect found during the M3.3 real acceptance (a surviving
 `ralph` kept working and committing after Ctrl+C) is fixed in

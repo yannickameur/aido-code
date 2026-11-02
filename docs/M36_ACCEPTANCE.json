@@ -1,0 +1,154 @@
+{
+  "recorded_at": "2026-11-02T06:53:55.403546+00:00",
+  "project_id": "m36-qwen-acceptance-08",
+  "work_item_id": "LIVE-QWEN-08",
+  "frontend_source_commit": "904195e3e5bdb3f1ea6bd3a595a6a50519b97da6",
+  "engine_release": "v0.2.2",
+  "frontend_version": "0.2.3",
+  "artifacts": {
+    "aido_code-0.2.3.tar.gz": "632fe926677e648fdc478c67bd6260ec2fe83a26bff6b4fbdd898a285daa49dc",
+    "aido_code-0.2.3-py3-none-any.whl": "8d7983bcbfb914cc9a71e12b4886e73681bb48b2eb6e63173d546e7e7b2abe7f"
+  },
+  "executions": [
+    {
+      "execution_id": "30dbd76c7b304c6db8ca0930c6b4f273",
+      "worker_id": "qwen_developer",
+      "provider": "ollama",
+      "backend": "codex",
+      "model": "qwen3.5:9b",
+      "role": "developer",
+      "started_at": "2026-11-02T06:46:28.509784+00:00",
+      "finished_at": "2026-11-02T06:49:47.768469+00:00",
+      "status": "succeeded",
+      "exit_code": 0,
+      "ralph_loop_id": "primary-20261102-064628",
+      "git_sha_before": "7f6065316f2f03bb1b5d586702b538c35a882238",
+      "git_sha_after": "0bfa9a6b271c81cc72336370a2c7bd45e79e345a",
+      "permission_mode": "standard"
+    },
+    {
+      "execution_id": "6777bb02f38c4ba5834bc651296d9248",
+      "worker_id": "qwen_reviewer",
+      "provider": "ollama",
+      "backend": "codex",
+      "model": "qwen3.5:9b",
+      "role": "developer",
+      "started_at": "2026-11-02T06:49:51.757791+00:00",
+      "finished_at": "2026-11-02T06:52:13.720478+00:00",
+      "status": "succeeded",
+      "exit_code": 0,
+      "ralph_loop_id": "primary-20261102-064951",
+      "git_sha_before": "0bfa9a6b271c81cc72336370a2c7bd45e79e345a",
+      "git_sha_after": "0bfa9a6b271c81cc72336370a2c7bd45e79e345a",
+      "permission_mode": "standard"
+    }
+  ],
+  "qa": [
+    {
+      "run_id": "a38be39e8c1a46859426e7111f978bc3",
+      "work_item_id": "LIVE-QWEN-08",
+      "expected_head_sha": "0bfa9a6b271c81cc72336370a2c7bd45e79e345a",
+      "status": "completed",
+      "verdict_status": "pass",
+      "verdict_reason": "all mandatory QA evidence present and passing for the current head SHA"
+    }
+  ],
+  "git": [
+    {
+      "work_item_id": "LIVE-QWEN-08",
+      "status": "merged",
+      "base_sha": "7f6065316f2f03bb1b5d586702b538c35a882238",
+      "current_head_sha": "0bfa9a6b271c81cc72336370a2c7bd45e79e345a",
+      "merged_sha": "0bfa9a6b271c81cc72336370a2c7bd45e79e345a",
+      "merged_at": "2026-11-02T06:52:13.968302+00:00"
+    }
+  ],
+  "protected_recipe_files_unchanged": true,
+  "operator_guidance": "No runtime guidance was needed in LIVE-QWEN-08.",
+  "model_observation": {
+    "models": [
+      {
+        "name": "qwen3.5:9b",
+        "model": "qwen3.5:9b",
+        "size": 6164200816,
+        "digest": "56671c2ab9385f9cfcb404638e32cd62d88e3501d44822208363c010179a3c90",
+        "details": {
+          "parent_model": "",
+          "format": "gguf",
+          "family": "qwen35",
+          "families": [
+            "qwen35"
+          ],
+          "parameter_size": "9.0B",
+          "quantization_level": "Q4_K_M"
+        },
+        "expires_at": "2026-11-02T07:53:45.17795763+01:00",
+        "size_vram": 6164200816,
+        "context_length": 16384,
+        "runner": "llamacpp"
+      }
+    ]
+  },
+  "commands_verified": [
+    "/workers",
+    "/status",
+    "/status --probe",
+    "/version",
+    "/v",
+    "aido version",
+    "aido v"
+  ],
+  "offline_tests": {
+    "engine": 1541,
+    "frontend_governed": 461,
+    "frontend_installed_wheel": 461
+  },
+  "failed_endpoint_probe": {
+    "ollama": "provider_error",
+    "local_quota": "unknown",
+    "openai": "available"
+  },
+  "earlier_corrective_review": "Engine docs/P2_ACCEPTANCE.json records LIVE-QWEN-06 corrective Qwen review; the operator clarified its existing Unicode criterion.",
+  "earlier_failed_recipe": "LIVE-QWEN-07 failed on Ollama prediction aborted/token repeat limit reached and was interrupted during recovery. Restarting only the dedicated Ollama server restored identical tool-call probes; no model, context or worker config change was made.",
+  "discarded_nested_attempt": "Earlier M3.6 cloud DEV A attempted an out-of-scope nested run under /var/tmp. It was interrupted; AIDO recovered normally. No acceptance PASS is claimed for it.",
+  "frontend_release_commit": "be76fc6d4508045bc0eab5bd1376b4fd7498cf40",
+  "source_tree": "a9af512a613af2dc00bd181e844b693e90e3fe8d",
+  "sdist_rebuild_matches_wheel": true,
+  "deployment": {
+    "observed_at": "2026-11-02T06:57:07.695244+00:00",
+    "active_frontend": "0.2.3",
+    "active_engine": "0.2.2",
+    "venv": "venv-0.2.3",
+    "previous_venvs_preserved": true,
+    "launchers": [
+      "aido",
+      "aido-code"
+    ],
+    "dedicated_user_service": "aido-ollama.service",
+    "unit_active": true,
+    "unit_enabled": true,
+    "startup": "user session; lingering unchanged/disabled",
+    "shared_ollama_service_unchanged": true,
+    "global_local_first_enabled": true,
+    "existing_cloud_override_preserved": true,
+    "rollback_executed_and_verified": true,
+    "rollback_versions": [
+      "aido-code 0.2.2",
+      "ai-dev-orchestrator 0.2.1"
+    ],
+    "reactivation_verified": true,
+    "installed_commands_verified": true,
+    "managed_service_inference_smoke": "pass",
+    "context_length": 16384
+  },
+  "ci": {
+    "pr": "https://github.com/yannickameur/aido-code/pull/19",
+    "pr_run": "https://github.com/yannickameur/aido-code/actions/runs/41310719464",
+    "main_run": "https://github.com/yannickameur/aido-code/actions/runs/41351255830",
+    "python_versions": [
+      "3.10",
+      "3.12"
+    ],
+    "conclusion": "success"
+  }
+}
