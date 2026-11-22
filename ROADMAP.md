@@ -279,9 +279,10 @@ Capabilities: development
 
 Acceptance criteria:
 
-- Reuse `interpret()` for `STATUS` and `RUN`. Cover documented English requests such as `status` and `continue the project` and explicitly recognize French `continue le projet`, `lancer le projet`, `continuer le projet`, `reprendre le projet` and `l'état du projet` in the same deterministic router. Cover case, surrounding whitespace and terminal punctuation, including a typographic apostrophe in the French status phrase.
+- Reuse `interpret()` for `STATUS` and `RUN`. Cover documented English requests such as `status` and `continue the project` and explicitly recognize French `continue le projet`, `lancer le projet`, `continuer le projet`, `démarrer le projet`, `reprendre le projet` and `l'état du projet` in the same deterministic router. Cover case, surrounding whitespace and terminal punctuation, including a typographic apostrophe in the French status phrase.
 - Treat negations, mixed intents and unrecognized requests as unsupported. Keep `workers` and `why_waiting` in the interactive interface. Test that rejected requests and a run against a `DRAFT` plan do not reach engine execution or any provider.
 - Reuse `build_status_output()` with probing disabled and keep the existing modern run path shared with explicit `aido run`. Use `load_project_command_context()`, the typed engine plan, `EngineClient.from_config()` and `run_interruptibly()`. Retain typed `RunResult` through the CLI decision. Interactive REPL/session behavior remains compatible.
+- The v0.2.2 worker and QA launchers inherit fd 0. For `-p` runs, isolate it in the CLI once the request is read so child processes see EOF instead of the caller's TTY or pipe. Use the existing `/dev/null` approach and restore the descriptor on return, error and interruption. Verify EOF and restoration in an offline test.
 - Test status parity with `aido status` and correct project selection from the current directory. Test that a run dispatches once through the typed engine client, including a second invocation that uses the same engine recovery path. No direct Ralph/provider calls, second orchestrator or new natural-language engine.
 
 #### WI-M4-03 — Output, exit codes and regression coverage
